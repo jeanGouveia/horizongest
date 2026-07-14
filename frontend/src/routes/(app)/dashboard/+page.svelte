@@ -105,6 +105,20 @@
       </div>
     </div>
 
+    <!-- AJUSTES DE ESTOQUE -->
+    <div class="module-card module-card--secondary">
+      <div class="module-icon">📦</div>
+      <div class="module-body">
+        <h2 class="module-title">Ajustes de Estoque</h2>
+        <p class="module-desc">
+          Aprove ou rejeite ajustes de estoque pendentes de pedidos cancelados.
+        </p>
+      </div>
+      <div class="module-actions">
+        <a href="/stock-adjustments" class="btn btn-secondary">Ver Ajustes</a>
+      </div>
+    </div>
+
     <!-- FLUXO DE TESTES -->
     <div class="module-card module-card--guide">
       <div class="module-icon">🧪</div>

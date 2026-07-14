@@ -117,6 +117,8 @@ func (s *OrderService) GetOrder(ctx context.Context, id uint) (*domain.Order, er
 }
 
 func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in UpdateOrderStatusInput) (*domain.Order, error) {
+	log.Printf("[SERVICE] UpdateOrderStatus chamado: order_id=%d, new_status=%s", id, in.Status)
+
 	order, err := s.orderRepo.FindOrderByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("OrderService.UpdateOrderStatus: %w", err)
@@ -131,11 +133,14 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 		return nil, fmt.Errorf("transição inválida: %s → %s", order.Status, newStatus)
 	}
 
+	log.Printf("[SERVICE] Status atual=%s, novo status=%s", order.Status, newStatus)
+
 	// Se o pedido está sendo cancelado, usar transação atômica para:
 	// 1. Atualizar status do pedido
 	// 2. Registrar ajustes pendentes
 	// Garante consistência: ou ambos sucedem, ou ambos falham
 	if newStatus == domain.OrderStatusCancelled {
+		log.Printf("[SERVICE] Entrou em condição de cancelamento")
 		// Carregar fichas técnicas dos produtos do pedido
 		productIngredients := make(map[uint][]domain.ProductIngredient)
 		for _, item := range order.Items {
@@ -143,8 +148,12 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 			if err != nil {
 				return nil, fmt.Errorf("OrderService.UpdateOrderStatus: carregar ficha técnica produto_id=%d: %w", item.ProductID, err)
 			}
+			log.Printf("[SERVICE] Produto %d tem %d ingredientes", item.ProductID, len(ingredients))
 			productIngredients[item.ProductID] = ingredients
 		}
+
+		log.Printf("[SERVICE] Total de produtos com ficha técnica: %d", len(productIngredients))
+		log.Printf("[SERVICE] Total de itens no pedido: %d", len(order.Items))
 
 		// Executar atualização de status e registro de ajustes em transação atômica
 		if err := s.orderRepo.UpdateOrderStatusWithAdjustments(
@@ -154,8 +163,10 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 			productIngredients,
 			order.Items,
 		); err != nil {
+			log.Printf("[SERVICE] Erro em UpdateOrderStatusWithAdjustments: %v", err)
 			return nil, fmt.Errorf("OrderService.UpdateOrderStatus: %w", err)
 		}
+		log.Printf("[SERVICE] UpdateOrderStatusWithAdjustments concluído com sucesso")
 	} else {
 		// Para outros status, apenas atualizar o status
 		if err := s.orderRepo.UpdateOrderStatus(ctx, id, newStatus); err != nil {

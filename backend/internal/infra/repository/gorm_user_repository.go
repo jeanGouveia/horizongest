@@ -12,16 +12,16 @@ import (
 	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
 )
 
-type gormUserModel struct {
-	ID           uint   `gorm:"primaryKey;autoIncrement"` 
-	Name         string `gorm:"not null"` 
-	Email        string `gorm:"uniqueIndex;not null"` 
-	PasswordHash string `gorm:"not null"` 
+type GormUserModel struct {
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	Name         string `gorm:"not null"`
+	Email        string `gorm:"uniqueIndex;not null"`
+	PasswordHash string `gorm:"not null"`
 	CreatedAt    int64  `gorm:"autoCreateTime"`
 	UpdatedAt    int64  `gorm:"autoUpdateTime"`
 }
 
-func (gormUserModel) TableName() string { return "users" }
+func (GormUserModel) TableName() string { return "users" }
 
 var _ ports.UserRepository = (*GormUserRepository)(nil)
 
@@ -34,7 +34,7 @@ func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 }
 
 func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) error {
-	model := gormUserModel{
+	model := GormUserModel{
 		Name:         user.Name,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
@@ -49,7 +49,7 @@ func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) erro
 }
 
 func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	var model gormUserModel
+	var model GormUserModel
 	err := r.db.WithContext(ctx).Where("email = ?", email).First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -61,7 +61,7 @@ func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*do
 }
 
 func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
-	var model gormUserModel
+	var model GormUserModel
 	err := r.db.WithContext(ctx).First(&model, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -72,7 +72,7 @@ func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 	return toDomainUser(&model), nil
 }
 
-func toDomainUser(m *gormUserModel) *domain.User {
+func toDomainUser(m *GormUserModel) *domain.User {
 	return &domain.User{
 		ID:           m.ID,
 		Name:         m.Name,

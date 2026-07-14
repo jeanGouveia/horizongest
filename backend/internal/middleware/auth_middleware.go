@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 
@@ -23,27 +24,35 @@ func NewAuthMiddleware(authService *service.AuthService) *AuthMiddleware {
 
 func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[MIDDLEWARE] Request recebida: %s %s", r.Method, r.URL.Path)
+
 		var token string
 
 		// Estratégia 1: Cookie HttpOnly (produção)
 		if cookie, err := r.Cookie("auth_token"); err == nil {
 			token = cookie.Value
+			log.Printf("[MIDDLEWARE] Token encontrado no cookie")
+		} else {
+			log.Printf("[MIDDLEWARE] Cookie não encontrado: %v", err)
 		}
 
 		// Estratégia 2: Authorization header (dev / Postman)
 		if token == "" {
 			if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 				token = strings.TrimPrefix(h, "Bearer ")
+				log.Printf("[MIDDLEWARE] Token encontrado no header Authorization")
 			}
 		}
 
 		if token == "" {
+			log.Printf("[MIDDLEWARE] Token não encontrado - retornando 401")
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
 
 		claims, err := m.authService.ValidateToken(token)
 		if err != nil {
+			log.Printf("[MIDDLEWARE] Token inválido: %v", err)
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
@@ -52,6 +61,7 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), ContextKeyUserID, claims.UserID)
 		ctx = context.WithValue(ctx, ContextKeyClaims, claims)
 
+		log.Printf("[MIDDLEWARE] UserID injetado no contexto: %d", claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

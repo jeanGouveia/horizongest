@@ -101,6 +101,54 @@ func (s *StockAdjustmentService) ListPendingAdjustments(
 	return adjustments, nil
 }
 
+// ListPendingAdjustmentsWithFilters lista ajustes com filtros opcionais
+func (s *StockAdjustmentService) ListPendingAdjustmentsWithFilters(
+	ctx context.Context,
+	statusFilter string,
+	orderIDFilter *uint,
+	ingredientIDFilter *uint,
+) ([]domain.StockAdjustmentPending, error) {
+	var adjustments []domain.StockAdjustmentPending
+	var err error
+
+	// Se não há filtros, usar método existente
+	if statusFilter == "" && orderIDFilter == nil && ingredientIDFilter == nil {
+		adjustments, err = s.stockAdjustmentRepo.ListPending(ctx)
+	} else {
+		// Aplicar filtros no nível de aplicação (simplificado para MVP)
+		adjustments, err = s.stockAdjustmentRepo.ListPending(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("ListPendingAdjustmentsWithFilters: %w", err)
+		}
+
+		// Filtrar em memória (para MVP, pode ser otimizado com query SQL no futuro)
+		filtered := make([]domain.StockAdjustmentPending, 0)
+		for _, adj := range adjustments {
+			if statusFilter != "" && string(adj.Status) != statusFilter {
+				continue
+			}
+			if orderIDFilter != nil && adj.OrderID != *orderIDFilter {
+				continue
+			}
+			if ingredientIDFilter != nil && adj.IngredientID != *ingredientIDFilter {
+				continue
+			}
+			filtered = append(filtered, adj)
+		}
+		adjustments = filtered
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("ListPendingAdjustmentsWithFilters: %w", err)
+	}
+	return adjustments, nil
+}
+
+// ListPending lista todos os ajustes pendentes (sem filtros)
+func (s *StockAdjustmentService) ListPending(ctx context.Context) ([]domain.StockAdjustmentPending, error) {
+	return s.stockAdjustmentRepo.ListPending(ctx)
+}
+
 // GetAdjustmentsByOrder lista todos os ajustes (todos os status) para um pedido
 func (s *StockAdjustmentService) GetAdjustmentsByOrder(
 	ctx context.Context, orderID uint,
@@ -148,44 +196,55 @@ func (s *StockAdjustmentService) GetAdjustmentByID(
 	return adjustment, nil
 }
 
-// ApproveAdjustment aprova um ajuste de estoque pendente
-// NOTA: Este método apenas marca como aprovado. A devolução efetiva do estoque
-// deve ser implementada separadamente com validações específicas de negócio
+// ApproveAdjustment aprova um ajuste de estoque pendente e repõe o estoque do ingrediente.
 func (s *StockAdjustmentService) ApproveAdjustment(
-	ctx context.Context, id uint,
-) (*domain.StockAdjustmentPending, error) {
-	adjustment, err := s.GetAdjustmentByID(ctx, id)
+	ctx context.Context, id uint, processedBy uint, notes string,
+) error {
+	// Verificar se o ajuste existe e está pendente
+	adjustment, err := s.stockAdjustmentRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("ApproveAdjustment: %w", err)
 	}
 	if adjustment == nil {
-		return nil, ErrStockAdjustmentNotFound
+		return ErrStockAdjustmentNotFound
 	}
 
-	if err := s.stockAdjustmentRepo.UpdateStatus(ctx, id, domain.StockAdjustmentStatusApproved); err != nil {
-		return nil, fmt.Errorf("ApproveAdjustment: %w", err)
+	// Validar status
+	if adjustment.Status != domain.StockAdjustmentStatusPending {
+		return fmt.Errorf("ajuste já processado (status: %s)", adjustment.Status)
 	}
 
-	adjustment.Status = domain.StockAdjustmentStatusApproved
-	return adjustment, nil
+	// Aprovar e repor estoque em transação atômica
+	if err := s.stockAdjustmentRepo.ApproveAndRestoreStock(ctx, id, processedBy, notes); err != nil {
+		return fmt.Errorf("ApproveAdjustment: %w", err)
+	}
+
+	return nil
 }
 
 // RejectAdjustment rejeita um ajuste de estoque pendente
+// Não altera estoque, apenas registra decisão operacional
 func (s *StockAdjustmentService) RejectAdjustment(
-	ctx context.Context, id uint,
-) (*domain.StockAdjustmentPending, error) {
-	adjustment, err := s.GetAdjustmentByID(ctx, id)
+	ctx context.Context, id uint, processedBy uint, notes string,
+) error {
+	// Verificar se o ajuste existe e está pendente
+	adjustment, err := s.stockAdjustmentRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("RejectAdjustment: %w", err)
 	}
 	if adjustment == nil {
-		return nil, ErrStockAdjustmentNotFound
+		return ErrStockAdjustmentNotFound
 	}
 
-	if err := s.stockAdjustmentRepo.UpdateStatus(ctx, id, domain.StockAdjustmentStatusRejected); err != nil {
-		return nil, fmt.Errorf("RejectAdjustment: %w", err)
+	// Validar status
+	if adjustment.Status != domain.StockAdjustmentStatusPending {
+		return fmt.Errorf("ajuste já processado (status: %s)", adjustment.Status)
 	}
 
-	adjustment.Status = domain.StockAdjustmentStatusRejected
-	return adjustment, nil
+	// Rejeitar no repository
+	if err := s.stockAdjustmentRepo.Reject(ctx, id, processedBy, notes); err != nil {
+		return fmt.Errorf("RejectAdjustment: %w", err)
+	}
+
+	return nil
 }

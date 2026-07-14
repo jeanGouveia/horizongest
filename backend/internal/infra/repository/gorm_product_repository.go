@@ -14,7 +14,7 @@ import (
 
 // ─── GORM models ────────────────────────────────────────────────────────────
 
-type gormProduct struct {
+type GormProduct struct {
 	ID          uint   `gorm:"primaryKey;autoIncrement"`
 	Name        string `gorm:"not null"`
 	Description string
@@ -25,9 +25,9 @@ type gormProduct struct {
 	UpdatedAt   int64   `gorm:"autoUpdateTime"`
 }
 
-func (gormProduct) TableName() string { return "products" }
+func (GormProduct) TableName() string { return "products" }
 
-type gormIngredient struct {
+type GormIngredient struct {
 	ID            uint    `gorm:"primaryKey;autoIncrement"`
 	Name          string  `gorm:"not null"`
 	Unit          string  `gorm:"not null;default:'un'"`
@@ -38,17 +38,17 @@ type gormIngredient struct {
 	UpdatedAt     int64   `gorm:"autoUpdateTime"`
 }
 
-func (gormIngredient) TableName() string { return "ingredients" }
+func (GormIngredient) TableName() string { return "ingredients" }
 
-type gormProductIngredient struct {
+type GormProductIngredient struct {
 	ID           uint           `gorm:"primaryKey;autoIncrement"`
 	ProductID    uint           `gorm:"not null;index"`
 	IngredientID uint           `gorm:"not null"`
 	Quantity     float64        `gorm:"not null"`
-	Ingredient   gormIngredient `gorm:"foreignKey:IngredientID"`
+	Ingredient   GormIngredient `gorm:"foreignKey:IngredientID"`
 }
 
-func (gormProductIngredient) TableName() string { return "product_ingredients" }
+func (GormProductIngredient) TableName() string { return "product_ingredients" }
 
 // ─── Repository ─────────────────────────────────────────────────────────────
 
@@ -63,7 +63,7 @@ func NewGormProductRepository(db *gorm.DB) *GormProductRepository {
 // ── Produto ──────────────────────────────────────────────────────────────────
 
 func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Product) error {
-	m := gormProduct{
+	m := GormProduct{
 		Name: p.Name, Description: p.Description,
 		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
 	}
@@ -77,7 +77,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 }
 
 func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*domain.Product, error) {
-	var m gormProduct
+	var m GormProduct
 	err := r.db.WithContext(ctx).First(&m, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -89,7 +89,7 @@ func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*
 }
 
 func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Product, error) {
-	var ms []gormProduct
+	var ms []GormProduct
 	if err := r.db.WithContext(ctx).Where("active = ?", true).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListProducts: %w", err)
 	}
@@ -101,7 +101,7 @@ func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Prod
 }
 
 func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Product) error {
-	m := gormProduct{
+	m := GormProduct{
 		ID: p.ID, Name: p.Name, Description: p.Description,
 		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
 	}
@@ -113,7 +113,7 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 
 func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) error {
 	// Soft delete: marca Active=false
-	if err := r.db.WithContext(ctx).Model(&gormProduct{}).
+	if err := r.db.WithContext(ctx).Model(&GormProduct{}).
 		Where("id = ?", id).Update("active", false).Error; err != nil {
 		return fmt.Errorf("DeleteProduct: %w", err)
 	}
@@ -123,7 +123,7 @@ func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) erro
 // ── Ingrediente ──────────────────────────────────────────────────────────────
 
 func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.Ingredient) error {
-	m := gormIngredient{
+	m := GormIngredient{
 		Name: i.Name, Unit: i.Unit,
 		StockQuantity: i.StockQuantity, MinStock: i.MinStock,
 		Active: true,
@@ -139,7 +139,7 @@ func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.
 }
 
 func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint) (*domain.Ingredient, error) {
-	var m gormIngredient
+	var m GormIngredient
 	err := r.db.WithContext(ctx).First(&m, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -151,7 +151,7 @@ func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint)
 }
 
 func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.Ingredient, error) {
-	var ms []gormIngredient
+	var ms []GormIngredient
 	if err := r.db.WithContext(ctx).Where("active = ?", true).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListIngredients: %w", err)
 	}
@@ -163,7 +163,7 @@ func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.I
 }
 
 func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.Ingredient) error {
-	m := gormIngredient{
+	m := GormIngredient{
 		ID: i.ID, Name: i.Name, Unit: i.Unit,
 		StockQuantity: i.StockQuantity, MinStock: i.MinStock,
 		Active: i.Active,
@@ -176,7 +176,7 @@ func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.
 
 func (r *GormProductRepository) DeleteIngredient(ctx context.Context, id uint) error {
 	// Soft delete: marca Active=false
-	if err := r.db.WithContext(ctx).Model(&gormIngredient{}).
+	if err := r.db.WithContext(ctx).Model(&GormIngredient{}).
 		Where("id = ?", id).Update("active", false).Error; err != nil {
 		return fmt.Errorf("DeleteIngredient: %w", err)
 	}
@@ -191,11 +191,11 @@ func (r *GormProductRepository) SetProductIngredients(
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Apaga ficha anterior e recria (upsert simples)
 		if err := tx.Where("product_id = ?", productID).
-			Delete(&gormProductIngredient{}).Error; err != nil {
+			Delete(&GormProductIngredient{}).Error; err != nil {
 			return fmt.Errorf("SetProductIngredients delete: %w", err)
 		}
 		for _, item := range items {
-			m := gormProductIngredient{
+			m := GormProductIngredient{
 				ProductID:    productID,
 				IngredientID: item.IngredientID,
 				Quantity:     item.Quantity,
@@ -211,7 +211,7 @@ func (r *GormProductRepository) SetProductIngredients(
 func (r *GormProductRepository) GetProductIngredients(
 	ctx context.Context, productID uint,
 ) ([]domain.ProductIngredient, error) {
-	var ms []gormProductIngredient
+	var ms []GormProductIngredient
 	if err := r.db.WithContext(ctx).
 		Preload("Ingredient").
 		Where("product_id = ?", productID).Find(&ms).Error; err != nil {
@@ -245,7 +245,7 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 
 	// Usa UPDATE com CHECK inline para garantir que não vai negativo
 	result := db.
-		Model(&gormIngredient{}).
+		Model(&GormIngredient{}).
 		Where("id = ? AND stock_quantity >= ?", ingredientID, qty).
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity - ?", qty))
 
@@ -261,9 +261,33 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 	return nil
 }
 
+func (r *GormProductRepository) IncreaseIngredientStock(
+	ctx context.Context, ingredientID uint, qty float64, txDB *gorm.DB,
+) error {
+	db := r.db
+	if txDB != nil {
+		db = txDB.WithContext(ctx)
+	} else {
+		db = db.WithContext(ctx)
+	}
+
+	result := db.
+		Model(&GormIngredient{}).
+		Where("id = ?", ingredientID).
+		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity + ?", qty))
+
+	if result.Error != nil {
+		return fmt.Errorf("IncreaseIngredientStock id=%d: %w", ingredientID, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("ingrediente id=%d não encontrado", ingredientID)
+	}
+	return nil
+}
+
 // ── Mappers ──────────────────────────────────────────────────────────────────
 
-func productToDomain(m *gormProduct) *domain.Product {
+func productToDomain(m *GormProduct) *domain.Product {
 	return &domain.Product{
 		ID: m.ID, Name: m.Name, Description: m.Description,
 		Price: m.Price, IsComposto: m.IsComposto, Active: m.Active,
@@ -271,7 +295,7 @@ func productToDomain(m *gormProduct) *domain.Product {
 	}
 }
 
-func ingredientToDomain(m *gormIngredient) *domain.Ingredient {
+func ingredientToDomain(m *GormIngredient) *domain.Ingredient {
 	return &domain.Ingredient{
 		ID: m.ID, Name: m.Name, Unit: m.Unit,
 		StockQuantity: m.StockQuantity, MinStock: m.MinStock,

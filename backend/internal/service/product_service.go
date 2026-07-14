@@ -9,7 +9,7 @@ import (
 	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
 )
 
-var ErrProductNotFound    = errors.New("produto não encontrado")
+var ErrProductNotFound = errors.New("produto não encontrado")
 var ErrIngredientNotFound = errors.New("ingrediente não encontrado")
 
 type ProductService struct {
@@ -57,7 +57,7 @@ type ProductIngredientInput struct {
 }
 
 type SetProductIngredientsInput struct {
-	Items []ProductIngredientInput `json:"items" validate:"required,min=1,dive"`
+	Items []ProductIngredientInput `json:"items" validate:"required,dive"`
 }
 
 type UpdateStockInput struct {

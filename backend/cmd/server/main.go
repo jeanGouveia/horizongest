@@ -36,15 +36,18 @@ func main() {
 	// --- Injeção de Dependência (DI manual, sem framework) ---
 	userRepo := repository.NewGormUserRepository(db)
 	productRepo := repository.NewGormProductRepository(db)
-	orderRepo := repository.NewGormOrderRepository(db, productRepo)
+	stockAdjustmentRepo := repository.NewGormStockAdjustmentRepository(db, productRepo)
+	orderRepo := repository.NewGormOrderRepository(db, productRepo, stockAdjustmentRepo)
 
 	authSvc := service.NewAuthService(userRepo)
 	productSvc := service.NewProductService(productRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
+	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
 
 	authHandler := handler.NewAuthHandler(authSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
+	stockAdjustmentHandler := handler.NewStockAdjustmentHandler(stockAdjustmentSvc)
 	authMw := middleware.NewAuthMiddleware(authSvc)
 
 	// --- Router ---
@@ -98,6 +101,11 @@ func main() {
 		r.Get("/api/orders", orderHandler.ListOrders)
 		r.Get("/api/orders/{id}", orderHandler.GetOrder)
 		r.Patch("/api/orders/{id}/status", orderHandler.UpdateOrderStatus)
+
+		// Ajustes de Estoque
+		r.Get("/api/stock-adjustments/pending", stockAdjustmentHandler.ListPendingAdjustments)
+		r.Post("/api/stock-adjustments/{id}/approve", stockAdjustmentHandler.ApproveAdjustment)
+		r.Post("/api/stock-adjustments/{id}/reject", stockAdjustmentHandler.RejectAdjustment)
 	})
 
 	// --- Servidor ---

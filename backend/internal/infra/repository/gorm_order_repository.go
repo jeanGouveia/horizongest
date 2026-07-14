@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 
 // ─── GORM models ────────────────────────────────────────────────────────────
 
-type gormOrder struct {
+type GormOrder struct {
 	ID         uint   `gorm:"primaryKey;autoIncrement"`
 	Status     string `gorm:"not null;default:'pending'"`
 	TotalPrice float64
@@ -23,30 +24,31 @@ type gormOrder struct {
 	UpdatedAt  int64 `gorm:"autoUpdateTime"`
 }
 
-func (gormOrder) TableName() string { return "orders" }
+func (GormOrder) TableName() string { return "orders" }
 
-type gormOrderItem struct {
+type GormOrderItem struct {
 	ID        uint         `gorm:"primaryKey;autoIncrement"`
 	OrderID   uint         `gorm:"not null;index"`
 	ProductID uint         `gorm:"not null"`
 	Quantity  float64      `gorm:"not null"`
 	UnitPrice float64      `gorm:"not null"`
-	Product   *gormProduct `gorm:"foreignKey:ProductID"`
+	Product   *GormProduct `gorm:"foreignKey:ProductID"`
 }
 
-func (gormOrderItem) TableName() string { return "order_items" }
+func (GormOrderItem) TableName() string { return "order_items" }
 
 // ─── Repository ─────────────────────────────────────────────────────────────
 
 var _ ports.OrderRepository = (*GormOrderRepository)(nil)
 
 type GormOrderRepository struct {
-	db          *gorm.DB
-	productRepo ports.ProductRepository
+	db                  *gorm.DB
+	productRepo         ports.ProductRepository
+	stockAdjustmentRepo *GormStockAdjustmentRepository
 }
 
-func NewGormOrderRepository(db *gorm.DB, productRepo ports.ProductRepository) *GormOrderRepository {
-	return &GormOrderRepository{db: db, productRepo: productRepo}
+func NewGormOrderRepository(db *gorm.DB, productRepo ports.ProductRepository, stockAdjustmentRepo *GormStockAdjustmentRepository) *GormOrderRepository {
+	return &GormOrderRepository{db: db, productRepo: productRepo, stockAdjustmentRepo: stockAdjustmentRepo}
 }
 
 // CreateOrder é a operação crítica: persiste pedido + itens + baixa de estoque
@@ -55,7 +57,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
 		// 1. Persiste o pedido
-		gOrder := gormOrder{
+		gOrder := GormOrder{
 			Status:     string(order.Status),
 			TotalPrice: order.TotalPrice,
 			Notes:      order.Notes,
@@ -72,7 +74,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			item.OrderID = order.ID
 
 			// 2a. Persiste o item
-			gItem := gormOrderItem{
+			gItem := GormOrderItem{
 				OrderID:   item.OrderID,
 				ProductID: item.ProductID,
 				Quantity:  item.Quantity,
@@ -109,7 +111,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 }
 
 func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*domain.Order, error) {
-	var gOrder gormOrder
+	var gOrder GormOrder
 	err := r.db.WithContext(ctx).First(&gOrder, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -118,7 +120,7 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 		return nil, fmt.Errorf("FindOrderByID: %w", err)
 	}
 
-	var gItems []gormOrderItem
+	var gItems []GormOrderItem
 	if err := r.db.WithContext(ctx).
 		Preload("Product").
 		Where("order_id = ?", id).
@@ -148,7 +150,7 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 }
 
 func (r *GormOrderRepository) ListOrders(ctx context.Context) ([]domain.Order, error) {
-	var gOrders []gormOrder
+	var gOrders []GormOrder
 	if err := r.db.WithContext(ctx).Order("created_at desc").Find(&gOrders).Error; err != nil {
 		return nil, fmt.Errorf("ListOrders: %w", err)
 	}
@@ -162,7 +164,7 @@ func (r *GormOrderRepository) ListOrders(ctx context.Context) ([]domain.Order, e
 func (r *GormOrderRepository) UpdateOrderStatus(
 	ctx context.Context, id uint, status domain.OrderStatus,
 ) error {
-	if err := r.db.WithContext(ctx).Model(&gormOrder{}).
+	if err := r.db.WithContext(ctx).Model(&GormOrder{}).
 		Where("id = ?", id).Update("status", string(status)).Error; err != nil {
 		return fmt.Errorf("UpdateOrderStatus: %w", err)
 	}
@@ -176,42 +178,85 @@ func (r *GormOrderRepository) UpdateOrderStatusWithAdjustments(
 	productIngredients map[uint][]domain.ProductIngredient,
 	orderItems []domain.OrderItem,
 ) error {
+	log.Printf("[REPO] ===== INÍCIO UpdateOrderStatusWithAdjustments =====")
+	log.Printf("[REPO] order_id=%d, novo_status=%s", id, status)
+	log.Printf("[REPO] Total de itens no pedido: %d", len(orderItems))
+	log.Printf("[REPO] Total de produtos com ficha técnica: %d", len(productIngredients))
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		log.Printf("[REPO] Transação iniciada para order_id=%d", id)
 		// 1. Atualizar status do pedido
-		if err := tx.Model(&gormOrder{}).
+		if err := tx.Model(&GormOrder{}).
 			Where("id = ?", id).
 			Update("status", string(status)).Error; err != nil {
 			return fmt.Errorf("UpdateOrderStatusWithAdjustments: atualizar status: %w", err)
 		}
+		log.Printf("[REPO] Status do pedido atualizado para %s", status)
 
 		// 2. Se cancelado, registrar ajustes pendentes na mesma transação
 		if status == domain.OrderStatusCancelled {
+			log.Printf("[REPO] Entrou em condição de cancelamento")
+			log.Printf("[REPO] Total de itens no pedido: %d", len(orderItems))
+			log.Printf("[REPO] Total de produtos com ficha técnica: %d", len(productIngredients))
+
+			// Verificar se já existem ajustes pendentes para este pedido (idempotência)
+			var existingCount int64
+			if err := tx.Model(&GormStockAdjustmentPending{}).
+				Where("order_id = ? AND status = ?", id, domain.StockAdjustmentStatusPending).
+				Count(&existingCount).Error; err != nil {
+				return fmt.Errorf("UpdateOrderStatusWithAdjustments: verificar ajustes existentes: %w", err)
+			}
+			if existingCount > 0 {
+				log.Printf("[REPO] Já existem %d ajustes pendentes para o pedido %d, pulando criação", existingCount, id)
+				return nil // Sucesso sem criar novos ajustes (idempotente)
+			}
+
+			ajustesCriados := 0
+			itemIndex := 0
 			for _, item := range orderItems {
+				itemIndex++
+				log.Printf("[REPO] Processando item %d: item_id=%d, product_id=%d, quantity=%.4f", itemIndex, item.ID, item.ProductID, item.Quantity)
 				ingredients, ok := productIngredients[item.ProductID]
 				if !ok || len(ingredients) == 0 {
 					// Produto simples ou sem ficha técnica: nada a registrar
+					log.Printf("[REPO] Produto %d sem ficha técnica, pulando", item.ProductID)
 					continue
 				}
 
+				log.Printf("[REPO] Produto %d tem %d ingredientes", item.ProductID, len(ingredients))
+				ingredientIndex := 0
 				for _, pi := range ingredients {
+					ingredientIndex++
 					consumedQuantity := pi.Quantity * item.Quantity
-					// Usar SQL direto para inserir ajuste (evita dependência de tipo GORM específico)
-					if err := tx.Exec(`
-						INSERT INTO stock_adjustments_pending 
-						(order_id, ingredient_id, quantity, order_status, status, created_at)
-						VALUES (?, ?, ?, ?, ?, datetime('now'))
-					`, id, pi.IngredientID, consumedQuantity, string(status), "pending").Error; err != nil {
+					log.Printf("[REPO] ===== ANTES DE INSERT =====")
+					log.Printf("[REPO] order_id=%d, item_id=%d, product_id=%d, ingredient_id=%d", id, item.ID, item.ProductID, pi.IngredientID)
+					log.Printf("[REPO] quantity=%.4f, novo_status=%s", consumedQuantity, status)
+					// Usar o repository oficial com suporte a transação
+					adjustment := &domain.StockAdjustmentPending{
+						OrderID:      id,
+						IngredientID: pi.IngredientID,
+						Quantity:     consumedQuantity,
+						OrderStatus:  string(status),
+						Status:       domain.StockAdjustmentStatusPending,
+					}
+					if err := r.stockAdjustmentRepo.CreateStockAdjustmentPendingWithTx(ctx, adjustment, tx); err != nil {
+						log.Printf("[REPO] ===== ERRO NO INSERT =====")
+						log.Printf("[REPO] order_id=%d, ingredient_id=%d", id, pi.IngredientID)
+						log.Printf("[REPO] Erro: %v", err)
 						return fmt.Errorf("UpdateOrderStatusWithAdjustments: criar ajuste: %w", err)
 					}
+					log.Printf("[REPO] INSERT bem-sucedido: order_id=%d, ingredient_id=%d", id, pi.IngredientID)
+					ajustesCriados++
 				}
 			}
+			log.Printf("[REPO] Total de ajustes criados: %d", ajustesCriados)
 		}
 
+		log.Printf("[REPO] ===== FIM UpdateOrderStatusWithAdjustments =====")
 		return nil
 	})
 }
 
-func orderToDomain(g *gormOrder) *domain.Order {
+func orderToDomain(g *GormOrder) *domain.Order {
 	return &domain.Order{
 		ID: g.ID, Status: domain.OrderStatus(g.Status),
 		TotalPrice: g.TotalPrice, Notes: g.Notes,

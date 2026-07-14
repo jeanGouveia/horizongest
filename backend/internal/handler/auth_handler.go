@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -145,12 +146,39 @@ func jsonValidationError(w http.ResponseWriter, err error) {
 	}
 	fields := make(map[string]string, len(ve))
 	for _, fe := range ve {
-		fields[fe.Field()] = fe.Tag()
+		fieldName := fe.Field()
+		tag := fe.Tag()
+		param := fe.Param()
+
+		var message string
+		switch tag {
+		case "required":
+			message = fmt.Sprintf("%s é obrigatório", fieldName)
+		case "min":
+			message = fmt.Sprintf("%s deve ter no mínimo %s caracteres", fieldName, param)
+		case "max":
+			message = fmt.Sprintf("%s deve ter no máximo %s caracteres", fieldName, param)
+		case "gt":
+			message = fmt.Sprintf("%s deve ser maior que %s", fieldName, param)
+		case "gte":
+			message = fmt.Sprintf("%s deve ser maior ou igual a %s", fieldName, param)
+		case "lt":
+			message = fmt.Sprintf("%s deve ser menor que %s", fieldName, param)
+		case "lte":
+			message = fmt.Sprintf("%s deve ser menor ou igual a %s", fieldName, param)
+		case "email":
+			message = fmt.Sprintf("%s deve ser um email válido", fieldName)
+		case "oneof":
+			message = fmt.Sprintf("%s deve ser um dos seguintes valores: %s", fieldName, param)
+		default:
+			message = fmt.Sprintf("%s falhou na validação: %s", fieldName, tag)
+		}
+		fields[fieldName] = message
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":  "validação falhou",
+		"error":  "dados inválidos",
 		"fields": fields,
 	})
 }

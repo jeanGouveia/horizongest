@@ -30,4 +30,5 @@ type ProductRepository interface {
 	// Estoque — chamado dentro de transação pelo OrderRepository
 	// Aceita um DB opcional para transações
 	DecreaseIngredientStock(ctx context.Context, ingredientID uint, qty float64, txDB *gorm.DB, ingredientName string, currentStock float64) error
+	IncreaseIngredientStock(ctx context.Context, ingredientID uint, qty float64, txDB *gorm.DB) error
 }

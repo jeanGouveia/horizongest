@@ -27,6 +27,15 @@ type StockAdjustmentRepository interface {
 	// UpdateStatus atualiza o status de um ajuste (pending → approved/rejected)
 	UpdateStatus(ctx context.Context, id uint, status domain.StockAdjustmentStatus) error
 
+	// Approve aprova um ajuste pendente, registrando quem aprovou e observações
+	Approve(ctx context.Context, id uint, processedBy uint, notes string) error
+
+	// ApproveAndRestoreStock aprova um ajuste pendente e repõe o estoque do ingrediente em transação atômica
+	ApproveAndRestoreStock(ctx context.Context, id uint, processedBy uint, notes string) error
+
+	// Reject rejeita um ajuste pendente, registrando quem rejeitou e observações
+	Reject(ctx context.Context, id uint, processedBy uint, notes string) error
+
 	// FindByID busca um ajuste por ID
 	FindByID(ctx context.Context, id uint) (*domain.StockAdjustmentPending, error)
 }

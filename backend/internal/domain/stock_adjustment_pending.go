@@ -15,12 +15,14 @@ const (
 // ou análise antes de serem aplicados. Usado para estornos de estoque por cancelamento
 // de pedidos, permitindo auditoria e validação humana.
 type StockAdjustmentPending struct {
-	ID           uint
-	OrderID      uint
-	IngredientID uint
-	Quantity     float64 // Quantidade que poderia ser devolvida ao estoque
-	OrderStatus  string  // Status do pedido no momento do cancelamento (para contexto)
-	Status       StockAdjustmentStatus
-	CreatedAt    time.Time
-	ProcessedAt  *time.Time // Quando foi aprovado/rejeitado (null se pending)
+	ID              uint                  `json:"id"`
+	OrderID         uint                  `json:"order_id"`
+	IngredientID    uint                  `json:"ingredient_id"`
+	Quantity        float64               `json:"quantity"`     // Quantidade que poderia ser devolvida ao estoque
+	OrderStatus     string                `json:"order_status"` // Status do pedido no momento do cancelamento (para contexto)
+	Status          StockAdjustmentStatus `json:"status"`
+	CreatedAt       time.Time             `json:"created_at"`
+	ProcessedAt     *time.Time            `json:"processed_at,omitempty"`     // Quando foi aprovado/rejeitado (null se pending)
+	ProcessedBy     *uint                 `json:"processed_by,omitempty"`     // ID do usuário que aprovou/rejeitou (null se pending)
+	ProcessingNotes string                `json:"processing_notes,omitempty"` // Observações do operador ao aprovar/rejeitar
 }
