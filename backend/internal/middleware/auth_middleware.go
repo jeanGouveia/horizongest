@@ -50,7 +50,7 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := m.authService.ValidateToken(token)
+		claims, err := m.authService.ValidateToken(r.Context(), token)
 		if err != nil {
 			log.Printf("[MIDDLEWARE] Token inválido: %v", err)
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)

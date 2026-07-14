@@ -1,0 +1,15 @@
+# IDE
+.vscode/
+.idea/
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários
+*.swp
+*.swo
+*~
+
+# Logs gerais
+*.log

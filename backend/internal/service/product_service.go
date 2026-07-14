@@ -9,8 +9,10 @@ import (
 	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
 )
 
-var ErrProductNotFound = errors.New("produto não encontrado")
-var ErrIngredientNotFound = errors.New("ingrediente não encontrado")
+var (
+	ErrProductNotFound    = errors.New("produto não encontrado")
+	ErrIngredientNotFound = errors.New("ingrediente não encontrado")
+)
 
 type ProductService struct {
 	repo ports.ProductRepository

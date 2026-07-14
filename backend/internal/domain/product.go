@@ -8,7 +8,8 @@ type Product struct {
 	Description string
 	Price       float64
 	IsComposto  bool
-	Active      bool
+	Active      bool       // "Pode ser utilizado pelo negócio?"
+	DeletedAt   *time.Time // "O registro foi removido logicamente"
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 

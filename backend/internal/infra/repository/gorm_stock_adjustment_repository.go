@@ -25,6 +25,9 @@ type GormStockAdjustmentPending struct {
 	ProcessedAt     *int64  `gorm:"index"`
 	ProcessedBy     *uint   `gorm:"index"`
 	ProcessingNotes string  `gorm:"type:text"`
+	IngredientName  string  `gorm:"not null"`              // snapshot do nome
+	IngredientUnit  string  `gorm:"not null;default:'un'"` // snapshot da unidade
+	DeletedAt       *int64  `gorm:"index"`
 }
 
 func (GormStockAdjustmentPending) TableName() string { return "stock_adjustments_pending" }
@@ -62,11 +65,13 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 	}
 
 	gAdjustment := GormStockAdjustmentPending{
-		OrderID:      adjustment.OrderID,
-		IngredientID: adjustment.IngredientID,
-		Quantity:     adjustment.Quantity,
-		OrderStatus:  adjustment.OrderStatus,
-		Status:       string(adjustment.Status),
+		OrderID:        adjustment.OrderID,
+		IngredientID:   adjustment.IngredientID,
+		Quantity:       adjustment.Quantity,
+		OrderStatus:    adjustment.OrderStatus,
+		Status:         string(adjustment.Status),
+		IngredientName: adjustment.IngredientName, // snapshot
+		IngredientUnit: adjustment.IngredientUnit, // snapshot
 	}
 	if err := db.Create(&gAdjustment).Error; err != nil {
 		log.Printf("[STOCK_REPO] Erro ao criar ajuste: %v", err)
@@ -83,7 +88,7 @@ func (r *GormStockAdjustmentRepository) FindPendingByOrderID(
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
 	if err := r.db.WithContext(ctx).
-		Where("order_id = ? AND status = ?", orderID, domain.StockAdjustmentStatusPending).
+		Where("order_id = ? AND status = ? AND deleted_at IS NULL", orderID, domain.StockAdjustmentStatusPending).
 		Find(&gAdjustments).Error; err != nil {
 		return nil, fmt.Errorf("FindPendingByOrderID: %w", err)
 	}
@@ -95,7 +100,7 @@ func (r *GormStockAdjustmentRepository) FindByOrderID(
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
 	if err := r.db.WithContext(ctx).
-		Where("order_id = ?", orderID).
+		Where("order_id = ? AND deleted_at IS NULL", orderID).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
 		return nil, fmt.Errorf("FindByOrderID: %w", err)
@@ -108,7 +113,7 @@ func (r *GormStockAdjustmentRepository) FindPendingByIngredientID(
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
 	if err := r.db.WithContext(ctx).
-		Where("ingredient_id = ? AND status = ?", ingredientID, domain.StockAdjustmentStatusPending).
+		Where("ingredient_id = ? AND status = ? AND deleted_at IS NULL", ingredientID, domain.StockAdjustmentStatusPending).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
 		return nil, fmt.Errorf("FindPendingByIngredientID: %w", err)
@@ -121,7 +126,7 @@ func (r *GormStockAdjustmentRepository) ListPending(
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
 	if err := r.db.WithContext(ctx).
-		Where("status = ?", domain.StockAdjustmentStatusPending).
+		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
 		return nil, fmt.Errorf("ListPending: %w", err)
@@ -191,7 +196,7 @@ func (r *GormStockAdjustmentRepository) ApproveAndRestoreStock(
 ) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var gAdjustment GormStockAdjustmentPending
-		if err := tx.First(&gAdjustment, id).Error; err != nil {
+		if err := tx.Where("deleted_at IS NULL").First(&gAdjustment, id).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return fmt.Errorf("ajuste id=%d não encontrado", id)
 			}
@@ -236,7 +241,7 @@ func (r *GormStockAdjustmentRepository) FindByID(
 	ctx context.Context, id uint,
 ) (*domain.StockAdjustmentPending, error) {
 	var gAdjustment GormStockAdjustmentPending
-	if err := r.db.WithContext(ctx).First(&gAdjustment, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&gAdjustment, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -248,6 +253,11 @@ func (r *GormStockAdjustmentRepository) FindByID(
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 func (r *GormStockAdjustmentRepository) mapToDomain(g *GormStockAdjustmentPending) *domain.StockAdjustmentPending {
+	var deletedAt *time.Time
+	if g.DeletedAt != nil {
+		dt := time.Unix(*g.DeletedAt, 0)
+		deletedAt = &dt
+	}
 	adjustment := &domain.StockAdjustmentPending{
 		ID:              g.ID,
 		OrderID:         g.OrderID,
@@ -258,6 +268,9 @@ func (r *GormStockAdjustmentRepository) mapToDomain(g *GormStockAdjustmentPendin
 		CreatedAt:       time.Unix(g.CreatedAt, 0),
 		ProcessedBy:     g.ProcessedBy,
 		ProcessingNotes: g.ProcessingNotes,
+		IngredientName:  g.IngredientName, // snapshot
+		IngredientUnit:  g.IngredientUnit, // snapshot
+		DeletedAt:       deletedAt,
 	}
 	if g.ProcessedAt != nil {
 		processedAt := time.Unix(*g.ProcessedAt, 0)

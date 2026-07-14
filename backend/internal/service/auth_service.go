@@ -21,16 +21,16 @@ var (
 
 // JWTClaims é exportado para que o middleware possa usar o tipo.
 type JWTClaims struct {
-	UserID uint   `json:"uid"` 
-	Email  string `json:"email"` 
-	Name   string `json:"name"` 
+	UserID uint   `json:"uid"`
+	Email  string `json:"email"`
+	Name   string `json:"name"`
 	jwt.RegisteredClaims
 }
 
 type AuthService struct {
-	userRepo  ports.UserRepository
-	secret    []byte
-	expiry    time.Duration
+	userRepo   ports.UserRepository
+	secret     []byte
+	expiry     time.Duration
 	bcryptCost int
 }
 
@@ -50,9 +50,9 @@ func NewAuthService(userRepo ports.UserRepository) *AuthService {
 // --- Register ---
 
 type RegisterInput struct {
-	Name     string `json:"name"     validate:"required,min=2,max=100"` 
-	Email    string `json:"email"    validate:"required,email"` 
-	Password string `json:"password" validate:"required,min=6"` 
+	Name     string `json:"name"     validate:"required,min=2,max=100"`
+	Email    string `json:"email"    validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, error) {
@@ -83,8 +83,8 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 // --- Login ---
 
 type LoginInput struct {
-	Email    string `json:"email"    validate:"required,email"` 
-	Password string `json:"password" validate:"required"` 
+	Email    string `json:"email"    validate:"required,email"`
+	Password string `json:"password" validate:"required"`
 }
 
 type LoginResult struct {
@@ -115,7 +115,7 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult
 // --- ValidateToken ---
 // Retorna *JWTClaims (exportado) para o middleware extrair UserID, Email e Name.
 
-func (s *AuthService) ValidateToken(tokenStr string) (*JWTClaims, error) {
+func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenStr,
 		&JWTClaims{},
@@ -134,7 +134,7 @@ func (s *AuthService) ValidateToken(tokenStr string) (*JWTClaims, error) {
 
 	claims, ok := token.Claims.(*JWTClaims)
 	if !ok || !token.Valid {
-		return nil, errors.New("ValidateToken: claims inválidos")
+		return nil, fmt.Errorf("ValidateToken: claims inválidos")
 	}
 	return claims, nil
 }

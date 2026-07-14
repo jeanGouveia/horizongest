@@ -8,6 +8,8 @@ type User struct {
 	Name         string
 	Email        string
 	PasswordHash string
+	Active       bool       // "Pode ser utilizado pelo negócio?"
+	DeletedAt    *time.Time // "O registro foi removido logicamente"
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

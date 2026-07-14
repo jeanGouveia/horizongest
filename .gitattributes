@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+*.go text
+*.ts text
+*.js text
+*.svelte text
+*.sql text
+*.md text

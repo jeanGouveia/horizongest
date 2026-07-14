@@ -19,6 +19,8 @@ go.work
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Database
 *.db
@@ -35,3 +37,12 @@ go.work
 # OS
 .DS_Store
 Thumbs.db
+
+# Databases
+*.db
+*.db.bkp
+*.sqlite
+*.sqlite3
+
+# Coverage
+coverage.out

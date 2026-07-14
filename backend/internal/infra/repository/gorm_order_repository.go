@@ -20,19 +20,24 @@ type GormOrder struct {
 	Status     string `gorm:"not null;default:'pending'"`
 	TotalPrice float64
 	Notes      string
-	CreatedAt  int64 `gorm:"autoCreateTime"`
-	UpdatedAt  int64 `gorm:"autoUpdateTime"`
+	DeletedAt  *int64 `gorm:"index"`
+	CreatedAt  int64  `gorm:"autoCreateTime"`
+	UpdatedAt  int64  `gorm:"autoUpdateTime"`
 }
 
 func (GormOrder) TableName() string { return "orders" }
 
 type GormOrderItem struct {
-	ID        uint         `gorm:"primaryKey;autoIncrement"`
-	OrderID   uint         `gorm:"not null;index"`
-	ProductID uint         `gorm:"not null"`
-	Quantity  float64      `gorm:"not null"`
-	UnitPrice float64      `gorm:"not null"`
-	Product   *GormProduct `gorm:"foreignKey:ProductID"`
+	ID                 uint         `gorm:"primaryKey;autoIncrement"`
+	OrderID            uint         `gorm:"not null;index"`
+	ProductID          uint         `gorm:"not null"`
+	Quantity           float64      `gorm:"not null"`
+	UnitPrice          float64      `gorm:"not null"`
+	ProductName        string       `gorm:"not null"`               // snapshot do nome
+	ProductDescription string       `gorm:"type:text"`              // snapshot da descrição
+	ProductIsComposto  bool         `gorm:"not null;default:false"` // snapshot da flag
+	DeletedAt          *int64       `gorm:"index"`
+	Product            *GormProduct `gorm:"foreignKey:ProductID"`
 }
 
 func (GormOrderItem) TableName() string { return "order_items" }
@@ -73,12 +78,24 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			item := &order.Items[i]
 			item.OrderID = order.ID
 
-			// 2a. Persiste o item
+			// 2a. Busca o produto atual para capturar snapshot (princípio #4: Histórico é imutável)
+			product, err := r.productRepo.FindProductByID(ctx, item.ProductID)
+			if err != nil {
+				return fmt.Errorf("CreateOrder: buscar produto_id=%d: %w", item.ProductID, err)
+			}
+			if product == nil {
+				return fmt.Errorf("CreateOrder: produto_id=%d não encontrado", item.ProductID)
+			}
+
+			// 2b. Persiste o item com snapshot dos dados do produto
 			gItem := GormOrderItem{
-				OrderID:   item.OrderID,
-				ProductID: item.ProductID,
-				Quantity:  item.Quantity,
-				UnitPrice: item.UnitPrice,
+				OrderID:            item.OrderID,
+				ProductID:          item.ProductID,
+				Quantity:           item.Quantity,
+				UnitPrice:          item.UnitPrice,
+				ProductName:        product.Name,        // snapshot do nome
+				ProductDescription: product.Description, // snapshot da descrição
+				ProductIsComposto:  product.IsComposto,  // snapshot da flag
 			}
 			if err := tx.Create(&gItem).Error; err != nil {
 				return fmt.Errorf("CreateOrder: criar item produto_id=%d: %w", item.ProductID, err)
@@ -112,7 +129,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 
 func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*domain.Order, error) {
 	var gOrder GormOrder
-	err := r.db.WithContext(ctx).First(&gOrder, id).Error
+	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&gOrder, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -123,7 +140,7 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 	var gItems []GormOrderItem
 	if err := r.db.WithContext(ctx).
 		Preload("Product").
-		Where("order_id = ?", id).
+		Where("order_id = ? AND deleted_at IS NULL", id).
 		Find(&gItems).Error; err != nil {
 		return nil, fmt.Errorf("FindOrderByID items: %w", err)
 	}
@@ -132,8 +149,14 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 	order.Items = make([]domain.OrderItem, len(gItems))
 	for i, gi := range gItems {
 		item := domain.OrderItem{
-			ID: gi.ID, OrderID: gi.OrderID,
-			ProductID: gi.ProductID, Quantity: gi.Quantity, UnitPrice: gi.UnitPrice,
+			ID:                 gi.ID,
+			OrderID:            gi.OrderID,
+			ProductID:          gi.ProductID,
+			Quantity:           gi.Quantity,
+			UnitPrice:          gi.UnitPrice,
+			ProductName:        gi.ProductName,        // snapshot
+			ProductDescription: gi.ProductDescription, // snapshot
+			ProductIsComposto:  gi.ProductIsComposto,  // snapshot
 		}
 		if gi.Product != nil {
 			item.Product = &domain.Product{
@@ -151,7 +174,7 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 
 func (r *GormOrderRepository) ListOrders(ctx context.Context) ([]domain.Order, error) {
 	var gOrders []GormOrder
-	if err := r.db.WithContext(ctx).Order("created_at desc").Find(&gOrders).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Order("created_at desc").Find(&gOrders).Error; err != nil {
 		return nil, fmt.Errorf("ListOrders: %w", err)
 	}
 	out := make([]domain.Order, len(gOrders))
@@ -257,9 +280,15 @@ func (r *GormOrderRepository) UpdateOrderStatusWithAdjustments(
 }
 
 func orderToDomain(g *GormOrder) *domain.Order {
+	var deletedAt *time.Time
+	if g.DeletedAt != nil {
+		dt := time.Unix(*g.DeletedAt, 0)
+		deletedAt = &dt
+	}
 	return &domain.Order{
 		ID: g.ID, Status: domain.OrderStatus(g.Status),
 		TotalPrice: g.TotalPrice, Notes: g.Notes,
+		DeletedAt: deletedAt,
 		CreatedAt: time.Unix(g.CreatedAt, 0), UpdatedAt: time.Unix(g.UpdatedAt, 0),
 	}
 }

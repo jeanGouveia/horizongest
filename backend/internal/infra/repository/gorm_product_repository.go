@@ -21,6 +21,7 @@ type GormProduct struct {
 	Price       float64 `gorm:"not null;default:0"`
 	IsComposto  bool    `gorm:"not null;default:false"`
 	Active      bool    `gorm:"not null;default:true"`
+	DeletedAt   *int64  `gorm:"index"`
 	CreatedAt   int64   `gorm:"autoCreateTime"`
 	UpdatedAt   int64   `gorm:"autoUpdateTime"`
 }
@@ -34,6 +35,7 @@ type GormIngredient struct {
 	StockQuantity float64 `gorm:"not null;default:0"`
 	MinStock      float64 `gorm:"not null;default:0"`
 	Active        bool    `gorm:"not null;default:true"`
+	DeletedAt     *int64  `gorm:"index"`
 	CreatedAt     int64   `gorm:"autoCreateTime"`
 	UpdatedAt     int64   `gorm:"autoUpdateTime"`
 }
@@ -45,6 +47,7 @@ type GormProductIngredient struct {
 	ProductID    uint           `gorm:"not null;index"`
 	IngredientID uint           `gorm:"not null"`
 	Quantity     float64        `gorm:"not null"`
+	DeletedAt    *int64         `gorm:"index"`
 	Ingredient   GormIngredient `gorm:"foreignKey:IngredientID"`
 }
 
@@ -78,7 +81,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 
 func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*domain.Product, error) {
 	var m GormProduct
-	err := r.db.WithContext(ctx).First(&m, id).Error
+	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&m, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -90,7 +93,7 @@ func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*
 
 func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Product, error) {
 	var ms []GormProduct
-	if err := r.db.WithContext(ctx).Where("active = ?", true).Find(&ms).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
@@ -112,9 +115,10 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 }
 
 func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) error {
-	// Soft delete: marca Active=false
+	// Soft delete: marca DeletedAt (princípio #8)
+	now := time.Now().Unix()
 	if err := r.db.WithContext(ctx).Model(&GormProduct{}).
-		Where("id = ?", id).Update("active", false).Error; err != nil {
+		Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteProduct: %w", err)
 	}
 	return nil
@@ -140,7 +144,7 @@ func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.
 
 func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint) (*domain.Ingredient, error) {
 	var m GormIngredient
-	err := r.db.WithContext(ctx).First(&m, id).Error
+	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&m, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -152,7 +156,7 @@ func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint)
 
 func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.Ingredient, error) {
 	var ms []GormIngredient
-	if err := r.db.WithContext(ctx).Where("active = ?", true).Find(&ms).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListIngredients: %w", err)
 	}
 	out := make([]domain.Ingredient, len(ms))
@@ -175,9 +179,10 @@ func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.
 }
 
 func (r *GormProductRepository) DeleteIngredient(ctx context.Context, id uint) error {
-	// Soft delete: marca Active=false
+	// Soft delete: marca DeletedAt (princípio #8)
+	now := time.Now().Unix()
 	if err := r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("id = ?", id).Update("active", false).Error; err != nil {
+		Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteIngredient: %w", err)
 	}
 	return nil
@@ -190,7 +195,7 @@ func (r *GormProductRepository) SetProductIngredients(
 ) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Apaga ficha anterior e recria (upsert simples)
-		if err := tx.Where("product_id = ?", productID).
+		if err := tx.Where("product_id = ? AND deleted_at IS NULL", productID).
 			Delete(&GormProductIngredient{}).Error; err != nil {
 			return fmt.Errorf("SetProductIngredients delete: %w", err)
 		}
@@ -214,7 +219,7 @@ func (r *GormProductRepository) GetProductIngredients(
 	var ms []GormProductIngredient
 	if err := r.db.WithContext(ctx).
 		Preload("Ingredient").
-		Where("product_id = ?", productID).Find(&ms).Error; err != nil {
+		Where("product_id = ? AND deleted_at IS NULL", productID).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("GetProductIngredients: %w", err)
 	}
 	out := make([]domain.ProductIngredient, len(ms))
@@ -288,18 +293,30 @@ func (r *GormProductRepository) IncreaseIngredientStock(
 // ── Mappers ──────────────────────────────────────────────────────────────────
 
 func productToDomain(m *GormProduct) *domain.Product {
+	var deletedAt *time.Time
+	if m.DeletedAt != nil {
+		dt := time.Unix(*m.DeletedAt, 0)
+		deletedAt = &dt
+	}
 	return &domain.Product{
 		ID: m.ID, Name: m.Name, Description: m.Description,
 		Price: m.Price, IsComposto: m.IsComposto, Active: m.Active,
+		DeletedAt: deletedAt,
 		CreatedAt: time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
 	}
 }
 
 func ingredientToDomain(m *GormIngredient) *domain.Ingredient {
+	var deletedAt *time.Time
+	if m.DeletedAt != nil {
+		dt := time.Unix(*m.DeletedAt, 0)
+		deletedAt = &dt
+	}
 	return &domain.Ingredient{
 		ID: m.ID, Name: m.Name, Unit: m.Unit,
 		StockQuantity: m.StockQuantity, MinStock: m.MinStock,
 		Active:    m.Active,
+		DeletedAt: deletedAt,
 		CreatedAt: time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
 	}
 }

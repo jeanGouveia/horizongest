@@ -72,13 +72,24 @@ func (s *StockAdjustmentService) RegisterStockAdjustmentForOrder(
 			// Calcular quantidade consumida
 			consumedQuantity := pi.Quantity * item.Quantity
 
-			// Registrar ajuste pendente
+			// Buscar ingrediente para capturar snapshot (princípio #4: Histórico é imutável)
+			ingredient, err := s.productRepo.FindIngredientByID(ctx, pi.IngredientID)
+			if err != nil {
+				return fmt.Errorf("RegisterStockAdjustmentForOrder: buscar ingrediente_id=%d: %w", pi.IngredientID, err)
+			}
+			if ingredient == nil {
+				return fmt.Errorf("ingrediente id=%d não encontrado", pi.IngredientID)
+			}
+
+			// Registrar ajuste pendente com snapshot dos dados do ingrediente
 			adjustment := &domain.StockAdjustmentPending{
-				OrderID:      orderID,
-				IngredientID: pi.IngredientID,
-				Quantity:     consumedQuantity,
-				OrderStatus:  string(orderStatus),
-				Status:       domain.StockAdjustmentStatusPending,
+				OrderID:        orderID,
+				IngredientID:   pi.IngredientID,
+				Quantity:       consumedQuantity,
+				OrderStatus:    string(orderStatus),
+				Status:         domain.StockAdjustmentStatusPending,
+				IngredientName: ingredient.Name, // snapshot do nome
+				IngredientUnit: ingredient.Unit, // snapshot da unidade
 			}
 
 			if err := s.stockAdjustmentRepo.CreateStockAdjustmentPending(ctx, adjustment); err != nil {

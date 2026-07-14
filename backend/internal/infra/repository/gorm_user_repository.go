@@ -17,6 +17,8 @@ type GormUserModel struct {
 	Name         string `gorm:"not null"`
 	Email        string `gorm:"uniqueIndex;not null"`
 	PasswordHash string `gorm:"not null"`
+	Active       bool   `gorm:"not null;default:true"`
+	DeletedAt    *int64 `gorm:"index"`
 	CreatedAt    int64  `gorm:"autoCreateTime"`
 	UpdatedAt    int64  `gorm:"autoUpdateTime"`
 }
@@ -50,7 +52,7 @@ func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) erro
 
 func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var model GormUserModel
-	err := r.db.WithContext(ctx).Where("email = ?", email).First(&model).Error
+	err := r.db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", email).First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -62,7 +64,7 @@ func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*do
 
 func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
 	var model GormUserModel
-	err := r.db.WithContext(ctx).First(&model, id).Error
+	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&model, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -73,11 +75,18 @@ func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 }
 
 func toDomainUser(m *GormUserModel) *domain.User {
+	var deletedAt *time.Time
+	if m.DeletedAt != nil {
+		dt := time.Unix(*m.DeletedAt, 0)
+		deletedAt = &dt
+	}
 	return &domain.User{
 		ID:           m.ID,
 		Name:         m.Name,
 		Email:        m.Email,
 		PasswordHash: m.PasswordHash,
+		Active:       m.Active,
+		DeletedAt:    deletedAt,
 		CreatedAt:    time.Unix(m.CreatedAt, 0),
 		UpdatedAt:    time.Unix(m.UpdatedAt, 0),
 	}
