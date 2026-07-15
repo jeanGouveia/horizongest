@@ -16,7 +16,14 @@
     loading = false;
 
     if (err || !data) {
-      error = err ?? 'Erro ao fazer login';
+      // Melhorar mensagem de erro específica
+      if (err?.includes('e-mail ou senha inválidos')) {
+        error = 'E-mail ou senha incorretos';
+      } else if (err?.includes('unauthorized')) {
+        error = 'Não autorizado';
+      } else {
+        error = err ?? 'Erro ao fazer login';
+      }
       return;
     }
 

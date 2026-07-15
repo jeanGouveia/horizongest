@@ -125,7 +125,7 @@
           <div class="ing-list">
             {#each productIngredients as ing}
               <div class="ing-row">
-                <span class="ing-name">{ing.Ingredient?.Name}</span>
+                <span class="ing-name">{ing.Name}</span>
                 <div class="ing-controls">
                   <input
                     type="number"
@@ -135,7 +135,7 @@
                     oninput={(e) => updateQty(ing.ID, Number((e.target as HTMLInputElement).value))}
                     class="qty-input"
                   />
-                  <span class="ing-unit">{ing.Ingredient?.Unit}</span>
+                  <span class="ing-unit">{ing.Unit}</span>
                   <button class="btn-remove" onclick={() => removeIngredient(ing.ID)} title="Remover">✕</button>
                 </div>
               </div>

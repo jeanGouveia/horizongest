@@ -78,24 +78,16 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			item := &order.Items[i]
 			item.OrderID = order.ID
 
-			// 2a. Busca o produto atual para capturar snapshot (princípio #4: Histórico é imutável)
-			product, err := r.productRepo.FindProductByID(ctx, item.ProductID)
-			if err != nil {
-				return fmt.Errorf("CreateOrder: buscar produto_id=%d: %w", item.ProductID, err)
-			}
-			if product == nil {
-				return fmt.Errorf("CreateOrder: produto_id=%d não encontrado", item.ProductID)
-			}
-
-			// 2b. Persiste o item com snapshot dos dados do produto
+			// 2a. Persiste o item com snapshot pré-carregado (princípio #4: Histórico é imutável)
+			// O snapshot já foi montado no service para evitar chamadas dentro da transação
 			gItem := GormOrderItem{
 				OrderID:            item.OrderID,
 				ProductID:          item.ProductID,
 				Quantity:           item.Quantity,
 				UnitPrice:          item.UnitPrice,
-				ProductName:        product.Name,        // snapshot do nome
-				ProductDescription: product.Description, // snapshot da descrição
-				ProductIsComposto:  product.IsComposto,  // snapshot da flag
+				ProductName:        item.ProductName,        // snapshot do nome
+				ProductDescription: item.ProductDescription, // snapshot da descrição
+				ProductIsComposto:  item.ProductIsComposto,  // snapshot da flag
 			}
 			if err := tx.Create(&gItem).Error; err != nil {
 				return fmt.Errorf("CreateOrder: criar item produto_id=%d: %w", item.ProductID, err)

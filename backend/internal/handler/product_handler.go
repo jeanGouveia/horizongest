@@ -25,7 +25,7 @@ func NewProductHandler(svc *service.ProductService) *ProductHandler {
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var in service.CreateProductInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -34,7 +34,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.svc.CreateProduct(r.Context(), in)
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível criar o produto. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusCreated, p)
@@ -44,7 +44,17 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := h.svc.ListProducts(r.Context())
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar os produtos. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, http.StatusOK, products)
+}
+
+// GET /api/products/active
+func (h *ProductHandler) ListActiveProducts(w http.ResponseWriter, r *http.Request) {
+	products, err := h.svc.ListActiveProducts(r.Context())
+	if err != nil {
+		jsonError(w, "não foi possível carregar os produtos ativos. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, products)
@@ -54,16 +64,16 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	p, err := h.svc.GetProduct(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrProductNotFound) {
-			jsonError(w, "produto não encontrado", http.StatusNotFound)
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar o produto. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, p)
@@ -73,30 +83,30 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	if err := h.svc.DeleteProduct(r.Context(), id); err != nil {
 		if errors.Is(err, service.ErrProductNotFound) {
-			jsonError(w, "produto não encontrado", http.StatusNotFound)
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível remover o produto. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "produto removido"})
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "produto removido com sucesso"})
 }
 
 // PUT /api/products/{id}
 func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	var in service.UpdateProductInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -106,10 +116,10 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	p, err := h.svc.UpdateProduct(r.Context(), id, in)
 	if err != nil {
 		if errors.Is(err, service.ErrProductNotFound) {
-			jsonError(w, "produto não encontrado", http.StatusNotFound)
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível atualizar o produto. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, p)
@@ -121,7 +131,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 func (h *ProductHandler) CreateIngredient(w http.ResponseWriter, r *http.Request) {
 	var in service.CreateIngredientInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -130,7 +140,7 @@ func (h *ProductHandler) CreateIngredient(w http.ResponseWriter, r *http.Request
 	}
 	i, err := h.svc.CreateIngredient(r.Context(), in)
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível criar o ingrediente. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusCreated, i)
@@ -140,7 +150,7 @@ func (h *ProductHandler) CreateIngredient(w http.ResponseWriter, r *http.Request
 func (h *ProductHandler) ListIngredients(w http.ResponseWriter, r *http.Request) {
 	ingredients, err := h.svc.ListIngredients(r.Context())
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar os ingredientes. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, ingredients)
@@ -150,16 +160,16 @@ func (h *ProductHandler) ListIngredients(w http.ResponseWriter, r *http.Request)
 func (h *ProductHandler) GetIngredient(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do ingrediente inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	i, err := h.svc.GetIngredient(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrIngredientNotFound) {
-			jsonError(w, "ingrediente não encontrado", http.StatusNotFound)
+			jsonError(w, "ingrediente não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar o ingrediente. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, i)
@@ -169,12 +179,12 @@ func (h *ProductHandler) GetIngredient(w http.ResponseWriter, r *http.Request) {
 func (h *ProductHandler) UpdateIngredientStock(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do ingrediente inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	var in service.UpdateStockInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -184,10 +194,10 @@ func (h *ProductHandler) UpdateIngredientStock(w http.ResponseWriter, r *http.Re
 	i, err := h.svc.UpdateIngredientStock(r.Context(), id, in)
 	if err != nil {
 		if errors.Is(err, service.ErrIngredientNotFound) {
-			jsonError(w, "ingrediente não encontrado", http.StatusNotFound)
+			jsonError(w, "ingrediente não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível ajustar o estoque. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, i)
@@ -197,12 +207,12 @@ func (h *ProductHandler) UpdateIngredientStock(w http.ResponseWriter, r *http.Re
 func (h *ProductHandler) UpdateIngredient(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do ingrediente inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	var in service.UpdateIngredientInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -212,10 +222,10 @@ func (h *ProductHandler) UpdateIngredient(w http.ResponseWriter, r *http.Request
 	i, err := h.svc.UpdateIngredient(r.Context(), id, in)
 	if err != nil {
 		if errors.Is(err, service.ErrIngredientNotFound) {
-			jsonError(w, "ingrediente não encontrado", http.StatusNotFound)
+			jsonError(w, "ingrediente não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível atualizar o ingrediente. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, i)
@@ -225,18 +235,18 @@ func (h *ProductHandler) UpdateIngredient(w http.ResponseWriter, r *http.Request
 func (h *ProductHandler) DeleteIngredient(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do ingrediente inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	if err := h.svc.DeleteIngredient(r.Context(), id); err != nil {
 		if errors.Is(err, service.ErrIngredientNotFound) {
-			jsonError(w, "ingrediente não encontrado", http.StatusNotFound)
+			jsonError(w, "ingrediente não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível remover o ingrediente. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "ingrediente removido"})
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "ingrediente removido com sucesso"})
 }
 
 // ── Ficha técnica ────────────────────────────────────────────────────────────
@@ -245,12 +255,12 @@ func (h *ProductHandler) DeleteIngredient(w http.ResponseWriter, r *http.Request
 func (h *ProductHandler) SetProductIngredients(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	var in service.SetProductIngredientsInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -259,29 +269,29 @@ func (h *ProductHandler) SetProductIngredients(w http.ResponseWriter, r *http.Re
 	}
 	if err := h.svc.SetProductIngredients(r.Context(), id, in); err != nil {
 		if errors.Is(err, service.ErrProductNotFound) {
-			jsonError(w, "produto não encontrado", http.StatusNotFound)
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusBadRequest)
+		jsonError(w, "não foi possível atualizar a ficha técnica. Verifique os ingredientes informados.", http.StatusBadRequest)
 		return
 	}
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "ficha técnica atualizada"})
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "ficha técnica atualizada com sucesso"})
 }
 
 // GET /api/products/{id}/ingredients
 func (h *ProductHandler) GetProductIngredients(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	p, err := h.svc.GetProduct(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrProductNotFound) {
-			jsonError(w, "produto não encontrado", http.StatusNotFound)
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar a ficha técnica. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, p.Ingredients)

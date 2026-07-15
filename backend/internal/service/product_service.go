@@ -87,6 +87,14 @@ func (s *ProductService) ListProducts(ctx context.Context) ([]domain.Product, er
 	return products, nil
 }
 
+func (s *ProductService) ListActiveProducts(ctx context.Context) ([]domain.Product, error) {
+	products, err := s.repo.ListActiveProducts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ProductService.ListActiveProducts: %w", err)
+	}
+	return products, nil
+}
+
 func (s *ProductService) GetProduct(ctx context.Context, id uint) (*domain.Product, error) {
 	p, err := s.repo.FindProductByID(ctx, id)
 	if err != nil {

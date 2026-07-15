@@ -21,7 +21,7 @@ func NewOrderHandler(svc *service.OrderService) *OrderHandler {
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var in service.CreateOrderInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	log.Printf("Handler - Payload recebido: %+v", in)
@@ -44,7 +44,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	orders, err := h.svc.ListOrders(r.Context())
 	if err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar os pedidos. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, orders)
@@ -54,16 +54,16 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do pedido inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	order, err := h.svc.GetOrder(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrOrderNotFound) {
-			jsonError(w, "pedido não encontrado", http.StatusNotFound)
+			jsonError(w, "pedido não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, "não foi possível carregar o pedido. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, order)
@@ -73,12 +73,12 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
-		jsonError(w, "id inválido", http.StatusBadRequest)
+		jsonError(w, "ID do pedido inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
 	var in service.UpdateOrderStatusInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(in); err != nil {
@@ -88,10 +88,14 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	order, err := h.svc.UpdateOrderStatus(r.Context(), id, in)
 	if err != nil {
 		if errors.Is(err, service.ErrOrderNotFound) {
-			jsonError(w, "pedido não encontrado", http.StatusNotFound)
+			jsonError(w, "pedido não encontrado. Verifique o ID informado.", http.StatusNotFound)
 			return
 		}
-		jsonError(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, service.ErrInvalidOrderStatus) {
+			jsonError(w, "transição de status inválida. Verifique o fluxo do pedido.", http.StatusBadRequest)
+			return
+		}
+		jsonError(w, "não foi possível atualizar o status do pedido. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 	jsonResponse(w, http.StatusOK, order)

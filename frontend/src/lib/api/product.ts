@@ -10,6 +10,12 @@ export async function getProducts(): Promise<Product[]> {
   return res.data!;
 }
 
+export async function getActiveProducts(): Promise<Product[]> {
+  const res = await request<Product[]>('/products/active');
+  if (res.error) throw new Error(res.error);
+  return res.data!;
+}
+
 export async function getProduct(id: number): Promise<Product> {
   const res = await request<Product>(`/products/${id}`);
   if (res.error) throw new Error(res.error);

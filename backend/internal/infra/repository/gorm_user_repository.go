@@ -74,6 +74,19 @@ func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 	return toDomainUser(&model), nil
 }
 
+func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) error {
+	model := GormUserModel{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+	}
+	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
+		return fmt.Errorf("UserRepository.Update: %w", err)
+	}
+	user.UpdatedAt = time.Unix(model.UpdatedAt, 0)
+	return nil
+}
+
 func toDomainUser(m *GormUserModel) *domain.User {
 	var deletedAt *time.Time
 	if m.DeletedAt != nil {

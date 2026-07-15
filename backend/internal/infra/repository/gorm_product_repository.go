@@ -93,8 +93,20 @@ func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*
 
 func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Product, error) {
 	var ms []GormProduct
-	if err := r.db.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListProducts: %w", err)
+	}
+	out := make([]domain.Product, len(ms))
+	for i, m := range ms {
+		out[i] = *productToDomain(&m)
+	}
+	return out, nil
+}
+
+func (r *GormProductRepository) ListActiveProducts(ctx context.Context) ([]domain.Product, error) {
+	var ms []GormProduct
+	if err := r.db.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
+		return nil, fmt.Errorf("ListActiveProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
 	for i, m := range ms {

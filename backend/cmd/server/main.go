@@ -78,10 +78,13 @@ func main() {
 		r.Use(authMw.Auth)
 
 		r.Get("/api/me", authHandler.Me)
+		r.Put("/api/me", authHandler.UpdateProfile)
+		r.Post("/api/me/change-password", authHandler.ChangePassword)
 
 		// Produtos
 		r.Post("/api/products", productHandler.CreateProduct)
 		r.Get("/api/products", productHandler.ListProducts)
+		r.Get("/api/products/active", productHandler.ListActiveProducts)
 		r.Get("/api/products/{id}", productHandler.GetProduct)
 		r.Put("/api/products/{id}", productHandler.UpdateProduct)
 		r.Delete("/api/products/{id}", productHandler.DeleteProduct)

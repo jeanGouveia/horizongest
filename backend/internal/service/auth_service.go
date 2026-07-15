@@ -112,6 +112,78 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult
 	return &LoginResult{Token: token, User: user}, nil
 }
 
+// --- UpdateProfile ---
+
+type UpdateProfileInput struct {
+	Name  string `json:"name"  validate:"required,min=2,max=100"`
+	Email string `json:"email" validate:"required,email"`
+}
+
+func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input UpdateProfileInput) (*domain.User, error) {
+	// Verificar se o e-mail já está em uso por outro usuário
+	existing, err := s.userRepo.FindByEmail(ctx, input.Email)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateProfile: %w", err)
+	}
+	if existing != nil && existing.ID != userID {
+		return nil, ErrEmailAlreadyExists
+	}
+
+	// Buscar usuário atual
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateProfile: %w", err)
+	}
+	if user == nil {
+		return nil, errors.New("usuário não encontrado")
+	}
+
+	// Atualizar campos
+	user.Name = input.Name
+	user.Email = input.Email
+
+	if err = s.userRepo.Update(ctx, user); err != nil {
+		return nil, fmt.Errorf("UpdateProfile: %w", err)
+	}
+	return user, nil
+}
+
+// --- ChangePassword ---
+
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password"     validate:"required,min=6"`
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input ChangePasswordInput) error {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("ChangePassword: %w", err)
+	}
+	if user == nil {
+		return errors.New("usuário não encontrado")
+	}
+
+	// Verificar senha atual
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.CurrentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	// Hash da nova senha
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), s.bcryptCost)
+	if err != nil {
+		return fmt.Errorf("ChangePassword: hash: %w", err)
+	}
+
+	// Atualizar senha
+	user.PasswordHash = string(hash)
+	if err = s.userRepo.Update(ctx, user); err != nil {
+		return fmt.Errorf("ChangePassword: %w", err)
+	}
+	return nil
+}
+
 // --- ValidateToken ---
 // Retorna *JWTClaims (exportado) para o middleware extrair UserID, Email e Name.
 

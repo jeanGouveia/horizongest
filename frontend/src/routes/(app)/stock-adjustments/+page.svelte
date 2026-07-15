@@ -7,7 +7,12 @@
 	let adjustments: StockAdjustment[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
-	let filter = $state<string>('all');
+	let filterStatus = $state<string>('all');
+	let searchQuery = $state<string>('');
+	let sortBy = $state<string>('date');
+	let sortOrder = $state<'asc' | 'desc'>('desc');
+	let currentPage = $state(1);
+	const itemsPerPage = 20;
 
 	onMount(loadAdjustments);
 
@@ -24,8 +29,49 @@
 	}
 
 	const filtered = $derived(
-		filter === 'all' ? adjustments : adjustments.filter((a) => a.status === filter)
+		adjustments.filter((a) => {
+			// Filtro por status
+			if (filterStatus !== 'all' && a.status !== filterStatus) return false;
+
+			// Filtro por busca (nome do ingrediente)
+			if (searchQuery) {
+				const query = searchQuery.toLowerCase();
+				if (!a.ingredient_name?.toLowerCase().includes(query)) return false;
+			}
+
+			return true;
+		}).sort((a, b) => {
+			// Ordenação
+			let comparison = 0;
+			if (sortBy === 'date') {
+				comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+			} else if (sortBy === 'quantity') {
+				comparison = a.quantity - b.quantity;
+			} else if (sortBy === 'id') {
+				comparison = a.id - b.id;
+			}
+			return sortOrder === 'asc' ? comparison : -comparison;
+		})
 	);
+
+	const totalPages = $derived(Math.ceil(filtered.length / itemsPerPage));
+	const paginated = $derived(
+		filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+	);
+
+	function goToPage(page: number) {
+		if (page >= 1 && page <= totalPages) {
+			currentPage = page;
+		}
+	}
+
+	function nextPage() {
+		goToPage(currentPage + 1);
+	}
+
+	function prevPage() {
+		goToPage(currentPage - 1);
+	}
 
 	function formatDate(d?: string) {
 		if (!d) return '—';
@@ -110,19 +156,55 @@
 	</header>
 
 	<!-- Filtros -->
-	<div class="filter-row">
-		{#each STATUS_OPTIONS as opt}
-			<button
-				class="filter-pill"
-				class:active={filter === opt.value}
-				onclick={() => (filter = opt.value)}
-			>
-				{opt.label}
-				{#if opt.value !== 'all' && countByStatus[opt.value]}
-					<span class="pill-count">{countByStatus[opt.value]}</span>
-				{/if}
-			</button>
-		{/each}
+	<div class="filter-section" role="region" aria-label="Filtros de ajustes de estoque">
+		<div class="filter-row" role="group" aria-label="Filtro por status">
+			{#each STATUS_OPTIONS as opt}
+				<button
+					class="filter-pill"
+					class:active={filterStatus === opt.value}
+					onclick={() => (filterStatus = opt.value)}
+					aria-pressed={filterStatus === opt.value}
+					aria-label={`Filtrar por ${opt.label}`}
+				>
+					{opt.label}
+					{#if opt.value !== 'all' && countByStatus[opt.value]}
+						<span class="pill-count" aria-label={`${countByStatus[opt.value]} ajustes`}>{countByStatus[opt.value]}</span>
+					{/if}
+				</button>
+			{/each}
+		</div>
+		<div class="filter-controls" role="search" aria-label="Busca e filtros adicionais">
+			<label for="adjustment-search" class="sr-only">Buscar ajustes</label>
+			<input
+				id="adjustment-search"
+				type="text"
+				placeholder="Buscar por ingrediente..."
+				bind:value={searchQuery}
+				class="search-input"
+				aria-label="Buscar ajustes por nome do ingrediente"
+			/>
+			<div class="sort-control">
+				<label for="adjustment-sort" class="sr-only">Ordenar ajustes</label>
+				<select bind:value={sortBy} id="adjustment-sort" class="sort-select" aria-label="Critério de ordenação de ajustes">
+					<option value="date">Ordenar por Data</option>
+					<option value="quantity">Ordenar por Quantidade</option>
+					<option value="id">Ordenar por ID</option>
+				</select>
+				<button
+					class="btn btn-sm btn-ghost"
+					onclick={() => (sortOrder = sortOrder === 'asc' ? 'desc' : 'asc')}
+					title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
+					aria-label={`Ordem ${sortOrder === 'asc' ? 'crescente' : 'decrescente'}, clique para inverter`}
+				>
+					{sortOrder === 'asc' ? '↑' : '↓'}
+				</button>
+			</div>
+			{searchQuery && (
+				<button class="btn btn-sm btn-ghost" onclick={() => (searchQuery = '')} aria-label="Limpar busca">
+					Limpar busca
+				</button>
+			)}
+		</div>
 	</div>
 
 	{#if loading}
@@ -138,11 +220,11 @@
 	{:else if filtered.length === 0}
 		<div class="empty-state">
 			<p class="empty-icon">📦</p>
-			<p class="empty-text">{filter === 'all' ? 'Nenhum ajuste ainda.' : 'Nenhum ajuste com esse status.'}</p>
+			<p class="empty-text">{filterStatus === 'all' ? 'Nenhum ajuste ainda.' : 'Nenhum ajuste com esse status.'}</p>
 		</div>
 	{:else}
 		<div class="adjustments-list">
-			{#each filtered as adj}
+			{#each paginated as adj}
 				<div class="adjustment-card">
 					<div class="adjustment-card-left">
 						<span class="adjustment-id"># {adj.id}</span>
@@ -194,6 +276,28 @@
 				{/if}
 			{/each}
 		</div>
+
+		{#if totalPages > 1}
+			<div class="pagination">
+				<button
+					class="pagination-btn"
+					disabled={currentPage === 1}
+					onclick={prevPage}
+				>
+					← Anterior
+				</button>
+				<span class="pagination-info">
+					Página {currentPage} de {totalPages} ({filtered.length} ajustes)
+				</span>
+				<button
+					class="pagination-btn"
+					disabled={currentPage === totalPages}
+					onclick={nextPage}
+				>
+					Próxima →
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -237,18 +341,35 @@
 {/if}
 
 <style>
+  /* Acessibilidade */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
   .page-wrapper   { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
   .page-header    { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; }
   .page-title     { font-size: 1.75rem; font-weight: 700; color: var(--color-text); margin: 0; }
   .page-subtitle  { font-size: 0.875rem; color: var(--color-muted); margin: 0.25rem 0 0; }
 
   /* Filtros */
-  .filter-row     { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-  .filter-pill    { border: 1px solid var(--color-border, #e5e7eb); background: var(--color-surface, #fff); color: var(--color-muted); font-size: 0.8rem; font-weight: 500; padding: 0.35rem 0.75rem; border-radius: 99px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 0.35rem; }
-  .filter-pill:hover { border-color: var(--color-primary, #e85d04); color: var(--color-primary, #e85d04); }
-  .filter-pill.active { background: var(--color-primary, #e85d04); border-color: var(--color-primary, #e85d04); color: #fff; }
-  .pill-count     { background: rgba(255,255,255,0.3); padding: 0 0.3rem; border-radius: 99px; font-size: 0.7rem; font-weight: 700; }
+  .filter-section { margin-bottom: 1.5rem; }
+  .filter-row     { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .filter-pill    { border: 1px solid var(--color-border, #e5e7eb); background: var(--color-surface, #fff); color: var(--color-muted); font-size: 0.8rem; font-weight: 500; padding: 0.4rem 0.85rem; border-radius: 99px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .filter-pill:hover { border-color: var(--color-primary, #e85d04); color: var(--color-primary, #e85d04); box-shadow: 0 2px 4px rgba(232,93,4,0.15); transform: translateY(-1px); }
+  .filter-pill.active { background: var(--color-primary, #e85d04); border-color: var(--color-primary, #e85d04); color: #fff; box-shadow: 0 2px 8px rgba(232,93,4,0.3); }
+  .pill-count     { background: rgba(255,255,255,0.25); padding: 0 0.35rem; border-radius: 99px; font-size: 0.7rem; font-weight: 700; min-width: 20px; text-align: center; }
   .filter-pill:not(.active) .pill-count { background: var(--color-surface-2, #f0f0f0); color: var(--color-text); }
+  .filter-controls { display: flex; gap: 0.75rem; align-items: center; }
+  .sort-control { display: flex; gap: 0.25rem; }
+  .search-input    { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: all 0.2s ease; min-width: 250px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .search-input:focus,
+  .sort-select:focus { outline: none; border-color: var(--color-primary, #e85d04); box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
+  .sort-select    { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: all 0.2s ease; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+  /* Paginação */
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding: 1rem; background: var(--color-surface-2, #f9fafb); border-radius: 0.5rem; }
+  .pagination-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border, #d1d5db); background: var(--color-surface, #fff); color: var(--color-text); border-radius: 0.4rem; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .pagination-btn:hover:not(:disabled) { background: var(--color-primary, #e85d04); color: #fff; border-color: var(--color-primary, #e85d04); }
+  .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pagination-info { font-size: 0.85rem; color: var(--color-muted); }
 
   /* Lista de ajustes */
   .adjustments-list { display: flex; flex-direction: column; gap: 0.6rem; }

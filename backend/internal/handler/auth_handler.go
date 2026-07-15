@@ -28,7 +28,7 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var input service.RegisterInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(input); err != nil {
@@ -39,10 +39,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	user, err := h.authService.Register(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, service.ErrEmailAlreadyExists) {
-			jsonError(w, "e-mail já cadastrado", http.StatusConflict)
+			jsonError(w, "este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.", http.StatusConflict)
 			return
 		}
-		jsonError(w, "erro interno", http.StatusInternalServerError)
+		jsonError(w, "não foi possível criar a conta. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var input service.LoginInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		jsonError(w, "body inválido", http.StatusBadRequest)
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
 	if err := validate.Struct(input); err != nil {
@@ -69,10 +69,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	result, err := h.authService.Login(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
-			jsonError(w, "e-mail ou senha inválidos", http.StatusUnauthorized)
+			jsonError(w, "e-mail ou senha incorretos. Verifique suas credenciais.", http.StatusUnauthorized)
 			return
 		}
-		jsonError(w, "erro interno", http.StatusInternalServerError)
+		jsonError(w, "não foi possível fazer login. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	claims, ok := middleware.GetClaimsFromContext(r.Context())
 	if !ok {
-		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		jsonError(w, "não autorizado. Faça login novamente.", http.StatusUnauthorized)
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
@@ -124,6 +124,74 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"name":  claims.Name,
 		"email": claims.Email,
 	})
+}
+
+// --- PUT /api/me (rota protegida) ---
+
+func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
+		jsonError(w, "não autorizado. Faça login novamente.", http.StatusUnauthorized)
+		return
+	}
+
+	var input service.UpdateProfileInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
+		return
+	}
+	if err := validate.Struct(input); err != nil {
+		jsonValidationError(w, err)
+		return
+	}
+
+	user, err := h.authService.UpdateProfile(r.Context(), claims.UserID, input)
+	if err != nil {
+		if errors.Is(err, service.ErrEmailAlreadyExists) {
+			jsonError(w, "este e-mail já está cadastrado por outro usuário.", http.StatusConflict)
+			return
+		}
+		jsonError(w, "não foi possível atualizar o perfil. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
+	})
+}
+
+// --- POST /api/me/change-password (rota protegida) ---
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if !ok {
+		jsonError(w, "não autorizado. Faça login novamente.", http.StatusUnauthorized)
+		return
+	}
+
+	var input service.ChangePasswordInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
+		return
+	}
+	if err := validate.Struct(input); err != nil {
+		jsonValidationError(w, err)
+		return
+	}
+
+	err := h.authService.ChangePassword(r.Context(), claims.UserID, input)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			jsonError(w, "senha atual incorreta. Verifique e tente novamente.", http.StatusUnauthorized)
+			return
+		}
+		jsonError(w, "não foi possível alterar a senha. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "senha alterada com sucesso"})
 }
 
 // --- helpers de resposta ---
@@ -178,7 +246,8 @@ func jsonValidationError(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error":  "dados inválidos",
-		"fields": fields,
+		"error":   "dados inválidos",
+		"fields":  fields,
+		"details": "Verifique os campos marcados em vermelho",
 	})
 }

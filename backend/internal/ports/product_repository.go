@@ -13,6 +13,7 @@ type ProductRepository interface {
 	CreateProduct(ctx context.Context, p *domain.Product) error
 	FindProductByID(ctx context.Context, id uint) (*domain.Product, error)
 	ListProducts(ctx context.Context) ([]domain.Product, error)
+	ListActiveProducts(ctx context.Context) ([]domain.Product, error)
 	UpdateProduct(ctx context.Context, p *domain.Product) error
 	DeleteProduct(ctx context.Context, id uint) error
 

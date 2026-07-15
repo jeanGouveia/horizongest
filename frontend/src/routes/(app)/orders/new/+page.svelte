@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { getProducts } from '$lib/api/product';
+  import { getActiveProducts } from '$lib/api/product';
   import { createOrder } from '$lib/api/order';
   import type { Product } from '$lib/types/product';
   import type { OrderCreatePayload } from '$lib/types/order';
@@ -22,8 +22,7 @@
   onMount(async () => {
     loading = true;
     try {
-      const all = await getProducts();
-      products = all.filter((p) => p.Active);
+      products = await getActiveProducts();
     } catch (e: any) {
       error = e?.message ?? 'Erro ao carregar produtos.';
     } finally {
@@ -93,7 +92,15 @@
     } catch (e: any) {
       console.error('Frontend - Erro ao criar pedido:', e);
       console.error('Frontend - Stack trace:', e.stack);
-      error = e?.message ?? 'Erro ao criar pedido.';
+      
+      // Formatar mensagem de erro de estoque insuficiente
+      const errorMsg = e?.message ?? 'Erro ao criar pedido.';
+      if (errorMsg.includes('Ingredientes insuficientes')) {
+        // A mensagem já vem formatada do backend, apenas preservar as quebras de linha
+        error = errorMsg;
+      } else {
+        error = errorMsg;
+      }
       submitting = false;
     }
   }
@@ -269,7 +276,7 @@
   .spinner        { width: 1.75rem; height: 1.75rem; border: 3px solid var(--color-border, #e5e7eb); border-top-color: var(--color-primary, #e85d04); border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin  { to { transform: rotate(360deg); } }
   .empty-note     { color: var(--color-muted); font-size: 0.9rem; text-align: center; padding: 2rem; }
-  .alert-error    { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; padding: 0.85rem 1.1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .alert-error    { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; padding: 0.85rem 1.1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.9rem; white-space: pre-line; line-height: 1.6; }
 
   @media (max-width: 768px) {
     .order-layout { grid-template-columns: 1fr; }

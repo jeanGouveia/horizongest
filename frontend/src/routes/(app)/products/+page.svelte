@@ -8,6 +8,16 @@
   let ingredients: Ingredient[] = $state([]);
   let loading = $state(true);
   let error = $state('');
+  let showLowStockOnly = $state(false);
+  let productSearch = $state('');
+  let ingredientSearch = $state('');
+  let productSortBy = $state<string>('name');
+  let productSortOrder = $state<'asc' | 'desc'>('asc');
+  let ingredientSortBy = $state<string>('name');
+  let ingredientSortOrder = $state<'asc' | 'desc'>('asc');
+  let productCurrentPage = $state(1);
+  let ingredientCurrentPage = $state(1);
+  const itemsPerPage = 20;
 
   // Modal novo produto
   let showProductModal = $state(false);
@@ -195,6 +205,64 @@
   function formatPrice(value: number) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   }
+
+  function getStockStatus(ing: Ingredient) {
+    if (ing.StockQuantity === 0) {
+      return { label: '🔴 Estoque Zerado', class: 'stock-zero' };
+    } else if (ing.StockQuantity <= ing.MinStock) {
+      return { label: '🟡 Estoque Baixo', class: 'stock-low' };
+    }
+    return null;
+  }
+
+  const filteredIngredients = $derived(
+    (showLowStockOnly
+      ? ingredients.filter(ing => ing.StockQuantity <= ing.MinStock)
+      : ingredients.filter(ing => !ingredientSearch || ing.Name.toLowerCase().includes(ingredientSearch.toLowerCase()))
+    ).sort((a, b) => {
+      let comparison = 0;
+      if (ingredientSortBy === 'name') {
+        comparison = a.Name.localeCompare(b.Name);
+      } else if (ingredientSortBy === 'stock') {
+        comparison = a.StockQuantity - b.StockQuantity;
+      }
+      return ingredientSortOrder === 'asc' ? comparison : -comparison;
+    })
+  );
+
+  const filteredProducts = $derived(
+    products.filter(p => !productSearch || p.Name.toLowerCase().includes(productSearch.toLowerCase()))
+    .sort((a, b) => {
+      let comparison = 0;
+      if (productSortBy === 'name') {
+        comparison = a.Name.localeCompare(b.Name);
+      } else if (productSortBy === 'price') {
+        comparison = a.Price - b.Price;
+      }
+      return productSortOrder === 'asc' ? comparison : -comparison;
+    })
+  );
+
+  const productTotalPages = $derived(Math.ceil(filteredProducts.length / itemsPerPage));
+  const ingredientTotalPages = $derived(Math.ceil(filteredIngredients.length / itemsPerPage));
+  const paginatedProducts = $derived(
+    filteredProducts.slice((productCurrentPage - 1) * itemsPerPage, productCurrentPage * itemsPerPage)
+  );
+  const paginatedIngredients = $derived(
+    filteredIngredients.slice((ingredientCurrentPage - 1) * itemsPerPage, ingredientCurrentPage * itemsPerPage)
+  );
+
+  function goToProductPage(page: number) {
+    if (page >= 1 && page <= productTotalPages) {
+      productCurrentPage = page;
+    }
+  }
+
+  function goToIngredientPage(page: number) {
+    if (page >= 1 && page <= ingredientTotalPages) {
+      ingredientCurrentPage = page;
+    }
+  }
 </script>
 
 <div class="page-wrapper">
@@ -225,18 +293,46 @@
     </div>
   {:else}
     <!-- Produtos -->
-    <section class="section">
-      <h2 class="section-title">Produtos <span class="badge">{products.length}</span></h2>
+    <section class="section" aria-labelledby="products-heading">
+      <div class="section-header">
+        <h2 id="products-heading" class="section-title">Produtos <span class="badge">{products.length}</span></h2>
+        <div class="section-filters" role="search" aria-label="Filtros de produtos">
+          <label for="product-search" class="sr-only">Buscar produtos</label>
+          <input
+            id="product-search"
+            type="text"
+            placeholder="Buscar produtos..."
+            bind:value={productSearch}
+            class="search-input"
+            aria-label="Buscar produtos por nome"
+          />
+          <div class="sort-control">
+            <label for="product-sort" class="sr-only">Ordenar produtos</label>
+            <select bind:value={productSortBy} id="product-sort" class="sort-select" aria-label="Critério de ordenação de produtos">
+              <option value="name">Nome</option>
+              <option value="price">Preço</option>
+            </select>
+            <button
+              class="btn btn-sm btn-ghost"
+              onclick={() => (productSortOrder = productSortOrder === 'asc' ? 'desc' : 'asc')}
+              title={productSortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
+              aria-label={`Ordem ${productSortOrder === 'asc' ? 'crescente' : 'decrescente'}, clique para inverter`}
+            >
+              {productSortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+        </div>
+      </div>
 
-      {#if products.length === 0}
+      {#if filteredProducts.length === 0}
         <div class="empty-state">
           <p class="empty-icon">🍽️</p>
-          <p class="empty-text">Nenhum produto cadastrado ainda.</p>
+          <p class="empty-text">{productSearch ? 'Nenhum produto encontrado.' : 'Nenhum produto cadastrado ainda.'}</p>
           <button class="btn btn-primary" onclick={() => (showProductModal = true)}>Criar primeiro produto</button>
         </div>
       {:else}
         <div class="card-grid">
-          {#each products as product}
+          {#each paginatedProducts as product}
             <div class="product-card">
               <div class="product-card-header">
                 <a href="/products/{product.ID}" class="product-name">{product.Name}</a>
@@ -261,16 +357,70 @@
           {/each}
         </div>
       {/if}
+
+      {#if productTotalPages > 1}
+        <div class="pagination">
+          <button
+            class="pagination-btn"
+            disabled={productCurrentPage === 1}
+            onclick={() => goToProductPage(productCurrentPage - 1)}
+          >
+            ← Anterior
+          </button>
+          <span class="pagination-info">
+            Página {productCurrentPage} de {productTotalPages} ({filteredProducts.length} produtos)
+          </span>
+          <button
+            class="pagination-btn"
+            disabled={productCurrentPage === productTotalPages}
+            onclick={() => goToProductPage(productCurrentPage + 1)}
+          >
+            Próxima →
+          </button>
+        </div>
+      {/if}
     </section>
 
     <!-- Ingredientes -->
-    <section class="section">
-      <h2 class="section-title">Ingredientes <span class="badge">{ingredients.length}</span></h2>
+    <section class="section" aria-labelledby="ingredients-heading">
+      <div class="section-header">
+        <h2 id="ingredients-heading" class="section-title">Ingredientes <span class="badge">{ingredients.length}</span></h2>
+        <div class="section-filters" role="search" aria-label="Filtros de ingredientes">
+          <label for="ingredient-search" class="sr-only">Buscar ingredientes</label>
+          <input
+            id="ingredient-search"
+            type="text"
+            placeholder="Buscar ingredientes..."
+            bind:value={ingredientSearch}
+            class="search-input"
+            aria-label="Buscar ingredientes por nome"
+          />
+          <div class="sort-control">
+            <label for="ingredient-sort" class="sr-only">Ordenar ingredientes</label>
+            <select bind:value={ingredientSortBy} id="ingredient-sort" class="sort-select" aria-label="Critério de ordenação de ingredientes">
+              <option value="name">Nome</option>
+              <option value="stock">Estoque</option>
+            </select>
+            <button
+              class="btn btn-sm btn-ghost"
+              onclick={() => (ingredientSortOrder = ingredientSortOrder === 'asc' ? 'desc' : 'asc')}
+              title={ingredientSortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
+              aria-label={`Ordem ${ingredientSortOrder === 'asc' ? 'crescente' : 'decrescente'}, clique para inverter`}
+            >
+              {ingredientSortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+          <label class="filter-toggle">
+            <input type="checkbox" bind:checked={showLowStockOnly} aria-label="Mostrar apenas ingredientes com estoque baixo" />
+            <span>Apenas estoque baixo</span>
+          </label>
+        </div>
+      </div>
 
-      {#if ingredients.length === 0}
+      {#if filteredIngredients.length === 0}
         <div class="empty-state">
           <p class="empty-icon">🥦</p>
-          <p class="empty-text">Nenhum ingrediente cadastrado.</p>
+          <p class="empty-text">{showLowStockOnly ? 'Nenhum ingrediente com estoque baixo.' : (ingredientSearch ? 'Nenhum ingrediente encontrado.' : 'Nenhum ingrediente cadastrado.')}</p>
           <button class="btn btn-secondary" onclick={() => (showIngModal = true)}>Adicionar ingrediente</button>
         </div>
       {:else}
@@ -283,17 +433,26 @@
                 <th>Unidade</th>
                 <th>Estoque</th>
                 <th>Estoque Mínimo</th>
+                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {#each ingredients as ing}
-                <tr>
+              {#each paginatedIngredients as ing}
+                {@const stockStatus = getStockStatus(ing)}
+                <tr class:stock-zero={stockStatus?.class === 'stock-zero'} class:stock-low={stockStatus?.class === 'stock-low'}>
                   <td class="muted">{ing.ID}</td>
                   <td class="bold">{ing.Name}</td>
                   <td>{ing.Unit}</td>
                   <td>{ing.StockQuantity}</td>
                   <td>{ing.MinStock}</td>
+                  <td>
+                    {#if stockStatus}
+                      <span class="stock-badge {stockStatus.class}">{stockStatus.label}</span>
+                    {:else}
+                      <span class="stock-badge stock-ok">✅ OK</span>
+                    {/if}
+                  </td>
                   <td>
                     <button class="btn btn-sm btn-ghost" onclick={() => openIngredientEdit(ing)}>Editar</button>
                     <button class="btn btn-sm btn-ghost" onclick={() => openStockModal(ing)}>Ajustar</button>
@@ -303,6 +462,28 @@
               {/each}
             </tbody>
           </table>
+        </div>
+      {/if}
+
+      {#if ingredientTotalPages > 1}
+        <div class="pagination">
+          <button
+            class="pagination-btn"
+            disabled={ingredientCurrentPage === 1}
+            onclick={() => goToIngredientPage(ingredientCurrentPage - 1)}
+          >
+            ← Anterior
+          </button>
+          <span class="pagination-info">
+            Página {ingredientCurrentPage} de {ingredientTotalPages} ({filteredIngredients.length} ingredientes)
+          </span>
+          <button
+            class="pagination-btn"
+            disabled={ingredientCurrentPage === ingredientTotalPages}
+            onclick={() => goToIngredientPage(ingredientCurrentPage + 1)}
+          >
+            Próxima →
+          </button>
         </div>
       {/if}
     </section>
@@ -421,6 +602,9 @@
 {/if}
 
 <style>
+  /* Acessibilidade */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
   .page-wrapper   { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
   .page-header    { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2.5rem; }
   .page-title     { font-size: 1.75rem; font-weight: 700; color: var(--color-text); margin: 0; }
@@ -463,6 +647,33 @@
   .empty-icon     { font-size: 2.5rem; margin: 0; }
   .empty-text     { color: var(--color-muted); margin: 0.5rem 0 1.25rem; }
   .alert-error    { display: flex; align-items: center; gap: 1rem; background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; padding: 1rem 1.25rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+
+  /* Section header with filter */
+  .section-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .section-filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+  .filter-toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--color-text); cursor: pointer; user-select: none; white-space: nowrap; padding: 0.4rem 0.6rem; border-radius: 0.4rem; transition: background 0.15s; }
+  .filter-toggle:hover { background: var(--color-surface-2, #f5f5f5); }
+  .filter-toggle input { cursor: pointer; }
+  .search-input { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: all 0.2s ease; min-width: 180px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .search-input:focus { outline: none; border-color: var(--color-primary, #e85d04); box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
+  .sort-control { display: flex; gap: 0.25rem; }
+  .sort-select { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: all 0.2s ease; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .sort-select:focus { outline: none; border-color: var(--color-primary, #e85d04); box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
+
+  /* Paginação */
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; padding: 0.75rem; background: var(--color-surface-2, #f9fafb); border-radius: 0.4rem; }
+  .pagination-btn { padding: 0.4rem 0.85rem; border: 1px solid var(--color-border, #d1d5db); background: var(--color-surface, #fff); color: var(--color-text); border-radius: 0.35rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .pagination-btn:hover:not(:disabled) { background: var(--color-primary, #e85d04); color: #fff; border-color: var(--color-primary, #e85d04); }
+  .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pagination-info { font-size: 0.8rem; color: var(--color-muted); }
+
+  /* Stock status badges */
+  .stock-badge    { display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+  .stock-ok       { background: #dcfce7; color: #15803d; }
+  .stock-low      { background: #fef9c3; color: #854d0e; }
+  .stock-zero     { background: #fee2e2; color: #b91c1c; }
+  .ing-table tr.stock-zero { background: #fef2f2; }
+  .ing-table tr.stock-low { background: #fffbeb; }
 
   /* Modal */
   .modal-overlay  { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }

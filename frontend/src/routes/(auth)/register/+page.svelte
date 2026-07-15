@@ -17,7 +17,14 @@
     loading = false;
 
     if (err || !data) {
-      error = err ?? 'Erro ao cadastrar';
+      // Melhorar mensagem de erro específica
+      if (err?.includes('e-mail já cadastrado')) {
+        error = 'Este e-mail já está cadastrado';
+      } else if (err?.includes('dados inválidos')) {
+        error = 'Verifique os campos marcados em vermelho';
+      } else {
+        error = err ?? 'Erro ao cadastrar';
+      }
       return;
     }
 

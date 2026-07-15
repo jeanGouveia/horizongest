@@ -61,6 +61,18 @@ export const api = {
       request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
     me: () =>
-      request<{ id: number; name: string; email: string }>('/me')
+      request<{ id: number; name: string; email: string }>('/me'),
+
+    updateProfile: (body: { name: string; email: string }) =>
+      request<{ id: number; name: string; email: string }>('/me', {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      }),
+
+    changePassword: (body: { current_password: string; new_password: string }) =>
+      request<{ message: string }>('/me/change-password', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      })
   }
 };

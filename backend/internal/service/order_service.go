@@ -13,6 +13,37 @@ import (
 var ErrOrderNotFound = errors.New("pedido não encontrado")
 var ErrInvalidOrderStatus = errors.New("status de pedido inválido")
 
+// InsufficientStockError representa erro de estoque insuficiente com detalhes
+type InsufficientStockError struct {
+	Message     string
+	Ingredients []InsufficientIngredient
+}
+
+type InsufficientIngredient struct {
+	Name      string
+	Available float64
+	Required  float64
+	Shortage  float64
+	Unit      string
+}
+
+func (e *InsufficientStockError) Error() string {
+	return e.Message
+}
+
+// NewInsufficientStockError cria um erro detalhado de estoque insuficiente
+func NewInsufficientStockError(ingredients []InsufficientIngredient) *InsufficientStockError {
+	msg := "Não foi possível concluir o pedido. Ingredientes insuficientes:\n"
+	for _, ing := range ingredients {
+		msg += fmt.Sprintf("• %s\n  Disponível: %.4f %s\n  Necessário: %.4f %s\n  Faltam: %.4f %s\n\n",
+			ing.Name, ing.Available, ing.Unit, ing.Required, ing.Unit, ing.Shortage, ing.Unit)
+	}
+	return &InsufficientStockError{
+		Message:     msg,
+		Ingredients: ingredients,
+	}
+}
+
 type OrderService struct {
 	orderRepo   ports.OrderRepository
 	productRepo ports.ProductRepository
@@ -52,9 +83,12 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 
 	var total float64
 
-	// Valida produtos e monta os itens com snapshot de preço
-	items := make([]domain.OrderItem, len(in.Items))
-	for i, itemIn := range in.Items {
+	// Pré-carrega produtos e fichas técnicas antes da transação para evitar context deadline
+	productData := make(map[uint]*domain.Product)
+	productIngredients := make(map[uint][]domain.ProductIngredient)
+
+	for _, itemIn := range in.Items {
+		// Buscar produto (fora da transação)
 		p, err := s.productRepo.FindProductByID(ctx, itemIn.ProductID)
 		if err != nil {
 			return nil, fmt.Errorf("OrderService.CreateOrder: buscar produto: %w", err)
@@ -62,22 +96,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 		if p == nil || !p.Active {
 			return nil, fmt.Errorf("produto id=%d não encontrado ou inativo", itemIn.ProductID)
 		}
+		productData[itemIn.ProductID] = p
 
-		items[i] = domain.OrderItem{
-			ProductID: p.ID,
-			Quantity:  itemIn.Quantity,
-			UnitPrice: p.Price, // snapshot do preço atual
-		}
-		total += p.Price * itemIn.Quantity
-	}
-
-	order.Items = items
-	order.TotalPrice = total
-	log.Printf("Service - Pedido montado: TotalPrice=%f, Items=%d", order.TotalPrice, len(order.Items))
-
-	// Pré-carrega as fichas técnicas antes da transação para evitar context deadline
-	productIngredients := make(map[uint][]domain.ProductIngredient)
-	for _, itemIn := range in.Items {
+		// Buscar ficha técnica (fora da transação)
 		ingredients, err := s.productRepo.GetProductIngredients(ctx, itemIn.ProductID)
 		if err != nil {
 			return nil, fmt.Errorf("OrderService.CreateOrder: ficha técnica produto_id=%d: %w", itemIn.ProductID, err)
@@ -86,8 +107,35 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 		log.Printf("Service - Produto %d tem %d ingredientes na ficha técnica", itemIn.ProductID, len(ingredients))
 	}
 
-	// CreateOrder já executa a baixa de estoque em transação
-	// Passamos as fichas técnicas pré-carregadas para evitar chamadas dentro da transação
+	// Monta itens com snapshot completo (nome, descrição, preço, flag)
+	items := make([]domain.OrderItem, len(in.Items))
+	for i, itemIn := range in.Items {
+		p := productData[itemIn.ProductID]
+		items[i] = domain.OrderItem{
+			ProductID:          p.ID,
+			Quantity:           itemIn.Quantity,
+			UnitPrice:          p.Price,       // snapshot do preço
+			ProductName:        p.Name,        // snapshot do nome
+			ProductDescription: p.Description, // snapshot da descrição
+			ProductIsComposto:  p.IsComposto,  // snapshot da flag
+		}
+		total += p.Price * itemIn.Quantity
+	}
+
+	order.Items = items
+	order.TotalPrice = total
+	log.Printf("Service - Pedido montado: TotalPrice=%f, Items=%d", order.TotalPrice, len(order.Items))
+
+	// Pré-validação de estoque: coletar TODOS os ingredientes insuficientes
+	// antes de tentar criar o pedido, para retornar mensagem completa
+	insufficientIngredients := s.validateStock(ctx, in.Items, productIngredients)
+	if len(insufficientIngredients) > 0 {
+		log.Printf("Service - Estoque insuficiente: %d ingredientes faltantes", len(insufficientIngredients))
+		return nil, NewInsufficientStockError(insufficientIngredients)
+	}
+
+	// CreateOrder executa a baixa de estoque em transação
+	// Passamos os snapshots pré-carregados para evitar chamadas dentro da transação
 	if err := s.orderRepo.CreateOrder(ctx, order, productIngredients); err != nil {
 		log.Printf("Service - Erro ao criar pedido no repository: %v", err)
 		return nil, fmt.Errorf("OrderService.CreateOrder: %w", err)
@@ -95,6 +143,57 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 
 	log.Printf("Service - Pedido criado com sucesso: ID=%d", order.ID)
 	return order, nil
+}
+
+// validateStock verifica se há estoque suficiente para todos os ingredientes
+// e retorna uma lista de ingredientes insuficientes (não para no primeiro erro)
+func (s *OrderService) validateStock(ctx context.Context, items []OrderItemInput, productIngredients map[uint][]domain.ProductIngredient) []InsufficientIngredient {
+	var insufficient []InsufficientIngredient
+
+	// Mapa para acumular consumo por ingrediente
+	requiredByIngredient := make(map[uint]float64)
+
+	// Calcular quantidade necessária de cada ingrediente
+	for _, itemIn := range items {
+		ingredients, ok := productIngredients[itemIn.ProductID]
+		if !ok || len(ingredients) == 0 {
+			// Produto simples sem ficha técnica: não há ingredientes para validar
+			continue
+		}
+
+		for _, pi := range ingredients {
+			required := pi.Quantity * itemIn.Quantity
+			requiredByIngredient[pi.IngredientID] += required
+		}
+	}
+
+	// Verificar estoque disponível para cada ingrediente necessário
+	for ingredientID, required := range requiredByIngredient {
+		ing, err := s.productRepo.FindIngredientByID(ctx, ingredientID)
+		if err != nil || ing == nil {
+			// Se não conseguir buscar o ingrediente, considera como insuficiente
+			insufficient = append(insufficient, InsufficientIngredient{
+				Name:      fmt.Sprintf("Ingrediente #%d", ingredientID),
+				Available: 0,
+				Required:  required,
+				Shortage:  required,
+				Unit:      "?",
+			})
+			continue
+		}
+
+		if ing.StockQuantity < required {
+			insufficient = append(insufficient, InsufficientIngredient{
+				Name:      ing.Name,
+				Available: ing.StockQuantity,
+				Required:  required,
+				Shortage:  required - ing.StockQuantity,
+				Unit:      ing.Unit,
+			})
+		}
+	}
+
+	return insufficient
 }
 
 func (s *OrderService) ListOrders(ctx context.Context) ([]domain.Order, error) {
