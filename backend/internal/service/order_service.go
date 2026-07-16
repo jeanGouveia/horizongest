@@ -107,17 +107,22 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 		log.Printf("Service - Produto %d tem %d ingredientes na ficha técnica", itemIn.ProductID, len(ingredients))
 	}
 
-	// Monta itens com snapshot completo (nome, descrição, preço, flag)
+	// Monta itens com snapshot completo (nome, descrição, preço, flag, campos comerciais)
 	items := make([]domain.OrderItem, len(in.Items))
 	for i, itemIn := range in.Items {
 		p := productData[itemIn.ProductID]
 		items[i] = domain.OrderItem{
-			ProductID:          p.ID,
-			Quantity:           itemIn.Quantity,
-			UnitPrice:          p.Price,       // snapshot do preço
-			ProductName:        p.Name,        // snapshot do nome
-			ProductDescription: p.Description, // snapshot da descrição
-			ProductIsComposto:  p.IsComposto,  // snapshot da flag
+			ProductID:             p.ID,
+			Quantity:              itemIn.Quantity,
+			UnitPrice:             p.Price,          // snapshot do preço
+			ProductName:           p.Name,           // snapshot do nome
+			ProductDescription:    p.Description,    // snapshot da descrição
+			ProductIsComposto:     p.IsComposto,     // snapshot da flag
+			ProductPhotoURL:       p.PhotoURL,       // snapshot da foto
+			ProductCategoryID:     p.CategoryID,     // snapshot da categoria
+			ProductPromotionPrice: p.PromotionPrice, // snapshot do preço promocional
+			ProductFeatured:       p.Featured,       // snapshot do destaque
+			ProductIsNew:          p.IsNew,          // snapshot do selo novo
 		}
 		total += p.Price * itemIn.Quantity
 	}

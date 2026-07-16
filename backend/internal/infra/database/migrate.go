@@ -17,6 +17,7 @@ func RunMigrations(db *gorm.DB) error {
 		&repository.GormProduct{},
 		&repository.GormIngredient{},
 		&repository.GormProductIngredient{},
+		&repository.GormCategory{},
 		&repository.GormOrder{},
 		&repository.GormOrderItem{},
 		&repository.GormStockAdjustmentPending{},

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
@@ -22,21 +24,111 @@ func NewProductService(repo ports.ProductRepository) *ProductService {
 	return &ProductService{repo: repo}
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+func generateSlug(name string) string {
+	// Converter para minúsculas
+	slug := strings.ToLower(name)
+
+	// Remover acentos (simplificado)
+	replacements := map[rune]string{
+		'à': "a", 'á': "a", 'â': "a", 'ã': "a", 'ä': "a",
+		'è': "e", 'é': "e", 'ê': "e", 'ë': "e",
+		'ì': "i", 'í': "i", 'î': "i", 'ï': "i",
+		'ò': "o", 'ó': "o", 'ô': "o", 'õ': "o", 'ö': "o",
+		'ù': "u", 'ú': "u", 'û': "u", 'ü': "u",
+		'ç': "c",
+		'ñ': "n",
+	}
+	for char, replacement := range replacements {
+		slug = strings.ReplaceAll(slug, string(char), replacement)
+	}
+
+	// Remover caracteres especiais (exceto hífen)
+	slug = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			return r
+		}
+		return '-'
+	}, slug)
+
+	// Substituir espaços e underscores por hífen
+	slug = strings.ReplaceAll(slug, " ", "-")
+	slug = strings.ReplaceAll(slug, "_", "-")
+
+	// Remover múltiplos hífens consecutivos
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+
+	// Remover hífens no início e fim
+	slug = strings.Trim(slug, "-")
+
+	// Limitar tamanho
+	if len(slug) > 100 {
+		slug = slug[:100]
+	}
+
+	return slug
+}
+
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
 type CreateProductInput struct {
-	Name        string  `json:"name"        validate:"required,min=2,max=120"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"       validate:"required,gt=0"`
-	IsComposto  bool    `json:"is_composto"`
+	Name                   string     `json:"name"                    validate:"required,min=2,max=120"`
+	Description            string     `json:"description"`
+	Price                  float64    `json:"price"                   validate:"required,gt=0"`
+	IsComposto             bool       `json:"is_composto"`
+	PhotoURL               string     `json:"photo_url"`
+	CategoryID             *uint      `json:"category_id"`
+	DisplayOrder           int        `json:"display_order"           validate:"gte=0"`
+	PreparationTimeMinutes int        `json:"preparation_time_minutes" validate:"gte=0"`
+	Featured               bool       `json:"featured"`
+	IsNew                  bool       `json:"is_new"`
+	PromotionPrice         *float64   `json:"promotion_price"          validate:"omitempty,gt=0"`
+	PromotionStart         *time.Time `json:"promotion_start"`
+	PromotionEnd           *time.Time `json:"promotion_end"`
+	AvailableFrom          string     `json:"available_from"`
+	AvailableUntil         string     `json:"available_until"`
+	SKU                    string     `json:"sku"`
+	InternalNotes          string     `json:"internal_notes"`
+	Slug                   string     `json:"slug"`
+	MetaTitle              string     `json:"meta_title"`
+	MetaDescription        string     `json:"meta_description"`
+	AltImage               string     `json:"alt_image"`
+	Canonical              string     `json:"canonical"`
+	ExternalID             string     `json:"external_id"`
+	MarketplaceID          string     `json:"marketplace_id"`
+	SyncStatus             string     `json:"sync_status"`
 }
 
 type UpdateProductInput struct {
-	Name        string  `json:"name"        validate:"required,min=2,max=120"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"       validate:"required,gt=0"`
-	IsComposto  bool    `json:"is_composto"`
-	Active      bool    `json:"active"`
+	Name                   string     `json:"name"                    validate:"required,min=2,max=120"`
+	Description            string     `json:"description"`
+	Price                  float64    `json:"price"                   validate:"required,gt=0"`
+	IsComposto             bool       `json:"is_composto"`
+	Active                 bool       `json:"active"`
+	PhotoURL               string     `json:"photo_url"`
+	CategoryID             *uint      `json:"category_id"`
+	DisplayOrder           int        `json:"display_order"           validate:"gte=0"`
+	PreparationTimeMinutes int        `json:"preparation_time_minutes" validate:"gte=0"`
+	Featured               bool       `json:"featured"`
+	IsNew                  bool       `json:"is_new"`
+	PromotionPrice         *float64   `json:"promotion_price"          validate:"omitempty,gt=0"`
+	PromotionStart         *time.Time `json:"promotion_start"`
+	PromotionEnd           *time.Time `json:"promotion_end"`
+	AvailableFrom          string     `json:"available_from"`
+	AvailableUntil         string     `json:"available_until"`
+	SKU                    string     `json:"sku"`
+	InternalNotes          string     `json:"internal_notes"`
+	Slug                   string     `json:"slug"`
+	MetaTitle              string     `json:"meta_title"`
+	MetaDescription        string     `json:"meta_description"`
+	AltImage               string     `json:"alt_image"`
+	Canonical              string     `json:"canonical"`
+	ExternalID             string     `json:"external_id"`
+	MarketplaceID          string     `json:"marketplace_id"`
+	SyncStatus             string     `json:"sync_status"`
 }
 
 type CreateIngredientInput struct {
@@ -69,9 +161,36 @@ type UpdateStockInput struct {
 // ── Produto ──────────────────────────────────────────────────────────────────
 
 func (s *ProductService) CreateProduct(ctx context.Context, in CreateProductInput) (*domain.Product, error) {
+	// Gerar slug automaticamente se não fornecido
+	slug := in.Slug
+	if slug == "" {
+		slug = generateSlug(in.Name)
+	}
+
 	p := &domain.Product{
 		Name: in.Name, Description: in.Description,
 		Price: in.Price, IsComposto: in.IsComposto, Active: true,
+		PhotoURL:               in.PhotoURL,
+		CategoryID:             in.CategoryID,
+		DisplayOrder:           in.DisplayOrder,
+		PreparationTimeMinutes: in.PreparationTimeMinutes,
+		Featured:               in.Featured,
+		IsNew:                  in.IsNew,
+		PromotionPrice:         in.PromotionPrice,
+		PromotionStart:         in.PromotionStart,
+		PromotionEnd:           in.PromotionEnd,
+		AvailableFrom:          in.AvailableFrom,
+		AvailableUntil:         in.AvailableUntil,
+		SKU:                    in.SKU,
+		InternalNotes:          in.InternalNotes,
+		Slug:                   slug,
+		MetaTitle:              in.MetaTitle,
+		MetaDescription:        in.MetaDescription,
+		AltImage:               in.AltImage,
+		Canonical:              in.Canonical,
+		ExternalID:             in.ExternalID,
+		MarketplaceID:          in.MarketplaceID,
+		SyncStatus:             in.SyncStatus,
 	}
 	if err := s.repo.CreateProduct(ctx, p); err != nil {
 		return nil, fmt.Errorf("ProductService.CreateProduct: %w", err)
@@ -137,6 +256,33 @@ func (s *ProductService) UpdateProduct(ctx context.Context, id uint, in UpdatePr
 	p.Price = in.Price
 	p.IsComposto = in.IsComposto
 	p.Active = in.Active
+	p.PhotoURL = in.PhotoURL
+	p.CategoryID = in.CategoryID
+	p.DisplayOrder = in.DisplayOrder
+	p.PreparationTimeMinutes = in.PreparationTimeMinutes
+	p.Featured = in.Featured
+	p.IsNew = in.IsNew
+	p.PromotionPrice = in.PromotionPrice
+	p.PromotionStart = in.PromotionStart
+	p.PromotionEnd = in.PromotionEnd
+	p.AvailableFrom = in.AvailableFrom
+	p.AvailableUntil = in.AvailableUntil
+	p.SKU = in.SKU
+	p.InternalNotes = in.InternalNotes
+
+	// Gerar slug automaticamente se não fornecido ou se nome mudou
+	if in.Slug == "" || in.Slug != p.Slug {
+		p.Slug = generateSlug(in.Name)
+	} else {
+		p.Slug = in.Slug
+	}
+	p.MetaTitle = in.MetaTitle
+	p.MetaDescription = in.MetaDescription
+	p.AltImage = in.AltImage
+	p.Canonical = in.Canonical
+	p.ExternalID = in.ExternalID
+	p.MarketplaceID = in.MarketplaceID
+	p.SyncStatus = in.SyncStatus
 
 	if err := s.repo.UpdateProduct(ctx, p); err != nil {
 		return nil, fmt.Errorf("ProductService.UpdateProduct: %w", err)

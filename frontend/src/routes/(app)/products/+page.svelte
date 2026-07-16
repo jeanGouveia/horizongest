@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { getProducts, createProduct, updateProduct, deleteProduct } from '$lib/api/product';
   import type { Product } from '$lib/types/product';
-  import { Card, Button, Input, Textarea, Select, Checkbox, Badge, Alert, Loading, EmptyState, Modal, Table, Skeleton } from '$lib/components/ui';
+  import { Card, Button, Input, Textarea, Select, Checkbox, Badge, Alert, Loading, EmptyState, Modal, Table, Skeleton, ProductCard } from '$lib/components/ui';
   import { Workspace } from '$lib/components/layout';
   import { Search, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, Activity, MoreHorizontal, Filter, ArrowUpDown } from '@lucide/svelte';
 
@@ -13,13 +13,20 @@
   let productSortBy = $state<string>('name');
   let productSortOrder = $state<'asc' | 'desc'>('asc');
   let productCurrentPage = $state(1);
+  let productFilter = $state<'all' | 'active' | 'archived' | 'promotion' | 'new' | 'featured' | 'composto'>('all');
   const itemsPerPage = 12;
 
   // Modal novo produto
   let showProductModal = $state(false);
   let productEditMode = $state(false);
   let productEditId = $state<number | null>(null);
-  let productForm = $state({ Name: '', Description: '', Price: 0, IsComposto: false, Active: true });
+  let productForm = $state({
+    Name: '', Description: '', Price: 0, IsComposto: false, Active: true,
+    PhotoURL: '', CategoryID: undefined as number | undefined, DisplayOrder: 0, PreparationTimeMinutes: 0,
+    Featured: false, IsNew: false, PromotionPrice: undefined as number | undefined,
+    PromotionStart: undefined as string | undefined, PromotionEnd: undefined as string | undefined,
+    AvailableFrom: '', AvailableUntil: '', SKU: '', InternalNotes: ''
+  });
   let productSaving = $state(false);
   let productError = $state('');
 
@@ -50,6 +57,19 @@
         price: Number(productForm.Price),
         is_composto: productForm.IsComposto,
         active: productForm.Active,
+        photo_url: productForm.PhotoURL,
+        category_id: productForm.CategoryID,
+        display_order: Number(productForm.DisplayOrder),
+        preparation_time_minutes: Number(productForm.PreparationTimeMinutes),
+        featured: productForm.Featured,
+        is_new: productForm.IsNew,
+        promotion_price: productForm.PromotionPrice ? Number(productForm.PromotionPrice) : undefined,
+        promotion_start: productForm.PromotionStart,
+        promotion_end: productForm.PromotionEnd,
+        available_from: productForm.AvailableFrom,
+        available_until: productForm.AvailableUntil,
+        sku: productForm.SKU,
+        internal_notes: productForm.InternalNotes,
       };
 
       if (productEditMode && productEditId) {
@@ -61,7 +81,12 @@
       }
 
       showProductModal = false;
-      productForm = { Name: '', Description: '', Price: 0, IsComposto: false, Active: true };
+      productForm = {
+        Name: '', Description: '', Price: 0, IsComposto: false, Active: true,
+        PhotoURL: '', CategoryID: undefined, DisplayOrder: 0, PreparationTimeMinutes: 0,
+        Featured: false, IsNew: false, PromotionPrice: undefined, PromotionStart: undefined,
+        PromotionEnd: undefined, AvailableFrom: '', AvailableUntil: '', SKU: '', InternalNotes: ''
+      };
       productEditMode = false;
       productEditId = null;
     } catch (e: any) {
@@ -80,15 +105,25 @@
       Price: product.Price,
       IsComposto: product.IsComposto,
       Active: product.Active,
+      PhotoURL: product.PhotoURL ?? '',
+      CategoryID: product.CategoryID,
+      DisplayOrder: product.DisplayOrder,
+      PreparationTimeMinutes: product.PreparationTimeMinutes,
+      Featured: product.Featured,
+      IsNew: product.IsNew,
+      PromotionPrice: product.PromotionPrice,
+      PromotionStart: product.PromotionStart,
+      PromotionEnd: product.PromotionEnd,
+      AvailableFrom: product.AvailableFrom ?? '',
+      AvailableUntil: product.AvailableUntil ?? '',
+      SKU: product.SKU ?? '',
+      InternalNotes: product.InternalNotes ?? '',
     };
     showProductModal = true;
   }
 
   function openProductCreate() {
-    productEditMode = false;
-    productEditId = null;
-    productForm = { Name: '', Description: '', Price: 0, IsComposto: false, Active: true };
-    showProductModal = true;
+    window.location.href = '/products/new';
   }
 
   async function deleteProductById(id: number) {
@@ -98,6 +133,140 @@
       products = products.filter(p => p.ID !== id);
     } catch (e: any) {
       error = e?.message ?? 'Erro ao excluir produto.';
+    }
+  }
+
+  async function duplicateProduct(id: number) {
+    if (!confirm('Tem certeza que deseja duplicar este produto?')) return;
+    try {
+      const product = products.find(p => p.ID === id);
+      if (!product) return;
+      
+      const payload = {
+        name: product.Name + ' (Cópia)',
+        description: product.Description,
+        price: product.Price,
+        is_composto: product.IsComposto,
+        active: false, // Cópia começa inativa
+        photo_url: product.PhotoURL,
+        category_id: product.CategoryID,
+        display_order: product.DisplayOrder,
+        preparation_time_minutes: product.PreparationTimeMinutes,
+        featured: false, // Cópia não destacada
+        is_new: false, // Cópia não é nova
+        promotion_price: product.PromotionPrice,
+        promotion_start: product.PromotionStart,
+        promotion_end: product.PromotionEnd,
+        available_from: product.AvailableFrom,
+        available_until: product.AvailableUntil,
+        sku: product.SKU,
+        internal_notes: product.InternalNotes,
+      };
+      
+      const created = await createProduct(payload);
+      products = [...products, created];
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao duplicar produto.';
+    }
+  }
+
+  async function archiveProduct(id: number) {
+    if (!confirm('Tem certeza que deseja arquivar este produto?')) return;
+    try {
+      const product = products.find(p => p.ID === id);
+      if (!product) return;
+      
+      const payload = {
+        name: product.Name,
+        description: product.Description,
+        price: product.Price,
+        is_composto: product.IsComposto,
+        active: false, // Arquivar = desativar
+        photo_url: product.PhotoURL,
+        category_id: product.CategoryID,
+        display_order: product.DisplayOrder,
+        preparation_time_minutes: product.PreparationTimeMinutes,
+        featured: product.Featured,
+        is_new: product.IsNew,
+        promotion_price: product.PromotionPrice,
+        promotion_start: product.PromotionStart,
+        promotion_end: product.PromotionEnd,
+        available_from: product.AvailableFrom,
+        available_until: product.AvailableUntil,
+        sku: product.SKU,
+        internal_notes: product.InternalNotes,
+      };
+      
+      const updated = await updateProduct(id, payload);
+      products = products.map(p => p.ID === id ? updated : p);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao arquivar produto.';
+    }
+  }
+
+  async function toggleProductActive(id: number) {
+    try {
+      const product = products.find(p => p.ID === id);
+      if (!product) return;
+      
+      const payload = {
+        name: product.Name,
+        description: product.Description,
+        price: product.Price,
+        is_composto: product.IsComposto,
+        active: !product.Active,
+        photo_url: product.PhotoURL,
+        category_id: product.CategoryID,
+        display_order: product.DisplayOrder,
+        preparation_time_minutes: product.PreparationTimeMinutes,
+        featured: product.Featured,
+        is_new: product.IsNew,
+        promotion_price: product.PromotionPrice,
+        promotion_start: product.PromotionStart,
+        promotion_end: product.PromotionEnd,
+        available_from: product.AvailableFrom,
+        available_until: product.AvailableUntil,
+        sku: product.SKU,
+        internal_notes: product.InternalNotes,
+      };
+      
+      const updated = await updateProduct(id, payload);
+      products = products.map(p => p.ID === id ? updated : p);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao alterar status do produto.';
+    }
+  }
+
+  async function toggleProductFeatured(id: number) {
+    try {
+      const product = products.find(p => p.ID === id);
+      if (!product) return;
+      
+      const payload = {
+        name: product.Name,
+        description: product.Description,
+        price: product.Price,
+        is_composto: product.IsComposto,
+        active: product.Active,
+        photo_url: product.PhotoURL,
+        category_id: product.CategoryID,
+        display_order: product.DisplayOrder,
+        preparation_time_minutes: product.PreparationTimeMinutes,
+        featured: !product.Featured,
+        is_new: product.IsNew,
+        promotion_price: product.PromotionPrice,
+        promotion_start: product.PromotionStart,
+        promotion_end: product.PromotionEnd,
+        available_from: product.AvailableFrom,
+        available_until: product.AvailableUntil,
+        sku: product.SKU,
+        internal_notes: product.InternalNotes,
+      };
+      
+      const updated = await updateProduct(id, payload);
+      products = products.map(p => p.ID === id ? updated : p);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao alterar destaque do produto.';
     }
   }
 
@@ -116,7 +285,30 @@
 
 
   const filteredProducts = $derived(
-    products.filter(p => !productSearch || p.Name.toLowerCase().includes(productSearch.toLowerCase()))
+    products.filter(p => {
+      // Filtro de busca
+      if (productSearch && !p.Name.toLowerCase().includes(productSearch.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro de status
+      switch (productFilter) {
+        case 'active':
+          return p.Active;
+        case 'archived':
+          return !p.Active;
+        case 'promotion':
+          return p.PromotionPrice !== undefined && p.PromotionPrice > 0;
+        case 'new':
+          return p.IsNew;
+        case 'featured':
+          return p.Featured;
+        case 'composto':
+          return p.IsComposto;
+        default:
+          return true;
+      }
+    })
     .sort((a, b) => {
       let comparison = 0;
       if (productSortBy === 'name') {
@@ -200,6 +392,18 @@
           </div>
         </div>
         <div class="filter-group">
+          <label class="filter-label">Filtrar por</label>
+          <Select bind:value={productFilter} class="filter-select">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="archived">Arquivados</option>
+            <option value="promotion">Em promoção</option>
+            <option value="new">Novidades</option>
+            <option value="featured">Destaques</option>
+            <option value="composto">Compostos</option>
+          </Select>
+        </div>
+        <div class="filter-group">
           <label class="filter-label">Ordenar por</label>
           <div class="sort-wrapper">
             <Select bind:value={productSortBy} class="sort-select">
@@ -242,42 +446,15 @@
     {:else}
       <div class="products-grid">
         {#each paginatedProducts as product}
-          {@const lowStock = getProductLowStockStatus(product)}
-          <Card class="product-card">
-            <div class="product-card-top">
-              <div class="product-info">
-                <a href="/products/{product.ID}" class="product-name">{product.Name}</a>
-                {#if product.Description}
-                  <p class="product-desc">{product.Description}</p>
-                {/if}
-              </div>
-              <div class="product-price">{formatPrice(product.Price)}</div>
-            </div>
-            
-            <div class="product-meta">
-              {#if product.IsComposto}
-                <Badge variant="primary" size="sm">Composto</Badge>
-              {/if}
-              <Badge variant={product.Active ? 'success' : 'default'} size="sm">
-                {product.Active ? 'Ativo' : 'Inativo'}
-              </Badge>
-              {#if lowStock}
-                <Badge variant="warning" size="sm" icon>
-                  <AlertTriangle size={12} />
-                  {lowStock.count}/{lowStock.total} ingredientes baixos
-                </Badge>
-              {/if}
-            </div>
-
-            <div class="product-actions">
-              <Button variant="ghost" size="sm" onclick={() => openProductEdit(product)}>
-                Editar
-              </Button>
-              <Button variant="ghost" size="sm" onclick={() => deleteProductById(product.ID)} class="danger">
-                Excluir
-              </Button>
-            </div>
-          </Card>
+          <ProductCard
+            product={product}
+            onClick={() => window.location.href = `/products/${product.ID}/edit`}
+            onEdit={() => window.location.href = `/products/${product.ID}/edit`}
+            onDuplicate={() => duplicateProduct(product.ID)}
+            onArchive={() => archiveProduct(product.ID)}
+            onToggleActive={() => toggleProductActive(product.ID)}
+            onToggleFeatured={() => toggleProductFeatured(product.ID)}
+          />
         {/each}
       </div>
 
@@ -420,8 +597,18 @@
 
   .filters-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .filters-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .filter-select {
+    width: 100%;
   }
 
   .filter-group {
@@ -489,9 +676,16 @@
   /* Products Grid */
   .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
     margin-bottom: 2rem;
+  }
+
+  @media (max-width: 768px) {
+    .products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
   }
 
   .product-card {

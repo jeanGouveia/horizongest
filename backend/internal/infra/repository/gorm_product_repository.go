@@ -15,15 +15,41 @@ import (
 // ─── GORM models ────────────────────────────────────────────────────────────
 
 type GormProduct struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement"`
-	Name        string `gorm:"not null"`
-	Description string
-	Price       float64 `gorm:"not null;default:0"`
-	IsComposto  bool    `gorm:"not null;default:false"`
-	Active      bool    `gorm:"not null;default:true"`
-	DeletedAt   *int64  `gorm:"index"`
-	CreatedAt   int64   `gorm:"autoCreateTime"`
-	UpdatedAt   int64   `gorm:"autoUpdateTime"`
+	ID                     uint   `gorm:"primaryKey;autoIncrement"`
+	Name                   string `gorm:"not null"`
+	Description            string
+	Price                  float64 `gorm:"not null;default:0"`
+	IsComposto             bool    `gorm:"not null;default:false"`
+	Active                 bool    `gorm:"not null;default:true"`
+	PhotoURL               string
+	CategoryID             *uint `gorm:"index"`
+	DisplayOrder           int   `gorm:"not null;default:0"`
+	PreparationTimeMinutes int   `gorm:"not null;default:0"`
+	Featured               bool  `gorm:"not null;default:false"`
+	IsNew                  bool  `gorm:"not null;default:false"`
+	PromotionPrice         *float64
+	PromotionStart         *int64
+	PromotionEnd           *int64
+	AvailableFrom          string
+	AvailableUntil         string
+	SKU                    string
+	InternalNotes          string
+	DeletedAt              *int64 `gorm:"index"`
+	CreatedAt              int64  `gorm:"autoCreateTime"`
+	UpdatedAt              int64  `gorm:"autoUpdateTime"`
+
+	// SEO fields para Cardápio Digital
+	Slug            string `gorm:"uniqueIndex"`
+	MetaTitle       string
+	MetaDescription string
+	AltImage        string
+	Canonical       string
+
+	// iFood integration fields
+	ExternalID    string
+	MarketplaceID string
+	SyncStatus    string
+	LastSync      *int64
 }
 
 func (GormProduct) TableName() string { return "products" }
@@ -53,6 +79,19 @@ type GormProductIngredient struct {
 
 func (GormProductIngredient) TableName() string { return "product_ingredients" }
 
+type GormCategory struct {
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	Name         string `gorm:"not null"`
+	Description  string
+	DisplayOrder int    `gorm:"not null;default:0"`
+	Active       bool   `gorm:"not null;default:true"`
+	DeletedAt    *int64 `gorm:"index"`
+	CreatedAt    int64  `gorm:"autoCreateTime"`
+	UpdatedAt    int64  `gorm:"autoUpdateTime"`
+}
+
+func (GormCategory) TableName() string { return "categories" }
+
 // ─── Repository ─────────────────────────────────────────────────────────────
 
 var _ ports.ProductRepository = (*GormProductRepository)(nil)
@@ -69,6 +108,33 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 	m := GormProduct{
 		Name: p.Name, Description: p.Description,
 		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
+		PhotoURL:               p.PhotoURL,
+		CategoryID:             p.CategoryID,
+		DisplayOrder:           p.DisplayOrder,
+		PreparationTimeMinutes: p.PreparationTimeMinutes,
+		Featured:               p.Featured,
+		IsNew:                  p.IsNew,
+		PromotionPrice:         p.PromotionPrice,
+		AvailableFrom:          p.AvailableFrom,
+		AvailableUntil:         p.AvailableUntil,
+		SKU:                    p.SKU,
+		InternalNotes:          p.InternalNotes,
+		Slug:                   p.Slug,
+		MetaTitle:              p.MetaTitle,
+		MetaDescription:        p.MetaDescription,
+		AltImage:               p.AltImage,
+		Canonical:              p.Canonical,
+		ExternalID:             p.ExternalID,
+		MarketplaceID:          p.MarketplaceID,
+		SyncStatus:             p.SyncStatus,
+	}
+	if p.PromotionStart != nil {
+		ps := p.PromotionStart.Unix()
+		m.PromotionStart = &ps
+	}
+	if p.PromotionEnd != nil {
+		pe := p.PromotionEnd.Unix()
+		m.PromotionEnd = &pe
 	}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
 		return fmt.Errorf("CreateProduct: %w", err)
@@ -119,6 +185,33 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 	m := GormProduct{
 		ID: p.ID, Name: p.Name, Description: p.Description,
 		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
+		PhotoURL:               p.PhotoURL,
+		CategoryID:             p.CategoryID,
+		DisplayOrder:           p.DisplayOrder,
+		PreparationTimeMinutes: p.PreparationTimeMinutes,
+		Featured:               p.Featured,
+		IsNew:                  p.IsNew,
+		PromotionPrice:         p.PromotionPrice,
+		AvailableFrom:          p.AvailableFrom,
+		AvailableUntil:         p.AvailableUntil,
+		SKU:                    p.SKU,
+		InternalNotes:          p.InternalNotes,
+		Slug:                   p.Slug,
+		MetaTitle:              p.MetaTitle,
+		MetaDescription:        p.MetaDescription,
+		AltImage:               p.AltImage,
+		Canonical:              p.Canonical,
+		ExternalID:             p.ExternalID,
+		MarketplaceID:          p.MarketplaceID,
+		SyncStatus:             p.SyncStatus,
+	}
+	if p.PromotionStart != nil {
+		ps := p.PromotionStart.Unix()
+		m.PromotionStart = &ps
+	}
+	if p.PromotionEnd != nil {
+		pe := p.PromotionEnd.Unix()
+		m.PromotionEnd = &pe
 	}
 	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
 		return fmt.Errorf("UpdateProduct: %w", err)
@@ -310,11 +403,46 @@ func productToDomain(m *GormProduct) *domain.Product {
 		dt := time.Unix(*m.DeletedAt, 0)
 		deletedAt = &dt
 	}
+	var promotionStart, promotionEnd, lastSync *time.Time
+	if m.PromotionStart != nil {
+		ps := time.Unix(*m.PromotionStart, 0)
+		promotionStart = &ps
+	}
+	if m.PromotionEnd != nil {
+		pe := time.Unix(*m.PromotionEnd, 0)
+		promotionEnd = &pe
+	}
+	if m.LastSync != nil {
+		ls := time.Unix(*m.LastSync, 0)
+		lastSync = &ls
+	}
 	return &domain.Product{
 		ID: m.ID, Name: m.Name, Description: m.Description,
 		Price: m.Price, IsComposto: m.IsComposto, Active: m.Active,
-		DeletedAt: deletedAt,
-		CreatedAt: time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
+		PhotoURL:               m.PhotoURL,
+		CategoryID:             m.CategoryID,
+		DisplayOrder:           m.DisplayOrder,
+		PreparationTimeMinutes: m.PreparationTimeMinutes,
+		Featured:               m.Featured,
+		IsNew:                  m.IsNew,
+		PromotionPrice:         m.PromotionPrice,
+		PromotionStart:         promotionStart,
+		PromotionEnd:           promotionEnd,
+		AvailableFrom:          m.AvailableFrom,
+		AvailableUntil:         m.AvailableUntil,
+		SKU:                    m.SKU,
+		InternalNotes:          m.InternalNotes,
+		DeletedAt:              deletedAt,
+		CreatedAt:              time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
+		Slug:            m.Slug,
+		MetaTitle:       m.MetaTitle,
+		MetaDescription: m.MetaDescription,
+		AltImage:        m.AltImage,
+		Canonical:       m.Canonical,
+		ExternalID:      m.ExternalID,
+		MarketplaceID:   m.MarketplaceID,
+		SyncStatus:      m.SyncStatus,
+		LastSync:        lastSync,
 	}
 }
 

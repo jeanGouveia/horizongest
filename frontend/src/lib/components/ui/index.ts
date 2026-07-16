@@ -22,3 +22,6 @@ export { default as Section } from './Section.svelte';
 export { default as Divider } from './Divider.svelte';
 export { default as Skeleton } from './Skeleton.svelte';
 export { default as Toast } from './Toast.svelte';
+export { default as TabNavigation } from './TabNavigation.svelte';
+export { default as PhotoUpload } from './PhotoUpload.svelte';
+export { default as ProductCard } from './ProductCard.svelte';

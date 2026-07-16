@@ -28,16 +28,21 @@ type GormOrder struct {
 func (GormOrder) TableName() string { return "orders" }
 
 type GormOrderItem struct {
-	ID                 uint         `gorm:"primaryKey;autoIncrement"`
-	OrderID            uint         `gorm:"not null;index"`
-	ProductID          uint         `gorm:"not null"`
-	Quantity           float64      `gorm:"not null"`
-	UnitPrice          float64      `gorm:"not null"`
-	ProductName        string       `gorm:"not null"`               // snapshot do nome
-	ProductDescription string       `gorm:"type:text"`              // snapshot da descrição
-	ProductIsComposto  bool         `gorm:"not null;default:false"` // snapshot da flag
-	DeletedAt          *int64       `gorm:"index"`
-	Product            *GormProduct `gorm:"foreignKey:ProductID"`
+	ID                    uint         `gorm:"primaryKey;autoIncrement"`
+	OrderID               uint         `gorm:"not null;index"`
+	ProductID             uint         `gorm:"not null"`
+	Quantity              float64      `gorm:"not null"`
+	UnitPrice             float64      `gorm:"not null"`
+	ProductName           string       `gorm:"not null"`               // snapshot do nome
+	ProductDescription    string       `gorm:"type:text"`              // snapshot da descrição
+	ProductIsComposto     bool         `gorm:"not null;default:false"` // snapshot da flag
+	ProductPhotoURL       string       // snapshot da foto
+	ProductCategoryID     *uint        // snapshot da categoria
+	ProductPromotionPrice *float64     // snapshot do preço promocional
+	ProductFeatured       bool         `gorm:"not null;default:false"` // snapshot do destaque
+	ProductIsNew          bool         `gorm:"not null;default:false"` // snapshot do selo novo
+	DeletedAt             *int64       `gorm:"index"`
+	Product               *GormProduct `gorm:"foreignKey:ProductID"`
 }
 
 func (GormOrderItem) TableName() string { return "order_items" }
@@ -81,13 +86,18 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			// 2a. Persiste o item com snapshot pré-carregado (princípio #4: Histórico é imutável)
 			// O snapshot já foi montado no service para evitar chamadas dentro da transação
 			gItem := GormOrderItem{
-				OrderID:            item.OrderID,
-				ProductID:          item.ProductID,
-				Quantity:           item.Quantity,
-				UnitPrice:          item.UnitPrice,
-				ProductName:        item.ProductName,        // snapshot do nome
-				ProductDescription: item.ProductDescription, // snapshot da descrição
-				ProductIsComposto:  item.ProductIsComposto,  // snapshot da flag
+				OrderID:               item.OrderID,
+				ProductID:             item.ProductID,
+				Quantity:              item.Quantity,
+				UnitPrice:             item.UnitPrice,
+				ProductName:           item.ProductName,           // snapshot do nome
+				ProductDescription:    item.ProductDescription,    // snapshot da descrição
+				ProductIsComposto:     item.ProductIsComposto,     // snapshot da flag
+				ProductPhotoURL:       item.ProductPhotoURL,       // snapshot da foto
+				ProductCategoryID:     item.ProductCategoryID,     // snapshot da categoria
+				ProductPromotionPrice: item.ProductPromotionPrice, // snapshot do preço promocional
+				ProductFeatured:       item.ProductFeatured,       // snapshot do destaque
+				ProductIsNew:          item.ProductIsNew,          // snapshot do selo novo
 			}
 			if err := tx.Create(&gItem).Error; err != nil {
 				return fmt.Errorf("CreateOrder: criar item produto_id=%d: %w", item.ProductID, err)
@@ -141,14 +151,19 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 	order.Items = make([]domain.OrderItem, len(gItems))
 	for i, gi := range gItems {
 		item := domain.OrderItem{
-			ID:                 gi.ID,
-			OrderID:            gi.OrderID,
-			ProductID:          gi.ProductID,
-			Quantity:           gi.Quantity,
-			UnitPrice:          gi.UnitPrice,
-			ProductName:        gi.ProductName,        // snapshot
-			ProductDescription: gi.ProductDescription, // snapshot
-			ProductIsComposto:  gi.ProductIsComposto,  // snapshot
+			ID:                    gi.ID,
+			OrderID:               gi.OrderID,
+			ProductID:             gi.ProductID,
+			Quantity:              gi.Quantity,
+			UnitPrice:             gi.UnitPrice,
+			ProductName:           gi.ProductName,           // snapshot
+			ProductDescription:    gi.ProductDescription,    // snapshot
+			ProductIsComposto:     gi.ProductIsComposto,     // snapshot
+			ProductPhotoURL:       gi.ProductPhotoURL,       // snapshot
+			ProductCategoryID:     gi.ProductCategoryID,     // snapshot
+			ProductPromotionPrice: gi.ProductPromotionPrice, // snapshot
+			ProductFeatured:       gi.ProductFeatured,       // snapshot
+			ProductIsNew:          gi.ProductIsNew,          // snapshot
 		}
 		if gi.Product != nil {
 			item.Product = &domain.Product{

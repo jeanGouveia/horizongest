@@ -36,18 +36,24 @@ func main() {
 	// --- Injeção de Dependência (DI manual, sem framework) ---
 	userRepo := repository.NewGormUserRepository(db)
 	productRepo := repository.NewGormProductRepository(db)
+	categoryRepo := repository.NewGormCategoryRepository(db)
 	stockAdjustmentRepo := repository.NewGormStockAdjustmentRepository(db, productRepo)
 	orderRepo := repository.NewGormOrderRepository(db, productRepo, stockAdjustmentRepo)
+	mediaRepo := repository.NewGormMediaRepository(db)
 
 	authSvc := service.NewAuthService(userRepo)
 	productSvc := service.NewProductService(productRepo)
+	categorySvc := service.NewCategoryService(categoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
+	mediaSvc := service.NewMediaService(mediaRepo)
 
 	authHandler := handler.NewAuthHandler(authSvc)
 	productHandler := handler.NewProductHandler(productSvc)
+	categoryHandler := handler.NewCategoryHandler(categorySvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	stockAdjustmentHandler := handler.NewStockAdjustmentHandler(stockAdjustmentSvc)
+	mediaHandler := handler.NewMediaHandler(mediaSvc)
 	authMw := middleware.NewAuthMiddleware(authSvc)
 
 	// --- Router ---
@@ -99,6 +105,13 @@ func main() {
 		r.Delete("/api/ingredients/{id}", productHandler.DeleteIngredient)
 		r.Patch("/api/ingredients/{id}/stock", productHandler.UpdateIngredientStock)
 
+		// Categorias
+		r.Post("/api/categories", categoryHandler.CreateCategory)
+		r.Get("/api/categories", categoryHandler.ListCategories)
+		r.Get("/api/categories/{id}", categoryHandler.GetCategory)
+		r.Put("/api/categories/{id}", categoryHandler.UpdateCategory)
+		r.Delete("/api/categories/{id}", categoryHandler.DeleteCategory)
+
 		// Pedidos
 		r.Post("/api/orders", orderHandler.CreateOrder)
 		r.Get("/api/orders", orderHandler.ListOrders)
@@ -109,7 +122,16 @@ func main() {
 		r.Get("/api/stock-adjustments/pending", stockAdjustmentHandler.ListPendingAdjustments)
 		r.Post("/api/stock-adjustments/{id}/approve", stockAdjustmentHandler.ApproveAdjustment)
 		r.Post("/api/stock-adjustments/{id}/reject", stockAdjustmentHandler.RejectAdjustment)
+
+		// Mídia
+		r.Post("/api/media/upload", mediaHandler.UploadMedia)
+		r.Get("/api/media/{id}", mediaHandler.GetMedia)
+		r.Delete("/api/media/{id}", mediaHandler.DeleteMedia)
+		r.Get("/api/media/entity/{entity_type}/{entity_id}", mediaHandler.GetMediaByEntity)
 	})
+
+	// --- Rotas públicas para servir arquivos estáticos ---
+	r.Get("/uploads/*", mediaHandler.ServeFile)
 
 	// --- Servidor ---
 	port := getEnv("PORT", "8080")

@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { Product, ProductCreatePayload, ProductIngredientPayload } from '$lib/types/product';
+import type { Product, ProductCreatePayload, ProductUpdatePayload, ProductIngredientPayload } from '$lib/types/product';
 import type { Ingredient, IngredientCreatePayload } from '$lib/types/ingredient';
 
 // ── Produtos ────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export async function createProduct(payload: ProductCreatePayload): Promise<Prod
   return res.data!;
 }
 
-export async function updateProduct(id: number, payload: ProductCreatePayload): Promise<Product> {
+export async function updateProduct(id: number, payload: ProductUpdatePayload): Promise<Product> {
   const res = await request<Product>(`/products/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload)
