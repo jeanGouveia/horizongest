@@ -3,6 +3,9 @@
   import { getOrders } from '$lib/api/order';
   import type { Order } from '$lib/types/order';
   import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '$lib/types/order';
+  import { Button, Input, Badge, Alert, Card, Skeleton } from '$lib/components/ui';
+  import { Workspace } from '$lib/components/layout';
+  import { Search, Calendar, DollarSign, Clock, Filter, ArrowUpDown, Plus, ShoppingBag, Activity, MoreHorizontal } from '@lucide/svelte';
 
   let orders: Order[] = $state([]);
   let loading = $state(true);
@@ -14,7 +17,7 @@
   let sortBy = $state<string>('date');
   let sortOrder = $state<'asc' | 'desc'>('desc');
   let currentPage = $state(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = 12;
 
   onMount(loadOrders);
 
@@ -32,37 +35,33 @@
 
   const filtered = $derived(
     orders.filter((order) => {
-      // Filtro por status
       if (filterStatus !== 'all' && order.Status !== filterStatus) return false;
 
-      // Filtro por busca (ID ou nome de produtos)
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const idMatch = order.ID.toString().includes(query);
         const productsMatch = order.Items.some(item =>
-          item.ProductName.toLowerCase().includes(query)
+          item.Product?.Name?.toLowerCase().includes(query)
         );
         if (!idMatch && !productsMatch) return false;
       }
 
-      // Filtro por data
       if (dateFrom) {
-        const orderDate = new Date(order.CreatedAt).setHours(0, 0, 0, 0);
+        const orderDate = new Date(order.CreatedAt || '').setHours(0, 0, 0, 0);
         const fromDate = new Date(dateFrom).setHours(0, 0, 0, 0);
         if (orderDate < fromDate) return false;
       }
       if (dateTo) {
-        const orderDate = new Date(order.CreatedAt).setHours(23, 59, 59, 999);
+        const orderDate = new Date(order.CreatedAt || '').setHours(23, 59, 59, 999);
         const toDate = new Date(dateTo).setHours(23, 59, 59, 999);
         if (orderDate > toDate) return false;
       }
 
       return true;
     }).sort((a, b) => {
-      // Ordenação
       let comparison = 0;
       if (sortBy === 'date') {
-        comparison = new Date(a.CreatedAt).getTime() - new Date(b.CreatedAt).getTime();
+        comparison = new Date(a.CreatedAt || '').getTime() - new Date(b.CreatedAt || '').getTime();
       } else if (sortBy === 'total') {
         comparison = a.TotalPrice - b.TotalPrice;
       } else if (sortBy === 'id') {
@@ -83,14 +82,6 @@
     }
   }
 
-  function nextPage() {
-    goToPage(currentPage + 1);
-  }
-
-  function prevPage() {
-    goToPage(currentPage - 1);
-  }
-
   function formatDate(d?: string) {
     if (!d) return '—';
     return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(d));
@@ -98,6 +89,18 @@
 
   function formatTotal(v: number) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  }
+
+  function getStatusVariant(status: string) {
+    switch (status) {
+      case 'pending': return 'warning';
+      case 'confirmed': return 'primary';
+      case 'preparing': return 'info';
+      case 'ready': return 'success';
+      case 'delivered': return 'success';
+      case 'cancelled': return 'danger';
+      default: return 'default';
+    }
   }
 
   const STATUS_OPTIONS = [
@@ -110,7 +113,6 @@
     { value: 'cancelled', label: 'Cancelados' },
   ];
 
-  // Contagem por status para os pills
   const countByStatus = $derived(
     orders.reduce<Record<string, number>>((acc, o) => {
       acc[o.Status] = (acc[o.Status] ?? 0) + 1;
@@ -119,237 +121,586 @@
   );
 </script>
 
-<div class="page-wrapper">
-  <header class="page-header">
-    <div>
-      <h1 class="page-title">Pedidos</h1>
-      <p class="page-subtitle">{orders.length} pedido{orders.length !== 1 ? 's' : ''} registrado{orders.length !== 1 ? 's' : ''}</p>
-    </div>
-    <a href="/orders/new" class="btn btn-primary">+ Novo Pedido</a>
-  </header>
-
-  <!-- Filtros -->
-  <div class="filter-section" role="region" aria-label="Filtros de pedidos">
-    <div class="filter-row" role="group" aria-label="Filtro por status">
-      {#each STATUS_OPTIONS as opt}
-        <button
-          class="filter-pill"
-          class:active={filterStatus === opt.value}
-          onclick={() => (filterStatus = opt.value)}
-          aria-pressed={filterStatus === opt.value}
-          aria-label={`Filtrar por ${opt.label}`}
-        >
-          {opt.label}
-          {#if opt.value !== 'all' && countByStatus[opt.value]}
-            <span class="pill-count" aria-label={`${countByStatus[opt.value]} pedidos`}>{countByStatus[opt.value]}</span>
-          {/if}
-        </button>
-      {/each}
-    </div>
-
-    <div class="filter-controls" role="search" aria-label="Busca e filtros adicionais">
-      <div class="filter-control">
-        <label for="order-search" class="sr-only">Buscar pedidos</label>
-        <input
-          id="order-search"
-          type="text"
-          placeholder="Buscar por ID ou produto..."
-          bind:value={searchQuery}
-          class="search-input"
-          aria-label="Buscar pedidos por ID ou nome do produto"
-        />
-      </div>
-      <div class="filter-control">
-        <label for="date-from" class="sr-only">Data inicial</label>
-        <input
-          id="date-from"
-          type="date"
-          placeholder="Data inicial"
-          bind:value={dateFrom}
-          class="date-input"
-          aria-label="Data inicial do filtro"
-        />
-      </div>
-      <div class="filter-control">
-        <label for="date-to" class="sr-only">Data final</label>
-        <input
-          id="date-to"
-          type="date"
-          placeholder="Data final"
-          bind:value={dateTo}
-          class="date-input"
-          aria-label="Data final do filtro"
-        />
-      </div>
-      <div class="filter-control sort-control">
-        <label for="sort-by" class="sr-only">Ordenar por</label>
-        <select bind:value={sortBy} id="sort-by" class="sort-select" aria-label="Critério de ordenação">
-          <option value="date">Ordenar por Data</option>
-          <option value="total">Ordenar por Valor</option>
-          <option value="id">Ordenar por ID</option>
-        </select>
-        <button
-          class="btn btn-sm btn-ghost"
-          onclick={() => (sortOrder = sortOrder === 'asc' ? 'desc' : 'asc')}
-          title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
-          aria-label={`Ordem ${sortOrder === 'asc' ? 'crescente' : 'decrescente'}, clique para inverter`}
-        >
-          {sortOrder === 'asc' ? '↑' : '↓'}
-        </button>
-      </div>
-      {(searchQuery || dateFrom || dateTo) && (
-        <button class="btn btn-sm btn-ghost" onclick={() => { searchQuery = ''; dateFrom = ''; dateTo = ''; }} aria-label="Limpar todos os filtros">
-          Limpar filtros
-        </button>
-      )}
-    </div>
-  </div>
+<Workspace
+  breadcrumb={[{ label: 'Pedidos' }]}
+  title="Gerenciamento de Pedidos"
+  description="Acompanhe e gerencie todos os pedidos do restaurante"
+>
+  <svelte:fragment slot="actions">
+    <a href="/orders/new">
+      <Button variant="primary">
+        <Plus size={16} />
+        Novo Pedido
+      </Button>
+    </a>
+  </svelte:fragment>
 
   {#if loading}
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <span>Carregando pedidos…</span>
-    </div>
-  {:else if error}
-    <div class="alert alert-error">
-      <span>⚠️ {error}</span>
-      <button class="btn btn-sm" onclick={loadOrders}>Tentar novamente</button>
-    </div>
-  {:else if filtered.length === 0}
-    <div class="empty-state">
-      <p class="empty-icon">🧾</p>
-      <p class="empty-text">{filterStatus === 'all' ? 'Nenhum pedido ainda.' : 'Nenhum pedido com esse status.'}</p>
-      {#if filterStatus === 'all'}
-        <a href="/orders/new" class="btn btn-primary">Criar primeiro pedido</a>
-      {:else}
-        <button class="btn btn-ghost" onclick={() => (filterStatus = 'all')}>Ver todos</button>
-      {/if}
-    </div>
-  {:else}
-    <div class="orders-list">
-      {#each paginated as order}
-        <a href="/orders/{order.ID}" class="order-card">
-          <div class="order-card-left">
-            <span class="order-id"># {order.ID}</span>
-            <span class="order-date">{formatDate(order.CreatedAt)}</span>
+    <div class="skeleton-grid">
+      {#each Array(6) as _}
+        <Card class="skeleton-card">
+          <div class="skeleton-card-header">
+            <Skeleton variant="text" width="60px" height="16px" />
+            <Skeleton variant="rectangular" width="80px" height="24px" />
           </div>
-          <div class="order-items-preview">
-            {#each (order.Items ?? []).slice(0, 3) as item}
-              <span class="item-chip">{item.Quantity}× Produto #{item.ProductID}</span>
-            {/each}
-            {#if (order.Items ?? []).length > 3}
-              <span class="item-chip muted">+{order.Items.length - 3} mais</span>
-            {/if}
+          <div class="skeleton-card-meta">
+            <Skeleton variant="text" width="100px" height="12px" />
+            <Skeleton variant="text" width="80px" height="12px" />
           </div>
-          <div class="order-card-right">
-            <span class="order-total">{formatTotal(order.TotalPrice)}</span>
-            <span class="status-badge {ORDER_STATUS_COLOR[order.Status]}">{ORDER_STATUS_LABEL[order.Status]}</span>
+          <div class="skeleton-card-items">
+            <Skeleton variant="text" width="120px" height="12px" />
+            <Skeleton variant="text" width="100px" height="12px" />
           </div>
-        </a>
+          <div class="skeleton-card-footer">
+            <Skeleton variant="text" width="80px" height="16px" />
+          </div>
+        </Card>
       {/each}
     </div>
-
-    {#if totalPages > 1}
-      <div class="pagination">
-        <button
-          class="pagination-btn"
-          disabled={currentPage === 1}
-          onclick={prevPage}
-        >
-          ← Anterior
-        </button>
-        <span class="pagination-info">
-          Página {currentPage} de {totalPages} ({filtered.length} pedidos)
-        </span>
-        <button
-          class="pagination-btn"
-          disabled={currentPage === totalPages}
-          onclick={nextPage}
-        >
-          Próxima →
-        </button>
+  {:else if error}
+    <Alert variant="error" dismissible onDismiss={() => error = ''}>
+      ⚠️ {error}
+      <Button onclick={loadOrders} size="sm">Tentar novamente</Button>
+    </Alert>
+  {:else}
+    <!-- Filtros -->
+    <Card class="filters-card">
+      <div class="filters-header">
+        <div class="filters-title">
+          <Filter size={18} />
+          <span>Filtros</span>
+        </div>
+        <div class="filters-stats">
+          <span class="stat-item">{filtered.length} pedidos</span>
+        </div>
       </div>
+      
+      <!-- Status Pills -->
+      <div class="status-pills">
+        {#each STATUS_OPTIONS as opt}
+          <button
+            class="status-pill"
+            class:active={filterStatus === opt.value}
+            onclick={() => (filterStatus = opt.value)}
+          >
+            {opt.label}
+            {#if opt.value !== 'all' && countByStatus[opt.value]}
+              <span class="pill-count">{countByStatus[opt.value]}</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+
+      <!-- Search and Sort -->
+      <div class="filters-row">
+        <div class="search-wrapper">
+          <Search size={16} class="search-icon" />
+          <Input
+            placeholder="Buscar por ID ou produto..."
+            bind:value={searchQuery}
+            class="search-input"
+          />
+        </div>
+        <div class="date-filters">
+          <div class="date-wrapper">
+            <Calendar size={16} class="date-icon" />
+            <Input
+              type="date"
+              placeholder="Data inicial"
+              bind:value={dateFrom}
+              class="date-input"
+            />
+          </div>
+          <div class="date-wrapper">
+            <Calendar size={16} class="date-icon" />
+            <Input
+              type="date"
+              placeholder="Data final"
+              bind:value={dateTo}
+              class="date-input"
+            />
+          </div>
+        </div>
+        <div class="sort-wrapper">
+          <select bind:value={sortBy} class="sort-select">
+            <option value="date">Data</option>
+            <option value="total">Valor</option>
+            <option value="id">ID</option>
+          </select>
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={() => (sortOrder = sortOrder === 'asc' ? 'desc' : 'asc')}
+            class="sort-toggle"
+          >
+            <ArrowUpDown size={16} />
+          </Button>
+        </div>
+        {#if searchQuery || dateFrom || dateTo}
+          <Button variant="ghost" size="sm" onclick={() => { searchQuery = ''; dateFrom = ''; dateTo = ''; }}>
+            Limpar
+          </Button>
+        {/if}
+      </div>
+    </Card>
+
+    {#if filtered.length === 0}
+      <div class="empty-state">
+        <ShoppingBag size={48} class="empty-icon" />
+        <span class="empty-title">{filterStatus === 'all' ? 'Nenhum pedido encontrado' : 'Nenhum pedido com esse status'}</span>
+        <span class="empty-subtitle">{filterStatus === 'all' ? 'Comece criando um novo pedido' : 'Tente outro filtro'}</span>
+        {#if filterStatus === 'all'}
+          <a href="/orders/new">
+            <Button variant="primary">Criar Pedido</Button>
+          </a>
+        {/if}
+      </div>
+    {:else}
+      <div class="orders-grid">
+        {#each paginated as order}
+          <Card class="order-card">
+            <div class="order-header">
+              <div class="order-id">#{order.ID}</div>
+              <Badge variant={getStatusVariant(order.Status)} size="sm">
+                {ORDER_STATUS_LABEL[order.Status]}
+              </Badge>
+            </div>
+            
+            <div class="order-meta">
+              <div class="order-date">
+                <Clock size={14} />
+                <span>{formatDate(order.CreatedAt)}</span>
+              </div>
+              <div class="order-table">
+                <span>Mesa {order.TableNumber || 'N/A'}</span>
+              </div>
+            </div>
+
+            <div class="order-items">
+              {#each (order.Items ?? []).slice(0, 3) as item}
+                <div class="order-item">
+                  <span class="item-quantity">{item.Quantity}×</span>
+                  <span class="item-name">{item.Product?.Name || `Produto #${item.ProductID}`}</span>
+                </div>
+              {/each}
+              {#if (order.Items ?? []).length > 3}
+                <div class="order-item more-items">
+                  <span>+{order.Items.length - 3} itens</span>
+                </div>
+              {/if}
+            </div>
+
+            <div class="order-footer">
+              <div class="order-total">
+                <DollarSign size={16} />
+                <span>{formatTotal(order.TotalPrice)}</span>
+              </div>
+              <Button href="/orders/{order.ID}" variant="ghost" size="sm">
+                Ver detalhes
+              </Button>
+            </div>
+          </Card>
+        {/each}
+      </div>
+
+      {#if totalPages > 1}
+        <div class="pagination">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage === 1}
+            onclick={() => goToPage(currentPage - 1)}
+          >
+            Anterior
+          </Button>
+          <span class="pagination-info">
+            Página {currentPage} de {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage === totalPages}
+            onclick={() => goToPage(currentPage + 1)}
+          >
+            Próxima
+          </Button>
+        </div>
+      {/if}
     {/if}
   {/if}
-</div>
+</Workspace>
 
 <style>
-  .page-wrapper   { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
-  .page-header    { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; }
-  .page-title     { font-size: 1.75rem; font-weight: 700; color: var(--color-text); margin: 0; }
-  .page-subtitle  { font-size: 0.875rem; color: var(--color-muted); margin: 0.25rem 0 0; }
+  /* Loading State */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem;
+    color: #64748b;
+    font-size: 0.875rem;
+  }
 
-  /* Acessibilidade */
-  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .spinner {
+    animation: spin 1s linear infinite;
+  }
 
-  /* Filtros */
-  .filter-section { margin-bottom: 1.5rem; }
-  .filter-row     { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-  .filter-pill    { border: 1px solid var(--color-border, #e5e7eb); background: var(--color-surface, #fff); color: var(--color-muted); font-size: 0.8rem; font-weight: 500; padding: 0.4rem 0.85rem; border-radius: 99px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-  .filter-pill:hover { border-color: var(--color-primary, #e85d04); color: var(--color-primary, #e85d04); box-shadow: 0 2px 4px rgba(232,93,4,0.15); transform: translateY(-1px); }
-  .filter-pill.active { background: var(--color-primary, #e85d04); border-color: var(--color-primary, #e85d04); color: #fff; box-shadow: 0 2px 8px rgba(232,93,4,0.3); }
-  .pill-count     { background: rgba(255,255,255,0.25); padding: 0 0.35rem; border-radius: 99px; font-size: 0.7rem; font-weight: 700; min-width: 20px; text-align: center; }
-  .filter-pill:not(.active) .pill-count { background: var(--color-surface-2, #f0f0f0); color: var(--color-text); }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
 
-  .filter-controls { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
-  .filter-control { flex: 1; min-width: 180px; }
-  .sort-control { display: flex; gap: 0.25rem; min-width: auto; }
-  .search-input,
-  .date-input,
-  .sort-select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: border-color 0.15s; box-sizing: border-box; }
-  .search-input:focus,
-  .date-input:focus,
-  .sort-select:focus { outline: none; border-color: var(--color-primary, #e85d04); }
-  .sort-select { flex: 1; cursor: pointer; }
+  /* Filters Card */
+  .filters-card {
+    margin-bottom: 2rem;
+  }
 
-  /* Paginação */
-  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding: 1rem; background: var(--color-surface-2, #f9fafb); border-radius: 0.5rem; }
-  .pagination-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border, #d1d5db); background: var(--color-surface, #fff); color: var(--color-text); border-radius: 0.4rem; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-  .pagination-btn:hover:not(:disabled) { background: var(--color-primary, #e85d04); color: #fff; border-color: var(--color-primary, #e85d04); }
-  .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .pagination-info { font-size: 0.85rem; color: var(--color-muted); }
+  .filters-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
 
-  /* Lista pedidos */
-  .orders-list    { display: flex; flex-direction: column; gap: 0.6rem; }
-  .order-card     { display: flex; align-items: center; gap: 1rem; background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.75rem; padding: 1rem 1.25rem; text-decoration: none; color: inherit; transition: box-shadow 0.15s, border-color 0.15s; }
-  .order-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.07); border-color: var(--color-primary, #e85d04); }
-  .order-card-left { display: flex; flex-direction: column; gap: 0.2rem; min-width: 90px; }
-  .order-id       { font-weight: 700; color: var(--color-text); font-size: 0.95rem; }
-  .order-date     { font-size: 0.75rem; color: var(--color-muted); }
-  .order-items-preview { flex: 1; display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .item-chip      { font-size: 0.78rem; background: var(--color-surface-2, #f5f5f5); padding: 0.2rem 0.5rem; border-radius: 4px; color: var(--color-text); }
-  .item-chip.muted { color: var(--color-muted); }
-  .order-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; min-width: 110px; }
-  .order-total    { font-weight: 700; font-size: 0.95rem; color: var(--color-text); }
+  .filters-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
 
-  /* Status badges */
-  .status-badge   { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 99px; white-space: nowrap; }
-  .badge-warning  { background: #fef9c3; color: #854d0e; }
-  .badge-info     { background: #dbeafe; color: #1e40af; }
-  .badge-success  { background: #dcfce7; color: #15803d; }
-  .badge-neutral  { background: var(--color-surface-2, #f3f4f6); color: var(--color-muted); }
-  .badge-error    { background: #fee2e2; color: #b91c1c; }
+  .filters-stats {
+    display: flex;
+    gap: 1rem;
+  }
 
-  /* Estados */
-  .loading-state  { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem; color: var(--color-muted); }
-  .spinner        { width: 2rem; height: 2rem; border: 3px solid var(--color-border, #e5e7eb); border-top-color: var(--color-primary, #e85d04); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin  { to { transform: rotate(360deg); } }
-  .empty-state    { text-align: center; padding: 4rem 1rem; }
-  .empty-icon     { font-size: 2.5rem; margin: 0; }
-  .empty-text     { color: var(--color-muted); margin: 0.5rem 0 1.25rem; }
-  .alert-error    { display: flex; align-items: center; gap: 1rem; background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; padding: 1rem 1.25rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+  .stat-item {
+    font-size: 0.75rem;
+    color: #64748b;
+    padding: 0.25rem 0.5rem;
+    background: #f8fafc;
+    border-radius: 4px;
+  }
 
-  .btn            { display: inline-flex; align-items: center; padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; text-decoration: none; }
-  .btn:disabled   { opacity: 0.55; cursor: not-allowed; }
-  .btn-primary    { background: var(--color-primary, #e85d04); color: #fff; }
-  .btn-primary:hover:not(:disabled) { background: var(--color-primary-dark, #c84e00); }
-  .btn-ghost      { background: transparent; color: var(--color-muted); border: 1px solid var(--color-border, #e5e7eb); }
-  .btn-ghost:hover { background: var(--color-surface-2, #f3f4f6); }
-  .btn-sm         { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+  /* Status Pills */
+  .status-pills {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
 
-  @media (max-width: 640px) {
-    .order-card         { flex-wrap: wrap; }
-    .order-items-preview { width: 100%; }
-    .order-card-right   { flex-direction: row; min-width: unset; width: 100%; justify-content: space-between; align-items: center; }
+  .status-pill {
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .status-pill:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    transform: translateY(-1px);
+  }
+
+  .status-pill.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: #ffffff;
+  }
+
+  .pill-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0 0.375rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .status-pill:not(.active) .pill-count {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  /* Filters Row */
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 250px;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+  }
+
+  .search-input {
+    padding-left: 2.5rem;
+  }
+
+  .date-filters {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .date-wrapper {
+    position: relative;
+  }
+
+  .date-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+  }
+
+  .date-input {
+    padding-left: 2.5rem;
+  }
+
+  .sort-wrapper {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .sort-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: #ffffff;
+    color: #0f172a;
+    cursor: pointer;
+  }
+
+  .sort-toggle {
+    padding: 0.5rem;
+  }
+
+  /* Orders Grid */
+  .orders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .order-card {
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px 0 rgb(0 0 0 / 0.08);
+  }
+
+  .order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .order-id {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .order-meta {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .order-date,
+  .order-table {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .order-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 8px;
+  }
+
+  .order-item {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .item-quantity {
+    font-weight: 600;
+    color: #6366f1;
+  }
+
+  .item-name {
+    color: #0f172a;
+  }
+
+  .more-items {
+    color: #64748b;
+    font-size: 0.75rem;
+  }
+
+  .order-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .order-total {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #6366f1;
+  }
+
+  /* Empty State */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem;
+    text-align: center;
+  }
+
+  .empty-icon {
+    color: #cbd5e1;
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .empty-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  /* Skeleton Loading */
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .skeleton-card {
+    padding: 1.5rem;
+  }
+
+  .skeleton-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .skeleton-card-meta {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .skeleton-card-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .skeleton-card-footer {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .pagination-info {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .filters-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .search-wrapper,
+    .date-filters,
+    .sort-wrapper {
+      width: 100%;
+    }
+
+    .date-filters {
+      flex-direction: column;
+    }
+
+    .orders-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .status-pills {
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .status-pill {
+      flex-shrink: 0;
+    }
   }
 </style>

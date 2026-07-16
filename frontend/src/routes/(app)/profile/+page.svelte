@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api/client';
+  import { Button, Input, Alert, Card, Skeleton } from '$lib/components/ui';
+  import { Workspace } from '$lib/components/layout';
+  import { User, Lock, Settings, LogOut, Activity, Check, AlertTriangle } from '@lucide/svelte';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -90,310 +93,295 @@
       savingPassword = false;
     }
   }
+
+  async function logout() {
+    try {
+      await api.auth.logout();
+      window.location.href = '/login';
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao fazer logout.';
+    }
+  }
 </script>
 
-<div class="page-wrapper">
-  <a href="/dashboard" class="back-link">← Voltar ao Dashboard</a>
-
-  <div class="profile-container">
-    <header class="profile-header">
-      <h1 class="profile-title">Meu Perfil</h1>
-      <p class="profile-subtitle">Gerencie suas informações de conta</p>
-    </header>
-
-    {#if loading}
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <span>Carregando perfil…</span>
-      </div>
-
-    {:else}
-      <div class="profile-card">
-        {#if error}
-          <div class="alert alert-error">
-            <span>⚠️ {error}</span>
+<Workspace
+  breadcrumb={[{ label: 'Perfil' }]}
+  title="Perfil do Usuário"
+  description="Gerencie suas informações e configurações de conta"
+>
+  {#if loading}
+    <div class="skeleton-grid">
+      {#each Array(4) as _}
+        <Card class="skeleton-card">
+          <div class="skeleton-card-header">
+            <Skeleton variant="circular" width="24px" height="24px" />
+            <Skeleton variant="text" width="120px" height="16px" />
           </div>
+          <div class="skeleton-card-body">
+            <Skeleton variant="text" width="100%" height="12px" />
+            <Skeleton variant="text" width="80%" height="12px" />
+          </div>
+        </Card>
+      {/each}
+    </div>
+  {:else}
+    <div class="profile-grid">
+      <!-- Informações Pessoais -->
+      <Card class="profile-section">
+        <div class="section-header">
+          <div class="section-title">
+            <User size={20} />
+            <span>Informações Pessoais</span>
+          </div>
+        </div>
+
+        {#if error}
+          <Alert variant="error" dismissible onDismiss={() => error = ''}>
+            <AlertTriangle size={16} />
+            {error}
+          </Alert>
         {/if}
 
         {#if success}
-          <div class="alert alert-success">
-            <span>✓ Perfil atualizado com sucesso!</span>
-          </div>
+          <Alert variant="success" dismissible onDismiss={() => success = false}>
+            <Check size={16} />
+            Perfil atualizado com sucesso!
+          </Alert>
         {/if}
 
         <form onsubmit={(e) => { e.preventDefault(); saveProfile(); }}>
-          <div class="form-group">
-            <label for="name">Nome</label>
-            <input
-              id="name"
-              type="text"
-              bind:value={name}
-              placeholder="Seu nome completo"
-              disabled={saving}
-              required
-            />
-          </div>
+          <Input
+            id="name"
+            label="Nome"
+            bind:value={name}
+            placeholder="Seu nome completo"
+            disabled={saving}
+          />
 
-          <div class="form-group">
-            <label for="email">E-mail</label>
-            <input
-              id="email"
-              type="email"
-              bind:value={email}
-              placeholder="seu@email.com"
-              disabled={saving}
-              required
-            />
-          </div>
+          <Input
+            id="email"
+            label="E-mail"
+            type="email"
+            bind:value={email}
+            placeholder="seu@email.com"
+            disabled={saving}
+          />
 
           <div class="form-actions">
-            <button
+            <Button
               type="submit"
-              class="btn btn-primary"
+              variant="primary"
               disabled={saving}
+              loading={saving}
             >
-              {saving ? 'Salvando…' : 'Salvar Alterações'}
-            </button>
+              Salvar Alterações
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
 
-      <div class="password-card">
-        <h2 class="card-title">Alterar Senha</h2>
+      <!-- Segurança -->
+      <Card class="profile-section">
+        <div class="section-header">
+          <div class="section-title">
+            <Lock size={20} />
+            <span>Segurança</span>
+          </div>
+        </div>
 
         {#if passwordError}
-          <div class="alert alert-error">
-            <span>⚠️ {passwordError}</span>
-          </div>
+          <Alert variant="error" dismissible onDismiss={() => passwordError = ''}>
+            <AlertTriangle size={16} />
+            {passwordError}
+          </Alert>
         {/if}
 
         {#if passwordSuccess}
-          <div class="alert alert-success">
-            <span>✓ Senha alterada com sucesso!</span>
-          </div>
+          <Alert variant="success" dismissible onDismiss={() => passwordSuccess = false}>
+            <Check size={16} />
+            Senha alterada com sucesso!
+          </Alert>
         {/if}
 
         <form onsubmit={(e) => { e.preventDefault(); changePassword(); }}>
-          <div class="form-group">
-            <label for="current-password">Senha Atual</label>
-            <input
-              id="current-password"
-              type="password"
-              bind:value={currentPassword}
-              placeholder="Digite sua senha atual"
-              disabled={savingPassword}
-              required
-            />
-          </div>
+          <Input
+            id="current-password"
+            label="Senha Atual"
+            type="password"
+            bind:value={currentPassword}
+            placeholder="Digite sua senha atual"
+            disabled={savingPassword}
+          />
 
-          <div class="form-group">
-            <label for="new-password">Nova Senha</label>
-            <input
-              id="new-password"
-              type="password"
-              bind:value={newPassword}
-              placeholder="Mínimo 6 caracteres"
-              disabled={savingPassword}
-              required
-              minlength="6"
-            />
-          </div>
+          <Input
+            id="new-password"
+            label="Nova Senha"
+            type="password"
+            bind:value={newPassword}
+            placeholder="Mínimo 6 caracteres"
+            disabled={savingPassword}
+            minlength={6}
+          />
 
-          <div class="form-group">
-            <label for="confirm-password">Confirmar Nova Senha</label>
-            <input
-              id="confirm-password"
-              type="password"
-              bind:value={confirmPassword}
-              placeholder="Repita a nova senha"
-              disabled={savingPassword}
-              required
-              minlength="6"
-            />
-          </div>
+          <Input
+            id="confirm-password"
+            label="Confirmar Nova Senha"
+            type="password"
+            bind:value={confirmPassword}
+            placeholder="Repita a nova senha"
+            disabled={savingPassword}
+            minlength={6}
+          />
 
           <div class="form-actions">
-            <button
+            <Button
               type="submit"
-              class="btn btn-secondary"
+              variant="secondary"
               disabled={savingPassword}
+              loading={savingPassword}
             >
-              {savingPassword ? 'Alterando…' : 'Alterar Senha'}
-            </button>
+              Alterar Senha
+            </Button>
           </div>
         </form>
-      </div>
-    {/if}
-  </div>
-</div>
+      </Card>
+
+      <!-- Preferências -->
+      <Card class="profile-section">
+        <div class="section-header">
+          <div class="section-title">
+            <Settings size={20} />
+            <span>Preferências</span>
+          </div>
+        </div>
+
+        <div class="preferences-content">
+          <p class="preferences-note">
+            Configurações adicionais estarão disponíveis em breve.
+          </p>
+        </div>
+      </Card>
+
+      <!-- Sessão -->
+      <Card class="profile-section">
+        <div class="section-header">
+          <div class="section-title">
+            <LogOut size={20} />
+            <span>Sessão</span>
+          </div>
+        </div>
+
+        <div class="session-content">
+          <p class="session-note">
+            Encerre sua sessão atual para sair da aplicação.
+          </p>
+          <Button onclick={logout} variant="danger">
+            <LogOut size={16} />
+            Sair da Conta
+          </Button>
+        </div>
+      </Card>
+    </div>
+  {/if}
+</Workspace>
 
 <style>
-  .page-wrapper {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
-  }
-
-  .back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    color: var(--color-muted);
-    font-size: 0.875rem;
-    text-decoration: none;
-    margin-bottom: 1.75rem;
-  }
-
-  .back-link:hover {
-    color: var(--color-text);
-  }
-
-  .profile-container {
-    background: var(--color-surface, #fff);
-    border-radius: 1rem;
-    padding: 2rem;
-    border: 1px solid var(--color-border, #e5e7eb);
-  }
-
-  .profile-header {
-    margin-bottom: 2rem;
-  }
-
-  .profile-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--color-text);
-    margin: 0 0 0.5rem;
-  }
-
-  .profile-subtitle {
-    color: var(--color-muted);
-    font-size: 0.9rem;
-    margin: 0;
-  }
-
+  /* Loading State */
   .loading-state {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 1rem;
-    padding: 3rem;
-    color: var(--color-muted);
+    padding: 4rem;
+    color: #64748b;
+    font-size: 0.875rem;
   }
 
   .spinner {
-    width: 2rem;
-    height: 2rem;
-    border: 3px solid var(--color-border, #e5e7eb);
-    border-top-color: var(--color-primary, #e85d04);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
+    animation: spin 1s linear infinite;
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 
-  .profile-card,
-  .password-card {
-    max-width: 400px;
-    margin-bottom: 2rem;
+  /* Profile Grid */
+  .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
   }
 
-  .card-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--color-text);
-    margin: 0 0 1.25rem;
+  .profile-section {
+    padding: 1.5rem;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .form-group {
+  .profile-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px 0 rgb(0 0 0 / 0.08);
+  }
+
+  .section-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
     display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .form-group label {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--color-text);
-  }
-
-  .form-group input {
-    border: 1px solid var(--color-border, #d1d5db);
-    border-radius: 0.5rem;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.9rem;
-    background: var(--color-surface, #fff);
-    color: var(--color-text);
-    transition: border-color 0.15s;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .form-group input:focus {
-    outline: none;
-    border-color: var(--color-primary, #e85d04);
-    box-shadow: 0 0 0 3px rgba(232,93,4,0.12);
-  }
-
-  .form-group input:disabled {
-    background: var(--color-surface-2, #f3f4f6);
-    cursor: not-allowed;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
   }
 
   .form-actions {
     margin-top: 1.5rem;
   }
 
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.6rem 1.25rem;
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    transition: background 0.15s;
-    width: 100%;
+  /* Skeleton Loading */
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
   }
 
-  .btn:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
+  .skeleton-card {
+    padding: 1.5rem;
   }
 
-  .btn-primary {
-    background: var(--color-primary, #e85d04);
-    color: #fff;
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-dark, #c84e00);
-  }
-
-  .alert {
+  .skeleton-card-header {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.85rem 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-    font-size: 0.9rem;
+    margin-bottom: 1rem;
   }
 
-  .alert-error {
-    background: #fef2f2;
-    border: 1px solid #fca5a5;
-    color: #b91c1c;
+  .skeleton-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  .alert-success {
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-    color: #15803d;
+  /* Preferences & Session */
+  .preferences-content,
+  .session-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .preferences-note,
+  .session-note {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .profile-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

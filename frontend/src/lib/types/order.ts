@@ -15,6 +15,7 @@ export interface Order {
   TotalPrice: number;
   Notes?: string;
   Items: OrderItem[];
+  TableNumber?: number;
   CreatedAt?: string;
   UpdatedAt?: string;
 }

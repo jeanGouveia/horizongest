@@ -168,7 +168,7 @@ func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint)
 
 func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.Ingredient, error) {
 	var ms []GormIngredient
-	if err := r.db.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListIngredients: %w", err)
 	}
 	out := make([]domain.Ingredient, len(ms))

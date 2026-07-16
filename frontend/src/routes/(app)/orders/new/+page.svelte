@@ -5,6 +5,9 @@
   import { createOrder } from '$lib/api/order';
   import type { Product } from '$lib/types/product';
   import type { OrderCreatePayload } from '$lib/types/order';
+  import { Workspace } from '$lib/components/layout';
+  import { Button, Input, Card, Alert } from '$lib/components/ui';
+  import { Search, ShoppingCart, Plus, Minus, X, DollarSign, Activity, Utensils, Coffee, Cake, Beef } from '@lucide/svelte';
 
   interface CartItem {
     product: Product;
@@ -18,6 +21,7 @@
   let submitting = $state(false);
   let error = $state('');
   let searchQuery = $state('');
+  let selectedCategory = $state<string>('all');
 
   onMount(async () => {
     loading = true;
@@ -30,10 +34,22 @@
     }
   });
 
+  const categories = $derived([
+    { value: 'all', label: 'Todos', icon: Utensils },
+    { value: 'bebidas', label: 'Bebidas', icon: Coffee },
+    { value: 'pratos', label: 'Pratos', icon: Beef },
+    { value: 'sobremesas', label: 'Sobremesas', icon: Cake },
+  ]);
+
   const filteredProducts = $derived(
-    products.filter((p) =>
-      p.Name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    products.filter((p) => {
+      const matchesSearch = p.Name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || 
+        (selectedCategory === 'pratos' && !p.Name.toLowerCase().includes('suco') && !p.Name.toLowerCase().includes('refrigerante') && !p.Name.toLowerCase().includes('café') && !p.Name.toLowerCase().includes('bolo') && !p.Name.toLowerCase().includes('torta')) ||
+        (selectedCategory === 'bebidas' && (p.Name.toLowerCase().includes('suco') || p.Name.toLowerCase().includes('refrigerante') || p.Name.toLowerCase().includes('café'))) ||
+        (selectedCategory === 'sobremesas' && (p.Name.toLowerCase().includes('bolo') || p.Name.toLowerCase().includes('torta')));
+      return matchesSearch && matchesCategory;
+    })
   );
 
   function addToCart(product: Product) {
@@ -81,22 +97,12 @@
       notes: notes.trim() || undefined,
       items: cart.map((c) => ({ product_id: c.product.ID, quantity: c.quantity })),
     };
-    console.log('Frontend - Payload enviado:', payload);
     try {
       const order = await createOrder(payload);
-      console.log('Frontend - Pedido criado:', order);
-      console.log('Frontend - order.ID:', order.ID);
-      console.log('Frontend - order.id:', order.id);
-      console.log('Frontend - Tentando goto para:', `/orders/${order.ID}`);
       goto(`/orders/${order.ID}`);
     } catch (e: any) {
-      console.error('Frontend - Erro ao criar pedido:', e);
-      console.error('Frontend - Stack trace:', e.stack);
-      
-      // Formatar mensagem de erro de estoque insuficiente
       const errorMsg = e?.message ?? 'Erro ao criar pedido.';
       if (errorMsg.includes('Ingredientes insuficientes')) {
-        // A mensagem já vem formatada do backend, apenas preservar as quebras de linha
         error = errorMsg;
       } else {
         error = errorMsg;
@@ -106,180 +112,543 @@
   }
 </script>
 
-<div class="page-wrapper">
-  <a href="/orders" class="back-link">← Voltar para Pedidos</a>
-  <h1 class="page-title">Novo Pedido</h1>
-
+<Workspace
+  breadcrumb={[{ label: 'Pedidos', href: '/orders' }, { label: 'Novo Pedido' }]}
+  title="Point of Sale"
+  description="Selecione os produtos para criar um novo pedido"
+>
   {#if error}
-    <div class="alert alert-error">{error}</div>
+    <Alert variant="error" dismissible onDismiss={() => error = ''}>
+      ⚠️ {error}
+    </Alert>
   {/if}
 
-  <div class="order-layout">
-    <!-- Painel esquerdo: seleção de produtos -->
-    <div class="products-panel">
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input
-          type="search"
-          bind:value={searchQuery}
-          placeholder="Buscar produto…"
-          class="search-input"
-        />
+  <div class="pos-layout">
+    <!-- Left Panel: Products -->
+    <div class="pos-products">
+      <!-- Search -->
+      <div class="pos-search">
+        <div class="search-wrapper">
+          <Search size={18} class="search-icon" />
+          <Input
+            placeholder="Buscar produtos..."
+            bind:value={searchQuery}
+            class="search-input"
+          />
+        </div>
       </div>
 
+      <!-- Categories -->
+      <div class="pos-categories">
+        {#each categories as cat}
+          <button
+            class="category-btn"
+            class:active={selectedCategory === cat.value}
+            onclick={() => selectedCategory = cat.value}
+          >
+            <svelte:component this={cat.icon} size={18} />
+            <span>{cat.label}</span>
+          </button>
+        {/each}
+      </div>
+
+      <!-- Products Grid -->
       {#if loading}
         <div class="loading-state">
-          <div class="spinner"></div>
-          <span>Carregando produtos…</span>
+          <Activity class="spinner" size={32} />
+          <span>Carregando produtos...</span>
         </div>
       {:else if filteredProducts.length === 0}
-        <p class="empty-note">Nenhum produto encontrado.</p>
+        <div class="empty-state">
+          <Utensils size={48} class="empty-icon" />
+          <span class="empty-title">Nenhum produto encontrado</span>
+          <span class="empty-subtitle">Tente outro termo de busca ou categoria</span>
+        </div>
       {:else}
-        <div class="product-grid">
+        <div class="products-grid">
           {#each filteredProducts as product}
             {@const qty = getCartQty(product.ID)}
-            <div class="product-tile" class:in-cart={qty > 0}>
-              <div class="tile-info">
-                <span class="tile-name">{product.Name}</span>
-                {#if product.IsComposto}
-                  <span class="tile-tag">Composto</span>
-                {/if}
-                <span class="tile-price">{formatPrice(product.Price)}</span>
+            <Card class={`product-card ${qty > 0 ? 'in-cart' : ''}`}>
+              <div class="product-image-placeholder">
+                <Utensils size={32} />
               </div>
-              <div class="tile-actions">
+              <div class="product-info">
+                <div class="product-name">{product.Name}</div>
+                {#if product.IsComposto}
+                  <span class="product-tag">Composto</span>
+                {/if}
+                <div class="product-price">{formatPrice(product.Price)}</div>
+              </div>
+              <div class="product-actions">
                 {#if qty > 0}
                   <div class="qty-control">
-                    <button onclick={() => updateQty(product.ID, qty - 1)}>−</button>
+                    <button onclick={() => updateQty(product.ID, qty - 1)}>
+                      <Minus size={16} />
+                    </button>
                     <span>{qty}</span>
-                    <button onclick={() => addToCart(product)}>+</button>
+                    <button onclick={() => addToCart(product)}>
+                      <Plus size={16} />
+                    </button>
                   </div>
                 {:else}
-                  <button class="btn-add" onclick={() => addToCart(product)}>Adicionar</button>
+                  <Button onclick={() => addToCart(product)} variant="primary" class="add-btn">
+                    <Plus size={16} />
+                    Adicionar
+                  </Button>
                 {/if}
               </div>
-            </div>
+            </Card>
           {/each}
         </div>
       {/if}
     </div>
 
-    <!-- Painel direito: resumo do pedido -->
-    <aside class="cart-panel">
-      <h2 class="cart-title">
-        Resumo
-        {#if cartCount > 0}
-          <span class="cart-count">{cartCount}</span>
+    <!-- Right Panel: Cart -->
+    <div class="pos-cart">
+      <Card class="cart-card">
+        <div class="cart-header">
+          <div class="cart-title">
+            <ShoppingCart size={20} />
+            <span>Carrinho</span>
+          </div>
+          {#if cartCount > 0}
+            <span class="cart-count">{cartCount}</span>
+          {/if}
+        </div>
+
+        {#if cart.length === 0}
+          <div class="cart-empty">
+            <ShoppingCart size={48} class="empty-icon" />
+            <span class="empty-title">Carrinho vazio</span>
+            <span class="empty-subtitle">Selecione produtos ao lado</span>
+          </div>
+        {:else}
+          <div class="cart-items">
+            {#each cart as item}
+              <div class="cart-item">
+                <div class="cart-item-info">
+                  <div class="cart-item-name">{item.product.Name}</div>
+                  <div class="cart-item-unit">{formatPrice(item.product.Price)} × {item.quantity}</div>
+                </div>
+                <div class="cart-item-right">
+                  <div class="cart-item-sub">{formatPrice(item.product.Price * item.quantity)}</div>
+                  <button class="btn-remove" onclick={() => removeFromCart(item.product.ID)}>
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
+
+          <div class="cart-total">
+            <span>Total</span>
+            <div class="total-value">
+              <DollarSign size={18} />
+              <span>{formatPrice(cartTotal)}</span>
+            </div>
+          </div>
+
+          <div class="cart-notes">
+            <label class="notes-label">Observações</label>
+            <Input
+              bind:value={notes}
+              placeholder="Ex: sem cebola, para viagem..."
+              class="notes-input"
+            />
+          </div>
+
+          <Button
+            onclick={submitOrder}
+            disabled={submitting || cart.length === 0}
+            variant="primary"
+            class="checkout-btn"
+            loading={submitting}
+          >
+            <span>Confirmar Pedido</span>
+            <span class="checkout-total">{formatPrice(cartTotal)}</span>
+          </Button>
         {/if}
-      </h2>
-
-      {#if cart.length === 0}
-        <div class="cart-empty">
-          <p>🛒</p>
-          <p>Selecione itens ao lado para montar o pedido.</p>
-        </div>
-      {:else}
-        <ul class="cart-list">
-          {#each cart as item}
-            <li class="cart-item">
-              <div class="cart-item-info">
-                <span class="cart-item-name">{item.product.Name}</span>
-                <span class="cart-item-unit">{formatPrice(item.product.Price)} × {item.quantity}</span>
-              </div>
-              <div class="cart-item-right">
-                <span class="cart-item-sub">{formatPrice(item.product.Price * item.quantity)}</span>
-                <button class="btn-remove" onclick={() => removeFromCart(item.product.ID)}>✕</button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-
-        <div class="cart-total">
-          <span>Total</span>
-          <span class="total-value">{formatPrice(cartTotal)}</span>
-        </div>
-
-        <div class="form-group">
-          <label for="notes">Observações</label>
-          <textarea id="notes" bind:value={notes} rows="3" placeholder="Ex: sem cebola, prato para viagem…"></textarea>
-        </div>
-
-        <button
-          class="btn btn-primary btn-full"
-          onclick={submitOrder}
-          disabled={submitting || cart.length === 0}
-        >
-          {submitting ? 'Enviando pedido…' : `Confirmar Pedido · ${formatPrice(cartTotal)}`}
-        </button>
-      {/if}
-    </aside>
+      </Card>
+    </div>
   </div>
-</div>
+</Workspace>
 
 <style>
-  .page-wrapper   { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
-  .back-link      { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--color-muted); font-size: 0.875rem; text-decoration: none; margin-bottom: 1.5rem; }
-  .back-link:hover { color: var(--color-text); }
-  .page-title     { font-size: 1.75rem; font-weight: 700; color: var(--color-text); margin: 0 0 1.75rem; }
+  /* POS Layout */
+  .pos-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2rem;
+    align-items: start;
+  }
 
-  .order-layout   { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+  /* Products Panel */
+  .pos-products {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
 
-  /* Painel produtos */
-  .products-panel { min-width: 0; }
-  .search-box     { position: relative; margin-bottom: 1.25rem; }
-  .search-icon    { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); pointer-events: none; font-size: 0.85rem; }
-  .search-input   { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; padding: 0.6rem 0.75rem 0.6rem 2.2rem; font-size: 0.9rem; background: var(--color-surface, #fff); color: var(--color-text); }
-  .search-input:focus { outline: none; border-color: var(--color-primary, #e85d04); box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
-  .product-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
-  .product-tile   { background: var(--color-surface, #fff); border: 1.5px solid var(--color-border, #e5e7eb); border-radius: 0.75rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; transition: border-color 0.15s; }
-  .product-tile.in-cart { border-color: var(--color-primary, #e85d04); }
-  .tile-info      { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
-  .tile-name      { font-weight: 600; font-size: 0.9rem; color: var(--color-text); }
-  .tile-tag       { font-size: 0.72rem; color: var(--color-muted); }
-  .tile-price     { font-weight: 700; color: var(--color-primary, #e85d04); font-size: 0.9rem; margin-top: 0.3rem; }
-  .tile-actions   { display: flex; }
-  .btn-add        { width: 100%; padding: 0.4rem; border: 1.5px solid var(--color-primary, #e85d04); background: transparent; color: var(--color-primary, #e85d04); border-radius: 0.4rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-  .btn-add:hover  { background: var(--color-primary, #e85d04); color: #fff; }
-  .qty-control    { display: flex; align-items: center; gap: 0; width: 100%; border: 1.5px solid var(--color-primary, #e85d04); border-radius: 0.4rem; overflow: hidden; }
-  .qty-control button { flex: 1; background: transparent; border: none; color: var(--color-primary, #e85d04); font-size: 1.1rem; font-weight: 700; cursor: pointer; padding: 0.3rem; transition: background 0.12s; }
-  .qty-control button:hover { background: rgba(232,93,4,0.1); }
-  .qty-control span { flex: 1; text-align: center; font-weight: 700; font-size: 0.9rem; color: var(--color-text); border-left: 1px solid var(--color-primary, #e85d04); border-right: 1px solid var(--color-primary, #e85d04); padding: 0.3rem 0; }
+  .pos-search {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
 
-  /* Painel carrinho */
-  .cart-panel     { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 1rem; padding: 1.5rem; position: sticky; top: 1rem; }
-  .cart-title     { font-size: 1.1rem; font-weight: 700; margin: 0 0 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
-  .cart-count     { background: var(--color-primary, #e85d04); color: #fff; font-size: 0.72rem; font-weight: 700; border-radius: 99px; padding: 0.1rem 0.5rem; }
-  .cart-empty     { text-align: center; color: var(--color-muted); font-size: 0.875rem; padding: 2rem 0; line-height: 1.8; }
-  .cart-list      { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-  .cart-item      { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-  .cart-item-info { flex: 1; }
-  .cart-item-name { font-size: 0.875rem; font-weight: 500; display: block; }
-  .cart-item-unit { font-size: 0.78rem; color: var(--color-muted); }
-  .cart-item-right { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
-  .cart-item-sub  { font-size: 0.85rem; font-weight: 600; color: var(--color-text); }
-  .btn-remove     { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 0.75rem; padding: 0.1rem 0.2rem; border-radius: 3px; }
-  .btn-remove:hover { color: #ef4444; background: #fee2e2; }
-  .cart-total     { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--color-border, #e5e7eb); padding: 0.85rem 0; margin-bottom: 1rem; font-weight: 600; }
-  .total-value    { font-size: 1.1rem; color: var(--color-primary, #e85d04); }
+  .search-wrapper {
+    position: relative;
+  }
 
-  .form-group     { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
-  .form-group label { font-size: 0.8rem; font-weight: 500; color: var(--color-text); }
-  .form-group textarea { border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; padding: 0.55rem 0.75rem; font-size: 0.875rem; resize: vertical; background: var(--color-surface, #fff); color: var(--color-text); width: 100%; box-sizing: border-box; }
-  .form-group textarea:focus { outline: none; border-color: var(--color-primary, #e85d04); }
+  .search-icon {
+    position: absolute;
+    left: 0.875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+  }
 
-  .btn            { display: inline-flex; align-items: center; justify-content: center; padding: 0.6rem 1.1rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; }
-  .btn:disabled   { opacity: 0.55; cursor: not-allowed; }
-  .btn-primary    { background: var(--color-primary, #e85d04); color: #fff; }
-  .btn-primary:hover:not(:disabled) { background: var(--color-primary-dark, #c84e00); }
-  .btn-full       { width: 100%; }
+  .search-input {
+    padding-left: 2.75rem;
+  }
 
-  .loading-state  { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 3rem; color: var(--color-muted); }
-  .spinner        { width: 1.75rem; height: 1.75rem; border: 3px solid var(--color-border, #e5e7eb); border-top-color: var(--color-primary, #e85d04); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin  { to { transform: rotate(360deg); } }
-  .empty-note     { color: var(--color-muted); font-size: 0.9rem; text-align: center; padding: 2rem; }
-  .alert-error    { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; padding: 0.85rem 1.1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.9rem; white-space: pre-line; line-height: 1.6; }
+  /* Categories */
+  .pos-categories {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
 
-  @media (max-width: 768px) {
-    .order-layout { grid-template-columns: 1fr; }
-    .cart-panel   { position: static; }
+  .category-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+    color: #64748b;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .category-btn:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+  }
+
+  .category-btn.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: #ffffff;
+  }
+
+  /* Products Grid */
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .product-card {
+    padding: 1.25rem;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px 0 rgb(0 0 0 / 0.08);
+  }
+
+  .product-card.in-cart {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+
+  .product-image-placeholder {
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e1;
+    margin-bottom: 1rem;
+  }
+
+  .product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-bottom: 1rem;
+  }
+
+  .product-name {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: #0f172a;
+  }
+
+  .product-tag {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .product-price {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: #6366f1;
+  }
+
+  .product-actions {
+    display: flex;
+  }
+
+  .add-btn {
+    width: 100%;
+  }
+
+  .qty-control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border: 1px solid #6366f1;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .qty-control button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #6366f1;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .qty-control button:hover {
+    background: rgba(99, 102, 241, 0.1);
+  }
+
+  .qty-control span {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: #0f172a;
+    border-left: 1px solid #6366f1;
+    border-right: 1px solid #6366f1;
+  }
+
+  /* Cart Panel */
+  .pos-cart {
+    position: sticky;
+    top: 0;
+  }
+
+  .cart-card {
+    padding: 1.5rem;
+  }
+
+  .cart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .cart-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .cart-count {
+    background: #6366f1;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 0.25rem 0.625rem;
+  }
+
+  .cart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 3rem 0;
+    text-align: center;
+  }
+
+  .empty-icon {
+    color: #cbd5e1;
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .empty-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  .cart-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .cart-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 8px;
+  }
+
+  .cart-item-info {
+    flex: 1;
+  }
+
+  .cart-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .cart-item-unit {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.125rem;
+  }
+
+  .cart-item-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .cart-item-sub {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .btn-remove {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+
+  .btn-remove:hover {
+    color: #ef4444;
+    background: #fef2f2;
+  }
+
+  .cart-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-top: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f1f5f9;
+    margin-bottom: 1.5rem;
+  }
+
+  .total-value {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #6366f1;
+  }
+
+  .cart-notes {
+    margin-bottom: 1.5rem;
+  }
+
+  .notes-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .checkout-btn {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .checkout-total {
+    font-weight: 700;
+  }
+
+  /* Loading State */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem;
+    color: #64748b;
+    font-size: 0.875rem;
+  }
+
+  .spinner {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Empty State */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem;
+    text-align: center;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .pos-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .pos-cart {
+      position: static;
+    }
   }
 </style>

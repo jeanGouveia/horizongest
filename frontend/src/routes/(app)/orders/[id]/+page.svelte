@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { getOrder, updateOrderStatus } from '$lib/api/order';
-  import type { Order } from '$lib/types/order';
+  import type { Order, OrderStatus } from '$lib/types/order';
   import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '$lib/types/order';
 
   const orderId = Number($page.params.id);
@@ -42,10 +42,11 @@
   const STATUS_STEPS = ['pending', 'confirmed', 'preparing', 'ready', 'delivered'] as const;
   type ProgressStatus = typeof STATUS_STEPS[number];
 
+  let currentStatus: OrderStatus | undefined = $derived.by(() => order?.Status);
   const currentStepIndex = $derived(
-    order ? STATUS_STEPS.indexOf(order.Status as ProgressStatus) : -1
+    currentStatus ? STATUS_STEPS.indexOf(currentStatus as ProgressStatus) : -1
   );
-  const isCancelled = $derived(order?.Status === 'cancelled');
+  const isCancelled = $derived(currentStatus === 'cancelled');
 
   // Transições permitidas
   const transitions: Record<string, string[]> = {
@@ -58,13 +59,13 @@
   };
 
   const nextStatus = $derived(
-    order && transitions[order.Status]?.length > 0
-      ? transitions[order.Status][0]
+    currentStatus && transitions[currentStatus]?.length > 0
+      ? transitions[currentStatus][0]
       : null
   );
 
   const canCancel = $derived(
-    order && transitions[order.Status]?.includes('cancelled')
+    currentStatus && transitions[currentStatus]?.includes('cancelled')
   );
 
   async function advanceStatus() {
@@ -81,7 +82,7 @@
     updating = true;
     updateError = '';
     try {
-      const updated = await updateOrderStatus(orderId, newStatus);
+      const updated = await updateOrderStatus(orderId, newStatus as OrderStatus);
       order = updated;
     } catch (e: any) {
       updateError = e?.message ?? 'Erro ao atualizar status.';
@@ -233,7 +234,7 @@
                 onclick={advanceStatus}
                 disabled={updating}
               >
-                {updating ? 'Atualizando…' : `Avançar para ${ORDER_STATUS_LABEL[nextStatus]}`}
+                {updating ? 'Atualizando…' : `Avançar para ${ORDER_STATUS_LABEL[nextStatus as OrderStatus]}`}
               </button>
             {/if}
             {#if canCancel}

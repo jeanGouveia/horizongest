@@ -3,16 +3,18 @@
 	import { getPendingAdjustments, approveAdjustment, rejectAdjustment } from '$lib/api/stock-adjustment';
 	import type { StockAdjustment } from '$lib/types/stock-adjustment';
 	import { STOCK_ADJUSTMENT_STATUS_LABEL, STOCK_ADJUSTMENT_STATUS_COLOR } from '$lib/types/stock-adjustment';
+	import { Button, Badge, Alert, Card, Modal, Textarea, Skeleton } from '$lib/components/ui';
+	import { Workspace } from '$lib/components/layout';
+	import { Check, X, Clock, Package, Filter, ArrowUpDown, Activity, Calendar, User } from '@lucide/svelte';
 
 	let adjustments: StockAdjustment[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
 	let filterStatus = $state<string>('all');
-	let searchQuery = $state<string>('');
 	let sortBy = $state<string>('date');
 	let sortOrder = $state<'asc' | 'desc'>('desc');
 	let currentPage = $state(1);
-	const itemsPerPage = 20;
+	const itemsPerPage = 12;
 
 	onMount(loadAdjustments);
 
@@ -30,18 +32,9 @@
 
 	const filtered = $derived(
 		adjustments.filter((a) => {
-			// Filtro por status
 			if (filterStatus !== 'all' && a.status !== filterStatus) return false;
-
-			// Filtro por busca (nome do ingrediente)
-			if (searchQuery) {
-				const query = searchQuery.toLowerCase();
-				if (!a.ingredient_name?.toLowerCase().includes(query)) return false;
-			}
-
 			return true;
 		}).sort((a, b) => {
-			// Ordenação
 			let comparison = 0;
 			if (sortBy === 'date') {
 				comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
@@ -65,17 +58,18 @@
 		}
 	}
 
-	function nextPage() {
-		goToPage(currentPage + 1);
-	}
-
-	function prevPage() {
-		goToPage(currentPage - 1);
-	}
-
 	function formatDate(d?: string) {
 		if (!d) return '—';
 		return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(d));
+	}
+
+	function getStatusVariant(status: string) {
+		switch (status) {
+			case 'pending': return 'warning';
+			case 'approved': return 'success';
+			case 'rejected': return 'danger';
+			default: return 'default';
+		}
 	}
 
 	const STATUS_OPTIONS = [
@@ -85,7 +79,6 @@
 		{ value: 'rejected', label: 'Rejeitados' },
 	];
 
-	// Contagem por status para os pills
 	const countByStatus = $derived(
 		adjustments.reduce<Record<string, number>>((acc, a) => {
 			acc[a.status] = (acc[a.status] ?? 0) + 1;
@@ -93,7 +86,6 @@
 		}, {})
 	);
 
-	// Modal de ação
 	let showActionModal = $state(false);
 	let actionModalType: 'approve' | 'reject' | null = $state(null);
 	let selectedAdjustment: StockAdjustment | null = $state(null);
@@ -141,300 +133,610 @@
 		} finally {
 			actionLoading = false;
 		}
-	}</script>
+	}
+</script>
 
-<svelte:head>
-	<title>Ajustes de Estoque - PratoOnline</title>
-</svelte:head>
+<Workspace
+  breadcrumb={[{ label: 'Ajustes de Estoque' }]}
+  title="Ajustes de Estoque"
+  description="Gerencie as solicitações de ajuste de ingredientes"
+>
+  {#if loading}
+    <div class="skeleton-grid">
+      {#each Array(6) as _}
+        <Card class="skeleton-card">
+          <div class="skeleton-card-header">
+            <Skeleton variant="text" width="80px" height="16px" />
+            <Skeleton variant="rectangular" width="60px" height="20px" />
+          </div>
+          <div class="skeleton-card-meta">
+            <Skeleton variant="text" width="120px" height="12px" />
+            <Skeleton variant="text" width="100px" height="12px" />
+          </div>
+          <div class="skeleton-card-details">
+            <Skeleton variant="text" width="100%" height="12px" />
+            <Skeleton variant="text" width="80%" height="12px" />
+          </div>
+        </Card>
+      {/each}
+    </div>
+  {:else if error}
+    <Alert variant="error" dismissible onDismiss={() => error = ''}>
+      ⚠️ {error}
+      <Button onclick={loadAdjustments} size="sm">Tentar novamente</Button>
+    </Alert>
+  {:else}
+    <!-- Filtros -->
+    <Card class="filters-card">
+      <div class="filters-header">
+        <div class="filters-title">
+          <Filter size={18} />
+          <span>Filtros</span>
+        </div>
+        <div class="filters-stats">
+          <span class="stat-item">{filtered.length} ajustes</span>
+        </div>
+      </div>
+      
+      <!-- Status Pills -->
+      <div class="status-pills">
+        {#each STATUS_OPTIONS as opt}
+          <button
+            class="status-pill"
+            class:active={filterStatus === opt.value}
+            onclick={() => (filterStatus = opt.value)}
+          >
+            {opt.label}
+            {#if opt.value !== 'all' && countByStatus[opt.value]}
+              <span class="pill-count">{countByStatus[opt.value]}</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
 
-<div class="page-wrapper">
-	<header class="page-header">
-		<div>
-			<h1 class="page-title">Ajustes de Estoque</h1>
-			<p class="page-subtitle">{adjustments.length} ajuste{adjustments.length !== 1 ? 's' : ''} registrado{adjustments.length !== 1 ? 's' : ''}</p>
-		</div>
-	</header>
+      <!-- Sort -->
+      <div class="filters-row">
+        <div class="sort-wrapper">
+          <select bind:value={sortBy} class="sort-select">
+            <option value="date">Data</option>
+            <option value="quantity">Quantidade</option>
+            <option value="id">ID</option>
+          </select>
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={() => (sortOrder = sortOrder === 'asc' ? 'desc' : 'asc')}
+            class="sort-toggle"
+          >
+            <ArrowUpDown size={16} />
+          </Button>
+        </div>
+      </div>
+    </Card>
 
-	<!-- Filtros -->
-	<div class="filter-section" role="region" aria-label="Filtros de ajustes de estoque">
-		<div class="filter-row" role="group" aria-label="Filtro por status">
-			{#each STATUS_OPTIONS as opt}
-				<button
-					class="filter-pill"
-					class:active={filterStatus === opt.value}
-					onclick={() => (filterStatus = opt.value)}
-					aria-pressed={filterStatus === opt.value}
-					aria-label={`Filtrar por ${opt.label}`}
-				>
-					{opt.label}
-					{#if opt.value !== 'all' && countByStatus[opt.value]}
-						<span class="pill-count" aria-label={`${countByStatus[opt.value]} ajustes`}>{countByStatus[opt.value]}</span>
-					{/if}
-				</button>
-			{/each}
-		</div>
-		<div class="filter-controls" role="search" aria-label="Busca e filtros adicionais">
-			<label for="adjustment-search" class="sr-only">Buscar ajustes</label>
-			<input
-				id="adjustment-search"
-				type="text"
-				placeholder="Buscar por ingrediente..."
-				bind:value={searchQuery}
-				class="search-input"
-				aria-label="Buscar ajustes por nome do ingrediente"
-			/>
-			<div class="sort-control">
-				<label for="adjustment-sort" class="sr-only">Ordenar ajustes</label>
-				<select bind:value={sortBy} id="adjustment-sort" class="sort-select" aria-label="Critério de ordenação de ajustes">
-					<option value="date">Ordenar por Data</option>
-					<option value="quantity">Ordenar por Quantidade</option>
-					<option value="id">Ordenar por ID</option>
-				</select>
-				<button
-					class="btn btn-sm btn-ghost"
-					onclick={() => (sortOrder = sortOrder === 'asc' ? 'desc' : 'asc')}
-					title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
-					aria-label={`Ordem ${sortOrder === 'asc' ? 'crescente' : 'decrescente'}, clique para inverter`}
-				>
-					{sortOrder === 'asc' ? '↑' : '↓'}
-				</button>
-			</div>
-			{searchQuery && (
-				<button class="btn btn-sm btn-ghost" onclick={() => (searchQuery = '')} aria-label="Limpar busca">
-					Limpar busca
-				</button>
-			)}
-		</div>
-	</div>
+    {#if filtered.length === 0}
+      <div class="empty-state">
+        <Package size={48} class="empty-icon" />
+        <span class="empty-title">{filterStatus === 'all' ? 'Nenhum ajuste encontrado' : 'Nenhum ajuste com esse status'}</span>
+        <span class="empty-subtitle">Não há solicitações de ajuste de estoque</span>
+      </div>
+    {:else}
+      <div class="adjustments-timeline">
+        {#each paginated as adj}
+          <Card class={`adjustment-card ${adj.status === 'pending' ? 'pending' : ''} ${adj.status === 'approved' ? 'approved' : ''} ${adj.status === 'rejected' ? 'rejected' : ''}`}>
+            <div class="adjustment-header">
+              <div class="adjustment-id">#{adj.id}</div>
+              <Badge variant={getStatusVariant(adj.status)} size="sm">
+                {STOCK_ADJUSTMENT_STATUS_LABEL[adj.status]}
+              </Badge>
+            </div>
 
-	{#if loading}
-		<div class="loading-state">
-			<div class="spinner"></div>
-			<span>Carregando ajustes…</span>
-		</div>
-	{:else if error}
-		<div class="alert alert-error">
-			<span>⚠️ {error}</span>
-			<button class="btn btn-sm" onclick={loadAdjustments}>Tentar novamente</button>
-		</div>
-	{:else if filtered.length === 0}
-		<div class="empty-state">
-			<p class="empty-icon">📦</p>
-			<p class="empty-text">{filterStatus === 'all' ? 'Nenhum ajuste ainda.' : 'Nenhum ajuste com esse status.'}</p>
-		</div>
-	{:else}
-		<div class="adjustments-list">
-			{#each paginated as adj}
-				<div class="adjustment-card">
-					<div class="adjustment-card-left">
-						<span class="adjustment-id"># {adj.id}</span>
-						<span class="adjustment-date">{formatDate(adj.created_at)}</span>
-					</div>
-					<div class="adjustment-card-center">
-						<div class="adjustment-info">
-							<span class="info-label">Pedido:</span>
-							<span class="info-value">{adj.order_id}</span>
-						</div>
-						<div class="adjustment-info">
-							<span class="info-label">Ingrediente:</span>
-							<span class="info-value">{adj.ingredient_id}</span>
-						</div>
-						<div class="adjustment-info">
-							<span class="info-label">Quantidade:</span>
-							<span class="info-value">{adj.quantity?.toFixed?.(4) ?? '0.0000'}</span>
-						</div>
-						<div class="adjustment-info">
-							<span class="info-label">Status Pedido:</span>
-							<span class="info-value">{adj.order_status}</span>
-						</div>
-					</div>
-					<div class="adjustment-card-right">
-						<span class="status-badge {STOCK_ADJUSTMENT_STATUS_COLOR[adj.status]}">{STOCK_ADJUSTMENT_STATUS_LABEL[adj.status]}</span>
-						{#if adj.status === 'pending'}
-							<div class="card-actions">
-								<button class="btn btn-sm btn-ghost" onclick={() => openApproveModal(adj)}>Aprovar</button>
-								<button class="btn btn-sm btn-ghost" onclick={() => openRejectModal(adj)}>Rejeitar</button>
-							</div>
-						{:else}
-							<span class="muted text-xs">
-								{adj.processed_by ? `Processado por ID ${adj.processed_by}` : 'Processado'}
-							</span>
-						{/if}
-					</div>
-				</div>
-				{#if adj.processed_by || adj.processing_notes}
-					<div class="adjustment-details">
-						{#if adj.processed_at}
-							<strong>Processado em:</strong> {formatDate(adj.processed_at)}
-							{#if adj.processed_by} - <strong>Por:</strong> ID {adj.processed_by}{/if}
-						{/if}
-						{#if adj.processing_notes}
-							<br />
-							<strong>Observações:</strong> {adj.processing_notes}
-						{/if}
-					</div>
-				{/if}
-			{/each}
-		</div>
+            <div class="adjustment-meta">
+              <div class="meta-item">
+                <Calendar size={14} />
+                <span>{formatDate(adj.created_at)}</span>
+              </div>
+              {#if adj.processed_at}
+                <div class="meta-item">
+                  <Clock size={14} />
+                  <span>Processado em {formatDate(adj.processed_at)}</span>
+                </div>
+              {/if}
+            </div>
 
-		{#if totalPages > 1}
-			<div class="pagination">
-				<button
-					class="pagination-btn"
-					disabled={currentPage === 1}
-					onclick={prevPage}
-				>
-					← Anterior
-				</button>
-				<span class="pagination-info">
-					Página {currentPage} de {totalPages} ({filtered.length} ajustes)
-				</span>
-				<button
-					class="pagination-btn"
-					disabled={currentPage === totalPages}
-					onclick={nextPage}
-				>
-					Próxima →
-				</button>
-			</div>
-		{/if}
-	{/if}
-</div>
+            <div class="adjustment-details">
+              <div class="detail-row">
+                <span class="detail-label">Pedido</span>
+                <span class="detail-value">#{adj.order_id}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Ingrediente</span>
+                <span class="detail-value">#{adj.ingredient_id}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Quantidade</span>
+                <span class="detail-value quantity">{adj.quantity?.toFixed?.(4) ?? '0.0000'}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Status Pedido</span>
+                <span class="detail-value">{adj.order_status}</span>
+              </div>
+            </div>
+
+            {#if adj.status === 'pending'}
+              <div class="adjustment-actions">
+                <Button onclick={() => openApproveModal(adj)} variant="success" size="sm">
+                  <Check size={14} />
+                  Aprovar
+                </Button>
+                <Button onclick={() => openRejectModal(adj)} variant="danger" size="sm">
+                  <X size={14} />
+                  Rejeitar
+                </Button>
+              </div>
+            {:else}
+              <div class="adjustment-processed">
+                {#if adj.processed_by}
+                  <div class="processed-info">
+                    <User size={14} />
+                    <span>Processado por ID {adj.processed_by}</span>
+                  </div>
+                {/if}
+                {#if adj.processing_notes}
+                  <div class="processed-notes">
+                    <span>{adj.processing_notes}</span>
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </Card>
+        {/each}
+      </div>
+
+      {#if totalPages > 1}
+        <div class="pagination">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage === 1}
+            onclick={() => goToPage(currentPage - 1)}
+          >
+            Anterior
+          </Button>
+          <span class="pagination-info">
+            Página {currentPage} de {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage === totalPages}
+            onclick={() => goToPage(currentPage + 1)}
+          >
+            Próxima
+          </Button>
+        </div>
+      {/if}
+    {/if}
+  {/if}
+</Workspace>
 
 <!-- Modal de Ação -->
-{#if showActionModal}
-	<div class="modal-overlay" onclick={() => (showActionModal = false)}>
-		<div class="modal" onclick={(e) => e.stopPropagation()}>
-			<h2 class="modal-title">
-				{actionModalType === 'approve' ? 'Aprovar Ajuste' : 'Rejeitar Ajuste'}
-			</h2>
+<Modal 
+  open={showActionModal} 
+  title={actionModalType === 'approve' ? 'Aprovar Ajuste' : 'Rejeitar Ajuste'}
+  onClose={closeModal}
+>
+  <div class="modal-info">
+    <div class="info-row">
+      <span class="info-label">ID:</span>
+      <span class="info-value">{selectedAdjustment?.id}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Pedido:</span>
+      <span class="info-value">#{selectedAdjustment?.order_id}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Ingrediente:</span>
+      <span class="info-value">#{selectedAdjustment?.ingredient_id}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Quantidade:</span>
+      <span class="info-value">{selectedAdjustment?.quantity?.toFixed?.(4) ?? '0.0000'}</span>
+    </div>
+  </div>
 
-			<div class="modal-info">
-				<p class="info-item"><strong>ID:</strong> {selectedAdjustment?.id}</p>
-				<p class="info-item"><strong>Pedido:</strong> {selectedAdjustment?.order_id}</p>
-				<p class="info-item"><strong>Ingrediente:</strong> {selectedAdjustment?.ingredient_id}</p>
-				<p class="info-item"><strong>Quantidade:</strong> {selectedAdjustment?.quantity?.toFixed?.(4) ?? '0.0000'}</p>
-			</div>
+  <Textarea
+    id="notes"
+    label="Observações (opcional)"
+    bind:value={actionNotes}
+    placeholder="Adicione observações sobre esta decisão..."
+    rows={3}
+  />
 
-			<div class="form-group">
-				<label for="notes">Observações (opcional)</label>
-				<textarea
-					id="notes"
-					bind:value={actionNotes}
-					placeholder="Adicione observações sobre esta decisão..."
-					rows="3"
-				></textarea>
-			</div>
-
-			<div class="modal-actions">
-				<button class="btn btn-ghost" onclick={closeModal} disabled={actionLoading}>Cancelar</button>
-				<button
-					class="btn {actionModalType === 'approve' ? 'btn-primary' : 'btn-danger'}"
-					onclick={executeAction}
-					disabled={actionLoading}
-				>
-					{actionLoading ? 'Processando...' : (actionModalType === 'approve' ? 'Aprovar' : 'Rejeitar')}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
+  <div class="modal-actions">
+    <Button variant="ghost" onclick={closeModal} disabled={actionLoading}>Cancelar</Button>
+    <Button
+      variant={actionModalType === 'approve' ? 'primary' : 'danger'}
+      onclick={executeAction}
+      disabled={actionLoading}
+      loading={actionLoading}
+    >
+      {actionModalType === 'approve' ? 'Aprovar' : 'Rejeitar'}
+    </Button>
+  </div>
+</Modal>
 
 <style>
-  /* Acessibilidade */
-  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  /* Loading State */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem;
+    color: #64748b;
+    font-size: 0.875rem;
+  }
 
-  .page-wrapper   { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
-  .page-header    { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; }
-  .page-title     { font-size: 1.75rem; font-weight: 700; color: var(--color-text); margin: 0; }
-  .page-subtitle  { font-size: 0.875rem; color: var(--color-muted); margin: 0.25rem 0 0; }
+  .spinner {
+    animation: spin 1s linear infinite;
+  }
 
-  /* Filtros */
-  .filter-section { margin-bottom: 1.5rem; }
-  .filter-row     { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-  .filter-pill    { border: 1px solid var(--color-border, #e5e7eb); background: var(--color-surface, #fff); color: var(--color-muted); font-size: 0.8rem; font-weight: 500; padding: 0.4rem 0.85rem; border-radius: 99px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-  .filter-pill:hover { border-color: var(--color-primary, #e85d04); color: var(--color-primary, #e85d04); box-shadow: 0 2px 4px rgba(232,93,4,0.15); transform: translateY(-1px); }
-  .filter-pill.active { background: var(--color-primary, #e85d04); border-color: var(--color-primary, #e85d04); color: #fff; box-shadow: 0 2px 8px rgba(232,93,4,0.3); }
-  .pill-count     { background: rgba(255,255,255,0.25); padding: 0 0.35rem; border-radius: 99px; font-size: 0.7rem; font-weight: 700; min-width: 20px; text-align: center; }
-  .filter-pill:not(.active) .pill-count { background: var(--color-surface-2, #f0f0f0); color: var(--color-text); }
-  .filter-controls { display: flex; gap: 0.75rem; align-items: center; }
-  .sort-control { display: flex; gap: 0.25rem; }
-  .search-input    { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: all 0.2s ease; min-width: 250px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-  .search-input:focus,
-  .sort-select:focus { outline: none; border-color: var(--color-primary, #e85d04); box-shadow: 0 0 0 3px rgba(232,93,4,0.1); }
-  .sort-select    { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; font-size: 0.85rem; background: var(--color-surface, #fff); color: var(--color-text); transition: all 0.2s ease; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
 
-  /* Paginação */
-  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding: 1rem; background: var(--color-surface-2, #f9fafb); border-radius: 0.5rem; }
-  .pagination-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border, #d1d5db); background: var(--color-surface, #fff); color: var(--color-text); border-radius: 0.4rem; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-  .pagination-btn:hover:not(:disabled) { background: var(--color-primary, #e85d04); color: #fff; border-color: var(--color-primary, #e85d04); }
-  .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .pagination-info { font-size: 0.85rem; color: var(--color-muted); }
+  /* Filters Card */
+  .filters-card {
+    margin-bottom: 2rem;
+  }
 
-  /* Lista de ajustes */
-  .adjustments-list { display: flex; flex-direction: column; gap: 0.6rem; }
-  .adjustment-card { display: flex; align-items: center; gap: 1rem; background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.75rem; padding: 1rem 1.25rem; transition: box-shadow 0.15s, border-color 0.15s; }
-  .adjustment-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.07); border-color: var(--color-primary, #e85d04); }
-  .adjustment-card-left { display: flex; flex-direction: column; gap: 0.2rem; min-width: 90px; }
-  .adjustment-id { font-weight: 700; color: var(--color-text); font-size: 0.95rem; }
-  .adjustment-date { font-size: 0.75rem; color: var(--color-muted); }
-  .adjustment-card-center { flex: 1; display: flex; gap: 1rem; flex-wrap: wrap; }
-  .adjustment-info { display: flex; gap: 0.5rem; font-size: 0.85rem; }
-  .info-label { color: var(--color-muted); }
-  .info-value { font-weight: 500; color: var(--color-text); }
-  .adjustment-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; min-width: 110px; }
-  .card-actions { display: flex; gap: 0.5rem; }
-  .adjustment-details { padding: 0.5rem 1.25rem 1rem; background: var(--color-surface-2, #f9fafb); border-radius: 0 0 0.75rem 0.75rem; font-size: 0.85rem; color: var(--color-muted); margin-top: -0.6rem; margin-bottom: 0.6rem; border: 1px solid var(--color-border, #e5e7eb); border-top: none; }
+  .filters-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
 
-  /* Status badges */
-  .status-badge   { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 99px; white-space: nowrap; }
-  .badge-warning  { background: #fef9c3; color: #854d0e; }
-  .badge-info     { background: #dbeafe; color: #1e40af; }
-  .badge-success  { background: #dcfce7; color: #15803d; }
-  .badge-neutral  { background: var(--color-surface-2, #f3f4f6); color: var(--color-muted); }
-  .badge-error    { background: #fee2e2; color: #b91c1c; }
+  .filters-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
 
-  /* Estados */
-  .loading-state  { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem; color: var(--color-muted); }
-  .spinner        { width: 2rem; height: 2rem; border: 3px solid var(--color-border, #e5e7eb); border-top-color: var(--color-primary, #e85d04); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin  { to { transform: rotate(360deg); } }
-  .empty-state    { text-align: center; padding: 4rem 1rem; }
-  .empty-icon     { font-size: 2.5rem; margin: 0; }
-  .empty-text     { color: var(--color-muted); margin: 0.5rem 0 1.25rem; }
-  .alert-error    { display: flex; align-items: center; gap: 1rem; background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; padding: 1rem 1.25rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+  .filters-stats {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .stat-item {
+    font-size: 0.75rem;
+    color: #64748b;
+    padding: 0.25rem 0.5rem;
+    background: #f8fafc;
+    border-radius: 4px;
+  }
+
+  /* Status Pills */
+  .status-pills {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .status-pill {
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .status-pill:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    transform: translateY(-1px);
+  }
+
+  .status-pill.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: #ffffff;
+  }
+
+  .pill-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0 0.375rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .status-pill:not(.active) .pill-count {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  /* Filters Row */
+  .filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .sort-wrapper {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .sort-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: #ffffff;
+    color: #0f172a;
+    cursor: pointer;
+  }
+
+  .sort-toggle {
+    padding: 0.5rem;
+  }
+
+  /* Adjustments Timeline */
+  .adjustments-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .adjustment-card {
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .adjustment-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px 0 rgb(0 0 0 / 0.08);
+  }
+
+  .adjustment-card.pending {
+    border-left: 4px solid #f59e0b;
+  }
+
+  .adjustment-card.approved {
+    border-left: 4px solid #10b981;
+  }
+
+  .adjustment-card.rejected {
+    border-left: 4px solid #ef4444;
+  }
+
+  .adjustment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .adjustment-id {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .adjustment-meta {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .adjustment-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .detail-label {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .detail-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .detail-value.quantity {
+    font-weight: 700;
+    color: #6366f1;
+  }
+
+  .adjustment-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .adjustment-processed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .processed-info {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .processed-notes {
+    font-size: 0.875rem;
+    color: #64748b;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 8px;
+  }
+
+  /* Empty State */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem;
+    text-align: center;
+  }
+
+  .empty-icon {
+    color: #cbd5e1;
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .empty-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .pagination-info {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
 
   /* Modal */
-  .modal-overlay  { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
-  .modal          { background: var(--color-surface, #fff); border-radius: 1rem; padding: 2rem; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-  .modal-title    { font-size: 1.25rem; font-weight: 700; margin: 0 0 1.5rem; }
-  .modal-info     { margin-bottom: 1.5rem; }
-  .info-item      { font-size: 0.9rem; color: var(--color-muted); margin: 0.5rem 0; }
-  .modal-actions  { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.75rem; }
+  .modal-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
 
-  /* Formulário */
-  .form-group     { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
-  .form-group label { font-size: 0.85rem; font-weight: 500; color: var(--color-text); }
-  .form-group textarea { border: 1px solid var(--color-border, #d1d5db); border-radius: 0.5rem; padding: 0.6rem 0.75rem; font-size: 0.9rem; background: var(--color-surface, #fff); color: var(--color-text); transition: border-color 0.15s; width: 100%; box-sizing: border-box; }
-  .form-group textarea:focus { outline: none; border-color: var(--color-primary, #e85d04); box-shadow: 0 0 0 3px rgba(232,93,4,0.12); }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+  }
 
-  /* Botões */
-  .btn            { display: inline-flex; align-items: center; padding: 0.55rem 1.1rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; text-decoration: none; }
-  .btn:disabled   { opacity: 0.55; cursor: not-allowed; }
-  .btn-primary    { background: var(--color-primary, #e85d04); color: #fff; }
-  .btn-primary:hover:not(:disabled) { background: var(--color-primary-dark, #c84e00); }
-  .btn-secondary  { background: var(--color-surface-2, #f3f4f6); color: var(--color-text); border: 1px solid var(--color-border, #d1d5db); }
-  .btn-secondary:hover:not(:disabled) { background: var(--color-border, #e5e7eb); }
-  .btn-ghost      { background: transparent; color: var(--color-muted); border: 1px solid var(--color-border, #e5e7eb); }
-  .btn-ghost:hover:not(:disabled) { background: var(--color-surface-2, #f3f4f6); }
-  .btn-danger     { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-  .btn-danger:hover:not(:disabled) { background: #fecaca; }
-  .btn-sm         { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+  .info-label {
+    color: #64748b;
+  }
 
-  .muted          { color: var(--color-muted); }
+  .info-value {
+    font-weight: 500;
+    color: #0f172a;
+  }
 
-  @media (max-width: 640px) {
-    .adjustment-card         { flex-wrap: wrap; }
-    .adjustment-card-center { width: 100%; }
-    .adjustment-card-right   { flex-direction: row; min-width: unset; width: 100%; justify-content: space-between; align-items: center; }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+  }
+
+  /* Skeleton Loading */
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .skeleton-card {
+    padding: 1.5rem;
+  }
+
+  .skeleton-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .skeleton-card-meta {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .skeleton-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .adjustment-details {
+      grid-template-columns: 1fr;
+    }
+
+    .status-pills {
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .status-pill {
+      flex-shrink: 0;
+    }
+
+    .adjustment-actions {
+      flex-direction: column;
+    }
+
+    .adjustment-actions button {
+      width: 100%;
+    }
   }
 </style>
