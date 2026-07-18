@@ -14,14 +14,21 @@
     quantity: number;
   }
 
+  interface CategoryItem {
+    value: number | 'all';
+    label: string;
+    icon: any;
+  }
+
   let products: Product[] = $state([]);
   let cart: CartItem[] = $state([]);
   let notes = $state('');
+  let tableNumber = $state<number>(0);
   let loading = $state(true);
   let submitting = $state(false);
   let error = $state('');
   let searchQuery = $state('');
-  let selectedCategory = $state<string>('all');
+  let selectedCategory = $state<number | 'all'>('all');
 
   onMount(async () => {
     loading = true;
@@ -34,31 +41,41 @@
     }
   });
 
-  const categories = $derived([
-    { value: 'all', label: 'Todos', icon: Utensils },
-    { value: 'bebidas', label: 'Bebidas', icon: Coffee },
-    { value: 'pratos', label: 'Pratos', icon: Beef },
-    { value: 'sobremesas', label: 'Sobremesas', icon: Cake },
-  ]);
+  const categories: CategoryItem[] = $derived.by(() => {
+    const uniqueCategories = new Map<number, string>();
+    products.forEach(p => {
+      if (p.CategoryID && p.CategoryID) {
+        // Usar nome da categoria se disponível, senão usar ID
+        uniqueCategories.set(p.CategoryID, `Categoria ${p.CategoryID}`);
+      }
+    });
+    return [
+      { value: 'all', label: 'Todos', icon: Utensils },
+      ...Array.from(uniqueCategories.entries()).map(([id, name]) => ({
+        value: id,
+        label: name,
+        icon: Utensils
+      }))
+    ];
+  });
 
   const filteredProducts = $derived(
     products.filter((p) => {
       const matchesSearch = p.Name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || 
-        (selectedCategory === 'pratos' && !p.Name.toLowerCase().includes('suco') && !p.Name.toLowerCase().includes('refrigerante') && !p.Name.toLowerCase().includes('café') && !p.Name.toLowerCase().includes('bolo') && !p.Name.toLowerCase().includes('torta')) ||
-        (selectedCategory === 'bebidas' && (p.Name.toLowerCase().includes('suco') || p.Name.toLowerCase().includes('refrigerante') || p.Name.toLowerCase().includes('café'))) ||
-        (selectedCategory === 'sobremesas' && (p.Name.toLowerCase().includes('bolo') || p.Name.toLowerCase().includes('torta')));
+      const matchesCategory = selectedCategory === 'all' || p.CategoryID === selectedCategory;
       return matchesSearch && matchesCategory;
     })
   );
 
   function addToCart(product: Product) {
-    const existing = cart.find((c) => c.product.ID === product.ID);
-    if (existing) {
-      cart = cart.map((c) =>
-        c.product.ID === product.ID ? { ...c, quantity: c.quantity + 1 } : c
-      );
+    const existingIndex = cart.findIndex((c) => c.product.ID === product.ID);
+    if (existingIndex >= 0) {
+      // Atualizar item existente
+      const newCart = [...cart];
+      newCart[existingIndex] = { ...newCart[existingIndex], quantity: newCart[existingIndex].quantity + 1 };
+      cart = newCart;
     } else {
+      // Adicionar novo item
       cart = [...cart, { product, quantity: 1 }];
     }
   }
@@ -93,20 +110,18 @@
     if (cart.length === 0) return;
     submitting = true;
     error = '';
-    const payload: OrderCreatePayload = {
-      notes: notes.trim() || undefined,
-      items: cart.map((c) => ({ product_id: c.product.ID, quantity: c.quantity })),
-    };
+
     try {
+      // Criar pedido diretamente (validação de estoque será feita pelo backend)
+      const payload: OrderCreatePayload = {
+        notes: notes.trim() || undefined,
+        table_number: tableNumber > 0 ? tableNumber : undefined,
+        items: cart.map((c) => ({ product_id: c.product.ID, quantity: c.quantity })),
+      };
       const order = await createOrder(payload);
       goto(`/orders/${order.ID}`);
     } catch (e: any) {
-      const errorMsg = e?.message ?? 'Erro ao criar pedido.';
-      if (errorMsg.includes('Ingredientes insuficientes')) {
-        error = errorMsg;
-      } else {
-        error = errorMsg;
-      }
+      error = e?.message ?? 'Erro ao criar pedido.';
       submitting = false;
     }
   }
@@ -170,7 +185,11 @@
             {@const qty = getCartQty(product.ID)}
             <Card class={`product-card ${qty > 0 ? 'in-cart' : ''}`}>
               <div class="product-image-placeholder">
-                <Utensils size={32} />
+                {#if product.PhotoURL}
+                  <img src={product.PhotoURL} alt={product.Name} class="product-image" loading="lazy" />
+                {:else}
+                  <Utensils size={32} />
+                {/if}
               </div>
               <div class="product-info">
                 <div class="product-name">{product.Name}</div>
@@ -223,6 +242,15 @@
             <span class="empty-subtitle">Selecione produtos ao lado</span>
           </div>
         {:else}
+          <div class="cart-table-field">
+            <label class="table-label">Número da Mesa (opcional)</label>
+            <Input
+              type="number"
+              placeholder="Ex: 1"
+              bind:value={tableNumber}
+              class="table-input"
+            />
+          </div>
           <div class="cart-items">
             {#each cart as item}
               <div class="cart-item">
@@ -376,6 +404,13 @@
     justify-content: center;
     color: #cbd5e1;
     margin-bottom: 1rem;
+    overflow: hidden;
+  }
+
+  .product-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .product-info {
@@ -486,6 +521,22 @@
     gap: 1rem;
     padding: 3rem 0;
     text-align: center;
+  }
+
+  .cart-table-field {
+    margin-bottom: 1rem;
+  }
+
+  .table-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+  }
+
+  .table-input {
+    width: 100%;
   }
 
   .empty-icon {
@@ -650,5 +701,130 @@
     .pos-cart {
       position: static;
     }
+  }
+
+  @media (max-width: 768px) {
+    .pos-search {
+      padding: 0.5rem;
+    }
+
+    .pos-categories {
+      padding: 0 0.5rem;
+      gap: 0.375rem;
+    }
+
+    .category-btn {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.8125rem;
+    }
+
+    .pos-products {
+      padding: 0.5rem;
+    }
+
+    .products-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+
+    .product-card {
+      padding: 0.75rem;
+    }
+
+    .product-name {
+      font-size: 0.875rem;
+    }
+
+    .product-price {
+      font-size: 1rem;
+    }
+
+    .pos-cart {
+      padding: 0.75rem;
+    }
+
+    .cart-items {
+      gap: 0.5rem;
+    }
+
+    .cart-item {
+      padding: 0.5rem;
+    }
+  }
+
+  /* Stock Validation Modal */
+  .stock-validation-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .stock-list {
+    margin-top: 1rem;
+  }
+
+  .stock-list h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+  }
+
+  .stock-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .stock-item {
+    padding: 0.75rem;
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .stock-item-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .stock-item-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+
+  .stock-item-details span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .stock-item-details .available {
+    color: #10b981;
+  }
+
+  .stock-item-details .required {
+    color: #ef4444;
+  }
+
+  .stock-item-details .shortage {
+    color: #dc2626;
+    font-weight: 600;
+  }
+
+  .stock-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
   }
 </style>

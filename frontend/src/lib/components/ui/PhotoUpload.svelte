@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Upload, X, Loader2 } from '@lucide/svelte';
   import { uploadMedia } from '$lib/api/media';
+  import { Alert } from '$lib/components/ui';
 
   interface Props {
     photoUrl?: string;
@@ -17,6 +18,7 @@
   let previewUrl: string = $state(photoUrl);
   let isDragging: boolean = $state(false);
   let uploading: boolean = $state(false);
+  let error: string = $state('');
 
   $effect(() => {
     previewUrl = photoUrl;
@@ -50,13 +52,14 @@
   }
 
   async function processFile(file: File) {
+    error = '';
     if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione apenas arquivos de imagem (PNG, JPG, WEBP)');
+      error = 'Por favor, selecione apenas arquivos de imagem (PNG, JPG, WEBP)';
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 5MB');
+      error = 'A imagem deve ter no máximo 5MB';
       return;
     }
 
@@ -71,11 +74,11 @@
     uploading = true;
     try {
       const uploaded = await uploadMedia(file, entityType, entityId);
-      const uploadedUrl = `/uploads/${uploaded.FilePath}`;
+      const uploadedUrl = `/${uploaded.FilePath}`;
       previewUrl = uploadedUrl;
       onPhotoChange?.({ file, previewUrl: uploadedUrl, uploadedUrl });
     } catch (error: any) {
-      alert('Erro ao fazer upload da imagem: ' + (error?.message || 'Tente novamente'));
+      error = 'Erro ao fazer upload da imagem: ' + (error?.message || 'Tente novamente');
       previewUrl = '';
       if (fileInput) {
         fileInput.value = '';
@@ -99,6 +102,12 @@
 </script>
 
 <div class="photo-upload" class:size class:dragging={isDragging} class:has-photo={previewUrl}>
+  {#if error}
+    <Alert variant="error" dismissible onDismiss={() => error = ''} class="upload-alert">
+      {error}
+    </Alert>
+  {/if}
+
   <input
     type="file"
     bind:this={fileInput}
@@ -187,6 +196,14 @@
 
   .file-input {
     display: none;
+  }
+
+  .upload-alert {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    z-index: 10;
   }
 
   .upload-area {

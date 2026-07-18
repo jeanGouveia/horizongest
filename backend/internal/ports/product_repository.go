@@ -16,6 +16,7 @@ type ProductRepository interface {
 	ListActiveProducts(ctx context.Context) ([]domain.Product, error)
 	UpdateProduct(ctx context.Context, p *domain.Product) error
 	DeleteProduct(ctx context.Context, id uint) error
+	CanDeleteProduct(ctx context.Context, id uint) (*domain.DependencyCheck, error)
 
 	// Ingrediente
 	CreateIngredient(ctx context.Context, i *domain.Ingredient) error
@@ -23,6 +24,7 @@ type ProductRepository interface {
 	ListIngredients(ctx context.Context) ([]domain.Ingredient, error)
 	UpdateIngredient(ctx context.Context, i *domain.Ingredient) error
 	DeleteIngredient(ctx context.Context, id uint) error
+	CanDeleteIngredient(ctx context.Context, id uint) (*domain.DependencyCheck, error)
 
 	// Ficha técnica (produto ↔ ingredientes)
 	SetProductIngredients(ctx context.Context, productID uint, items []domain.ProductIngredient) error

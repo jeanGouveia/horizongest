@@ -40,6 +40,7 @@ func main() {
 	stockAdjustmentRepo := repository.NewGormStockAdjustmentRepository(db, productRepo)
 	orderRepo := repository.NewGormOrderRepository(db, productRepo, stockAdjustmentRepo)
 	mediaRepo := repository.NewGormMediaRepository(db)
+	dashboardRepo := repository.NewGormDashboardRepository(db)
 
 	authSvc := service.NewAuthService(userRepo)
 	productSvc := service.NewProductService(productRepo)
@@ -54,6 +55,7 @@ func main() {
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	stockAdjustmentHandler := handler.NewStockAdjustmentHandler(stockAdjustmentSvc)
 	mediaHandler := handler.NewMediaHandler(mediaSvc)
+	dashboardHandler := handler.NewDashboardHandler(dashboardRepo)
 	authMw := middleware.NewAuthMiddleware(authSvc)
 
 	// --- Router ---
@@ -82,6 +84,8 @@ func main() {
 	// --- Rotas privadas (protegidas pelo AuthMiddleware) ---
 	r.Group(func(r chi.Router) {
 		r.Use(authMw.Auth)
+
+		r.Get("/api/dashboard", dashboardHandler.GetDashboard)
 
 		r.Get("/api/me", authHandler.Me)
 		r.Put("/api/me", authHandler.UpdateProfile)

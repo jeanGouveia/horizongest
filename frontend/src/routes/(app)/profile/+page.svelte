@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
+  import { userStore } from '$lib/stores/userStore.svelte';
   import { Button, Input, Alert, Card, Skeleton } from '$lib/components/ui';
   import { Workspace } from '$lib/components/layout';
   import { User, Lock, Settings, LogOut, Activity, Check, AlertTriangle } from '@lucide/svelte';
@@ -15,10 +17,13 @@
 
   let name = $state('');
   let email = $state('');
+  let originalEmail = $state('');
 
   let currentPassword = $state('');
   let newPassword = $state('');
   let confirmPassword = $state('');
+
+  let profilePassword = $state('');
 
   onMount(async () => {
     loading = true;
@@ -28,6 +33,7 @@
       if (res.data) {
         name = res.data.name;
         email = res.data.email;
+        originalEmail = res.data.email;
       }
     } catch (e: any) {
       error = e?.message ?? 'Erro ao carregar perfil.';
@@ -42,6 +48,14 @@
       return;
     }
 
+    // Se e-mail foi alterado, exigir confirmação de senha
+    if (email.trim() !== originalEmail) {
+      if (!profilePassword || profilePassword.length < 1) {
+        error = 'Confirme sua senha atual para alterar o e-mail.';
+        return;
+      }
+    }
+
     saving = true;
     error = '';
     success = false;
@@ -49,6 +63,8 @@
       const res = await api.auth.updateProfile({ name: name.trim(), email: email.trim() });
       if (res.error) throw new Error(res.error);
       success = true;
+      originalEmail = email.trim();
+      profilePassword = '';
       setTimeout(() => (success = false), 3000);
     } catch (e: any) {
       error = e?.message ?? 'Erro ao atualizar perfil.';
@@ -97,7 +113,8 @@
   async function logout() {
     try {
       await api.auth.logout();
-      window.location.href = '/login';
+      userStore.logout();
+      goto('/login');
     } catch (e: any) {
       error = e?.message ?? 'Erro ao fazer logout.';
     }
@@ -166,6 +183,17 @@
             placeholder="seu@email.com"
             disabled={saving}
           />
+
+          {#if email !== originalEmail}
+            <Input
+              id="profile-password"
+              label="Senha atual (obrigatório para alterar e-mail)"
+              type="password"
+              bind:value={profilePassword}
+              placeholder="Confirme sua senha atual"
+              disabled={saving}
+            />
+          {/if}
 
           <div class="form-actions">
             <Button

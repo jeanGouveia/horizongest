@@ -83,6 +83,35 @@ func (r *GormCategoryRepository) DeleteCategory(ctx context.Context, id uint) er
 	return nil
 }
 
+func (r *GormCategoryRepository) CanDeleteCategory(ctx context.Context, id uint) (*domain.DependencyCheck, error) {
+	check := &domain.DependencyCheck{CanDelete: true, Reasons: []domain.DependencyReason{}}
+
+	// Verificar produtos que usam esta categoria
+	type ProductResult struct {
+		ID   uint   `gorm:"column:id"`
+		Name string `gorm:"column:name"`
+	}
+	var products []ProductResult
+	if err := r.db.WithContext(ctx).Table("products").
+		Select("id, name").
+		Where("category_id = ? AND deleted_at IS NULL", id).
+		Find(&products).Error; err != nil {
+		return nil, fmt.Errorf("CanDeleteCategory: verificar produtos: %w", err)
+	}
+
+	for _, product := range products {
+		check.CanDelete = false
+		check.Reasons = append(check.Reasons, domain.DependencyReason{
+			Type:        "product",
+			ID:          product.ID,
+			Name:        product.Name,
+			Description: "Produto vinculado a esta categoria",
+		})
+	}
+
+	return check, nil
+}
+
 func categoryToDomain(m *GormCategory) *domain.Category {
 	var deletedAt *time.Time
 	if m.DeletedAt != nil {

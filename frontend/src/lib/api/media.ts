@@ -14,8 +14,7 @@ export async function uploadMedia(file: File, entityType: string = 'product', en
 
   const res = await request<MediaUploadResponse>('/media/upload', {
     method: 'POST',
-    body: formData,
-    headers: {} // Remove Content-Type para permitir boundary automático
+    body: formData
   });
 
   if (res.error) throw new Error(res.error);

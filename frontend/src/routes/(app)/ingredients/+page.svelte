@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getIngredients, createIngredient, updateIngredient, deleteIngredient, updateIngredientStock } from '$lib/api/product';
+  import { api } from '$lib/api/client';
   import type { Ingredient } from '$lib/types/ingredient';
+  import type { DependencyCheck } from '$lib/types/dependency';
   import { Card, Button, Input, Select, Badge, Alert, Modal } from '$lib/components/ui';
   import { Workspace } from '$lib/components/layout';
   import { Search, Plus, AlertTriangle, TrendingUp, TrendingDown, ArrowUpDown, Package } from '@lucide/svelte';
@@ -30,6 +32,11 @@
   let stockForm = $state({ Quantity: 0 });
   let stockSaving = $state(false);
   let stockError = $state('');
+
+  // Modal de dependências
+  let showDependencyModal = $state(false);
+  let dependencyCheck = $state<DependencyCheck | null>(null);
+  let deleteTargetId = $state<number | null>(null);
 
   onMount(async () => {
     await loadAll();
@@ -71,7 +78,30 @@
       ingEditMode = false;
       ingEditId = null;
     } catch (e: any) {
-      ingError = e?.message ?? 'Erro ao salvar ingrediente.';
+      // Melhorar tratamento de erro para mostrar mensagens específicas
+      if (e?.message) {
+        try {
+          const errorData = JSON.parse(e.message);
+          if (errorData.fields) {
+            const fieldMessages = Object.entries(errorData.fields).map(([field, msg]) => {
+              const fieldMap: Record<string, string> = {
+                name: 'Nome',
+                unit: 'Unidade',
+                stock_quantity: 'Estoque inicial',
+                min_stock: 'Estoque mínimo'
+              };
+              return `${fieldMap[field] || field}: ${msg}`;
+            });
+            ingError = fieldMessages.join('. ');
+          } else {
+            ingError = e.message;
+          }
+        } catch {
+          ingError = e.message;
+        }
+      } else {
+        ingError = 'Erro ao salvar ingrediente.';
+      }
     } finally {
       ingSaving = false;
     }
@@ -97,10 +127,37 @@
   }
 
   async function deleteIngredientById(id: number) {
-    if (!confirm('Tem certeza que deseja excluir este ingrediente?')) return;
     try {
+      const res = await api.canDeleteIngredient(id);
+      if (res.error) {
+        error = res.error;
+        return;
+      }
+
+      const check = res.data as DependencyCheck;
+      if (!check.canDelete) {
+        dependencyCheck = check;
+        deleteTargetId = id;
+        showDependencyModal = true;
+        return;
+      }
+
+      if (!confirm('Tem certeza que deseja excluir este ingrediente?')) return;
       await deleteIngredient(id);
       ingredients = ingredients.filter(i => i.ID !== id);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao excluir ingrediente.';
+    }
+  }
+
+  async function confirmDeleteIngredient() {
+    if (!deleteTargetId) return;
+    try {
+      await deleteIngredient(deleteTargetId);
+      ingredients = ingredients.filter(i => i.ID !== deleteTargetId);
+      showDependencyModal = false;
+      dependencyCheck = null;
+      deleteTargetId = null;
     } catch (e: any) {
       error = e?.message ?? 'Erro ao excluir ingrediente.';
     }
@@ -338,12 +395,18 @@
     bind:value={ingForm.Name}
     placeholder="Ex: Feijão Preto"
   />
-  <Input
+  <Select
     id="i-unit"
     label="Unidade *"
     bind:value={ingForm.Unit}
-    placeholder="kg, g, L, un…"
-  />
+  >
+    <option value="">Selecione...</option>
+    <option value="kg">kg (quilograma)</option>
+    <option value="g">g (grama)</option>
+    <option value="L">L (litro)</option>
+    <option value="ml">ml (mililitro)</option>
+    <option value="un">un (unidade)</option>
+  </Select>
   <Input
     id="i-stock"
     label="Estoque inicial"
@@ -696,4 +759,108 @@
       grid-template-columns: 1fr;
     }
   }
+
+  /* Dependency Modal */
+  .dependency-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dependency-list {
+    margin-top: 1rem;
+  }
+
+  .dependency-list h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+  }
+
+  .dependency-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .dependency-item {
+    padding: 0.75rem;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .dependency-type {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #92400e;
+    text-transform: uppercase;
+  }
+
+  .dependency-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .dependency-desc {
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+
+  .dependency-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
 </style>
+
+<!-- Modal de Dependências -->
+<Modal
+  open={showDependencyModal}
+  onClose={() => {
+    showDependencyModal = false;
+    dependencyCheck = null;
+    deleteTargetId = null;
+  }}
+  title="Não é possível excluir"
+>
+  <div class="dependency-modal">
+    <Alert variant="warning" dismissible={false}>
+      Este item possui dependências que impedem sua exclusão.
+    </Alert>
+
+    {#if dependencyCheck && dependencyCheck.reasons.length > 0}
+      <div class="dependency-list">
+        <h4>Dependências encontradas:</h4>
+        <ul>
+          {#each dependencyCheck.reasons as reason}
+            <li class="dependency-item">
+              <div class="dependency-type">{reason.type}</div>
+              <div class="dependency-name">{reason.name}</div>
+              <div class="dependency-desc">{reason.description}</div>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
+    <div class="dependency-actions">
+      <Button variant="ghost" onclick={() => {
+        showDependencyModal = false;
+        dependencyCheck = null;
+        deleteTargetId = null;
+      }}>
+        Fechar
+      </Button>
+    </div>
+  </div>
+</Modal>

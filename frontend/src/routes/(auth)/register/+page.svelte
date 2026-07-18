@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
   import { userStore } from '$lib/stores/userStore.svelte';
+  import { Button, Input, Alert, PageContainer } from '$lib/components/ui';
 
   let name     = $state('');
   let email    = $state('');
@@ -9,15 +10,30 @@
   let error    = $state('');
   let loading  = $state(false);
 
+  function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
   async function handleSubmit() {
-    error   = '';
+    error = '';
+
+    if (!isValidEmail(email)) {
+      error = 'Por favor, insira um e-mail válido';
+      return;
+    }
+
+    if (password.length < 6) {
+      error = 'A senha deve ter no mínimo 6 caracteres';
+      return;
+    }
+
     loading = true;
 
     const { data, error: err } = await api.auth.register({ name, email, password });
     loading = false;
 
     if (err || !data) {
-      // Melhorar mensagem de erro específica
       if (err?.includes('e-mail já cadastrado')) {
         error = 'Este e-mail já está cadastrado';
       } else if (err?.includes('dados inválidos')) {
@@ -43,60 +59,62 @@
   }
 </script>
 
-<div class="auth-container">
-  <div class="auth-card">
-    <h1>🍽️ Prato Online</h1>
-    <h2>Criar conta</h2>
+<PageContainer maxWidth="sm">
+  <div class="auth-container">
+    <div class="auth-card">
+      <h1 class="auth-title">🍽️ Prato Online</h1>
+      <h2 class="auth-subtitle">Criar conta</h2>
 
-    {#if error}
-      <div class="alert-error">{error}</div>
-    {/if}
+      {#if error}
+        <Alert variant="error" dismissible onDismiss={() => error = ''}>
+          {error}
+        </Alert>
+      {/if}
 
-    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-      <label>
-        Nome
-        <input
+      <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <Input
+          id="name"
+          label="Nome"
           type="text"
           bind:value={name}
-          placeholder="Seu nome"
+          placeholder="Seu nome completo"
           required
           autocomplete="name"
         />
-      </label>
 
-      <label>
-        E-mail
-        <input
+        <Input
+          id="email"
+          label="E-mail"
           type="email"
           bind:value={email}
           placeholder="voce@email.com"
           required
           autocomplete="email"
         />
-      </label>
 
-      <label>
-        Senha <span class="hint">(mínimo 6 caracteres)</span>
-        <input
+        <Input
+          id="password"
+          label="Senha"
           type="password"
           bind:value={password}
           placeholder="••••••"
           required
-          minlength="6"
+          minlength={6}
           autocomplete="new-password"
+          helper="Mínimo 6 caracteres"
         />
-      </label>
 
-      <button type="submit" disabled={loading}>
-        {loading ? 'Cadastrando...' : 'Criar conta'}
-      </button>
-    </form>
+        <Button type="submit" variant="primary" fullWidth loading={loading}>
+          {loading ? 'Cadastrando...' : 'Criar conta'}
+        </Button>
+      </form>
 
-    <p class="auth-link">
-      Já tem conta? <a href="/login">Entrar</a>
-    </p>
+      <p class="auth-link">
+        Já tem conta? <a href="/login">Entrar</a>
+      </p>
+    </div>
   </div>
-</div>
+</PageContainer>
 
 <style>
   .auth-container {
@@ -104,62 +122,57 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f5f5f0;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   }
+
   .auth-card {
-    background: white;
+    background: #ffffff;
     padding: 2.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(99, 102, 241, 0.1);
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
+    border: 1px solid #e2e8f0;
   }
-  h1 { font-size: 1.4rem; color: #e85d04; margin: 0; }
-  h2 { font-size: 1.1rem; color: #333; margin: 0; font-weight: 500; }
-  form { display: flex; flex-direction: column; gap: 1rem; }
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #555;
+
+  .auth-title {
+    font-size: 1.5rem;
+    color: #6366f1;
+    margin: 0;
+    font-weight: 700;
+    text-align: center;
   }
-  .hint { font-weight: 400; color: #999; }
-  input {
-    padding: 0.65rem 0.875rem;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  input:focus { border-color: #e85d04; }
-  button {
-    padding: 0.75rem;
-    background: #e85d04;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
+
+  .auth-subtitle {
+    font-size: 1.125rem;
+    color: #0f172a;
+    margin: 0;
     font-weight: 600;
-    cursor: pointer;
-    margin-top: 0.5rem;
-    transition: background 0.2s;
+    text-align: center;
   }
-  button:hover:not(:disabled) { background: #c94f03; }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  .alert-error {
-    background: #fff0f0;
-    border: 1px solid #fca5a5;
-    color: #dc2626;
-    padding: 0.75rem;
-    border-radius: 8px;
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .auth-link {
     font-size: 0.875rem;
+    text-align: center;
+    color: #64748b;
   }
-  .auth-link { font-size: 0.875rem; text-align: center; color: #666; }
-  .auth-link a { color: #e85d04; text-decoration: none; font-weight: 500; }
+
+  .auth-link a {
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .auth-link a:hover {
+    text-decoration: underline;
+  }
 </style>

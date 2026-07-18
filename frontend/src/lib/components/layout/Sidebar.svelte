@@ -1,11 +1,15 @@
 <script lang="ts">
-	import { LayoutDashboard, Plus, ShoppingCart, Utensils, Leaf, Scale, Users, User, Settings, LogOut, ChevronLeft, ChevronRight, Bell } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { api } from '$lib/api/client';
+	import type { Notifications } from '$lib/types/notifications';
+	import { LayoutDashboard, Plus, ShoppingCart, Utensils, Leaf, Scale, Users, User, LogOut, ChevronLeft, ChevronRight, Bell } from '@lucide/svelte';
 
 	interface NavItem {
 		label: string;
 		href: string;
 		icon: any;
 		badge?: number;
+		badgeKey?: 'pendingOrders' | 'lowStockCount' | 'productsWithoutPhoto' | 'expiredPromotions';
 	}
 
 	interface NavGroup {
@@ -19,6 +23,8 @@
 		onToggle?: () => void;
 		userName?: string;
 		userAvatar?: string;
+		open?: boolean;
+		onClose?: () => void;
 	}
 
 	let {
@@ -27,7 +33,11 @@
 		onToggle,
 		userName = 'Usuário',
 		userAvatar,
+		open = false,
+		onClose,
 	}: Props = $props();
+
+	let notifications = $state<Notifications | null>(null);
 
 	const navGroups: NavGroup[] = [
 		{
@@ -35,7 +45,7 @@
 			items: [
 				{ label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
 				{ label: 'Novo Pedido', href: '/orders/new', icon: Plus },
-				{ label: 'Pedidos', href: '/orders', icon: ShoppingCart, badge: 3 },
+				{ label: 'Pedidos', href: '/orders', icon: ShoppingCart, badgeKey: 'pendingOrders' },
 			],
 		},
 		{
@@ -48,15 +58,13 @@
 		{
 			title: 'ESTOQUE',
 			items: [
-				{ label: 'Ajustes', href: '/stock-adjustments', icon: Scale, badge: 2 },
+				{ label: 'Ajustes', href: '/stock-adjustments', icon: Scale, badgeKey: 'lowStockCount' },
 			],
 		},
 		{
 			title: 'ADMINISTRAÇÃO',
 			items: [
-				{ label: 'Usuários', href: '/users', icon: Users },
 				{ label: 'Perfil', href: '/profile', icon: User },
-				{ label: 'Configurações', href: '/settings', icon: Settings },
 			],
 		},
 	];
@@ -64,9 +72,26 @@
 	function isActive(href: string): boolean {
 		return currentPath === href || currentPath.startsWith(href + '/');
 	}
+
+	function getBadgeValue(badgeKey?: string): number | undefined {
+		if (!notifications || !badgeKey) return undefined;
+		const value = notifications[badgeKey as keyof Notifications];
+		return value > 0 ? value : undefined;
+	}
+
+	onMount(async () => {
+		try {
+			const res = await api.notifications();
+			if (!res.error && res.data) {
+				notifications = res.data;
+			}
+		} catch (e) {
+			console.error('Failed to load notifications:', e);
+		}
+	});
 </script>
 
-<aside class="sidebar {collapsed ? 'sidebar-collapsed' : ''}">
+<aside class="sidebar {collapsed ? 'sidebar-collapsed' : ''} {open ? 'mobile-open' : ''}">
 	<div class="sidebar-header">
 		<button class="sidebar-toggle" onclick={onToggle} aria-label="Toggle sidebar">
 			{#if collapsed}
@@ -99,8 +124,8 @@
 										<svelte:component this={item.icon} size={18} class="nav-icon" />
 										<span class="nav-label">{item.label}</span>
 									</div>
-									{#if item.badge}
-										<span class="nav-badge">{item.badge}</span>
+									{#if getBadgeValue(item.badgeKey)}
+										<span class="nav-badge">{getBadgeValue(item.badgeKey)}</span>
 									{/if}
 								</a>
 							</li>
@@ -118,8 +143,8 @@
 								title={item.label}
 							>
 								<svelte:component this={item.icon} size={18} class="nav-icon" />
-								{#if item.badge}
-									<span class="nav-badge nav-badge-collapsed">{item.badge}</span>
+								{#if getBadgeValue(item.badgeKey)}
+									<span class="nav-badge nav-badge-collapsed">{getBadgeValue(item.badgeKey)}</span>
 								{/if}
 							</a>
 						</li>
@@ -147,9 +172,6 @@
 				<button class="sidebar-action-btn" title="Notificações">
 					<Bell size={14} />
 				</button>
-				<a href="/settings" class="sidebar-action-btn" title="Configurações">
-					<Settings size={14} />
-				</a>
 				<a href="/logout" class="sidebar-action-btn danger" title="Sair">
 					<LogOut size={14} />
 				</a>
@@ -157,6 +179,10 @@
 		</div>
 	</div>
 </aside>
+
+{#if open}
+	<div class="sidebar-overlay" onclick={onClose}></div>
+{/if}
 
 <style>
 	.sidebar {
@@ -508,7 +534,30 @@
 
 	@media (max-width: 768px) {
 		.sidebar {
-			display: none;
+			position: fixed;
+			left: -240px;
+			top: 40px;
+			z-index: 200;
+			transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		}
+
+		.sidebar.mobile-open {
+			left: 0;
+		}
+
+		.sidebar-overlay {
+			display: block;
+			position: fixed;
+			top: 40px;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.5);
+			z-index: 150;
+		}
+	}
+
+	.sidebar-overlay {
+		display: none;
 	}
 </style>

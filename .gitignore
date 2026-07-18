@@ -13,3 +13,7 @@ Thumbs.db
 
 # Logs gerais
 *.log
+
+# SQLite temporários
+*.db-wal
+*.db-shm

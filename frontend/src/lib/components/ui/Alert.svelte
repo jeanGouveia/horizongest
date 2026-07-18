@@ -5,12 +5,14 @@
 		variant?: AlertVariant;
 		dismissible?: boolean;
 		onDismiss?: () => void;
+		class?: string;
 	}
 
 	let {
 		variant = 'info',
 		dismissible = false,
 		onDismiss,
+		class: className = '',
 	}: Props = $props();
 
 	let visible = $state(true);
@@ -28,6 +30,7 @@
 		class:alert-success={variant === 'success'}
 		class:alert-error={variant === 'error'}
 		class:alert-warning={variant === 'warning'}
+		class={className}
 	>
 		<div class="alert-content">
 			<slot />

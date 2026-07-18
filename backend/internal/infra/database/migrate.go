@@ -21,6 +21,7 @@ func RunMigrations(db *gorm.DB) error {
 		&repository.GormOrder{},
 		&repository.GormOrderItem{},
 		&repository.GormStockAdjustmentPending{},
+		&repository.GormMedia{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {

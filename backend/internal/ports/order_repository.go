@@ -17,6 +17,9 @@ type OrderRepository interface {
 	ListOrders(ctx context.Context) ([]domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, id uint, status domain.OrderStatus) error
 
+	// ValidateStock verifica se há estoque suficiente para os itens do pedido
+	ValidateStock(ctx context.Context, items []domain.OrderItem, productIngredients map[uint][]domain.ProductIngredient) (*domain.StockValidationResponse, error)
+
 	// UpdateOrderStatusWithAdjustments atualiza o status do pedido e registra ajustes de estoque
 	// em uma única transação atômica. Se o status for 'cancelled', registra ajustes pendentes.
 	// Se qualquer etapa falhar, rollback completo. Garante consistência entre status e auditoria.

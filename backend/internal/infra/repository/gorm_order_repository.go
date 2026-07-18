@@ -286,6 +286,54 @@ func (r *GormOrderRepository) UpdateOrderStatusWithAdjustments(
 	})
 }
 
+func (r *GormOrderRepository) ValidateStock(ctx context.Context, items []domain.OrderItem, productIngredients map[uint][]domain.ProductIngredient) (*domain.StockValidationResponse, error) {
+	response := &domain.StockValidationResponse{
+		Valid:             true,
+		InsufficientStock: []domain.InsufficientIngredient{},
+	}
+
+	// Mapa para acumular quantidade necessária por ingrediente
+	requiredByIngredient := make(map[uint]float64)
+
+	for _, item := range items {
+		ingredients, exists := productIngredients[item.ProductID]
+		if !exists || len(ingredients) == 0 {
+			// Produto simples ou sem ficha técnica - não afeta estoque
+			continue
+		}
+
+		for _, pi := range ingredients {
+			requiredQty := pi.Quantity * item.Quantity
+			requiredByIngredient[pi.IngredientID] += requiredQty
+		}
+	}
+
+	// Verificar estoque atual de cada ingrediente necessário
+	for ingredientID, requiredQty := range requiredByIngredient {
+		ingredient, err := r.productRepo.FindIngredientByID(ctx, ingredientID)
+		if err != nil {
+			return nil, fmt.Errorf("ValidateStock: buscar ingrediente %d: %w", ingredientID, err)
+		}
+		if ingredient == nil {
+			return nil, fmt.Errorf("ValidateStock: ingrediente %d não encontrado", ingredientID)
+		}
+
+		if ingredient.StockQuantity < requiredQty {
+			response.Valid = false
+			response.InsufficientStock = append(response.InsufficientStock, domain.InsufficientIngredient{
+				IngredientID:   ingredientID,
+				IngredientName: ingredient.Name,
+				Required:       requiredQty,
+				Available:      ingredient.StockQuantity,
+				Shortage:       requiredQty - ingredient.StockQuantity,
+				Unit:           ingredient.Unit,
+			})
+		}
+	}
+
+	return response, nil
+}
+
 func orderToDomain(g *GormOrder) *domain.Order {
 	var deletedAt *time.Time
 	if g.DeletedAt != nil {

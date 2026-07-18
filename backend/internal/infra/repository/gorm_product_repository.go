@@ -229,6 +229,55 @@ func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) erro
 	return nil
 }
 
+func (r *GormProductRepository) CanDeleteProduct(ctx context.Context, id uint) (*domain.DependencyCheck, error) {
+	check := &domain.DependencyCheck{CanDelete: true, Reasons: []domain.DependencyReason{}}
+
+	// Verificar pedidos que contêm este produto
+	type OrderResult struct {
+		ID     uint   `gorm:"column:id"`
+		Status string `gorm:"column:status"`
+		Date   int64  `gorm:"column:created_at"`
+	}
+	var orders []OrderResult
+	if err := r.db.WithContext(ctx).Table("order_items").
+		Select("orders.id, orders.status, orders.created_at").
+		Joins("JOIN orders ON order_items.order_id = orders.id").
+		Where("order_items.product_id = ? AND orders.deleted_at IS NULL", id).
+		Find(&orders).Error; err != nil {
+		return nil, fmt.Errorf("CanDeleteProduct: verificar pedidos: %w", err)
+	}
+
+	for _, order := range orders {
+		check.CanDelete = false
+		check.Reasons = append(check.Reasons, domain.DependencyReason{
+			Type:        "order",
+			ID:          order.ID,
+			Name:        fmt.Sprintf("Pedido #%d", order.ID),
+			Description: fmt.Sprintf("Status: %s, Data: %s", order.Status, time.Unix(order.Date, 0).Format("02/01/2006")),
+		})
+	}
+
+	// Verificar se produto composto é usado em fichas técnicas de outros produtos
+	var recipeCount int64
+	if err := r.db.WithContext(ctx).Model(&GormProductIngredient{}).
+		Where("ingredient_id = ? AND deleted_at IS NULL", id).
+		Count(&recipeCount).Error; err != nil {
+		return nil, fmt.Errorf("CanDeleteProduct: verificar fichas técnicas: %w", err)
+	}
+
+	if recipeCount > 0 {
+		check.CanDelete = false
+		check.Reasons = append(check.Reasons, domain.DependencyReason{
+			Type:        "recipe",
+			ID:          id,
+			Name:        "Fichas Técnicas",
+			Description: fmt.Sprintf("Usado em %d fichas técnicas de produtos compostos", recipeCount),
+		})
+	}
+
+	return check, nil
+}
+
 // ── Ingrediente ──────────────────────────────────────────────────────────────
 
 func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.Ingredient) error {
@@ -291,6 +340,36 @@ func (r *GormProductRepository) DeleteIngredient(ctx context.Context, id uint) e
 		return fmt.Errorf("DeleteIngredient: %w", err)
 	}
 	return nil
+}
+
+func (r *GormProductRepository) CanDeleteIngredient(ctx context.Context, id uint) (*domain.DependencyCheck, error) {
+	check := &domain.DependencyCheck{CanDelete: true, Reasons: []domain.DependencyReason{}}
+
+	// Verificar fichas técnicas que usam este ingrediente
+	type ProductResult struct {
+		ID   uint   `gorm:"column:id"`
+		Name string `gorm:"column:name"`
+	}
+	var products []ProductResult
+	if err := r.db.WithContext(ctx).Table("product_ingredients").
+		Select("products.id, products.name").
+		Joins("JOIN products ON product_ingredients.product_id = products.id").
+		Where("product_ingredients.ingredient_id = ? AND product_ingredients.deleted_at IS NULL AND products.deleted_at IS NULL", id).
+		Find(&products).Error; err != nil {
+		return nil, fmt.Errorf("CanDeleteIngredient: verificar fichas técnicas: %w", err)
+	}
+
+	for _, product := range products {
+		check.CanDelete = false
+		check.Reasons = append(check.Reasons, domain.DependencyReason{
+			Type:        "product",
+			ID:          product.ID,
+			Name:        product.Name,
+			Description: "Usado na ficha técnica deste produto composto",
+		})
+	}
+
+	return check, nil
 }
 
 // ── Ficha técnica ────────────────────────────────────────────────────────────

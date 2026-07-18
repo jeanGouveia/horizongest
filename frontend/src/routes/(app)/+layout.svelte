@@ -4,9 +4,13 @@
 	import { Footer } from '$lib/components/layout';
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore.svelte';
+	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 
 	let { children } = $props();
 	let sidebarCollapsed = $state(false);
+	let sidebarOpen = $state(false);
+	let showMenuButton = $state(false);
 
 	// Get current path for sidebar active state
 	let currentPath = $derived($page.url.pathname);
@@ -21,20 +25,35 @@
 		if (path === '/ingredients') return 'Ingredientes';
 		if (path === '/stock-adjustments') return 'Ajustes de Estoque';
 		if (path === '/profile') return 'Perfil';
-		if (path === '/settings') return 'Configurações';
 		return '';
 	});
+
+	onMount(() => {
+		if (browser) {
+			showMenuButton = window.innerWidth < 768;
+		}
+	});
+
+	function toggleSidebar() {
+		sidebarOpen = !sidebarOpen;
+	}
 </script>
 
 <div class="app-layout">
-	<Header breadcrumb={breadcrumb()} />
+	<Header
+		breadcrumb={breadcrumb()}
+		showMenuButton={showMenuButton}
+		onMenuToggle={toggleSidebar}
+	/>
 	<div class="main-content">
-		<Sidebar 
-			currentPath={currentPath} 
-			collapsed={sidebarCollapsed} 
+		<Sidebar
+			currentPath={currentPath}
+			collapsed={sidebarCollapsed}
 			onToggle={() => sidebarCollapsed = !sidebarCollapsed}
 			userName={userStore.user?.name}
 			userAvatar={userStore.user?.avatar}
+			open={sidebarOpen}
+			onClose={() => sidebarOpen = false}
 		/>
 		<main class="content">
 			{@render children()}

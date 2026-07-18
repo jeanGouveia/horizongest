@@ -13,30 +13,58 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    credentials: 'include', // sempre envia o cookie auth_token
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {})
+  try {
+    // Não definir Content-Type para FormData (deixa o navegador definir com boundary correto)
+    const headers = options.body instanceof FormData
+      ? { ...(options.headers ?? {}) }
+      : {
+          'Content-Type': 'application/json',
+          ...(options.headers ?? {})
+        };
+
+    const res = await fetch(`${BASE}${path}`, {
+      ...options,
+      credentials: 'include', // sempre envia o cookie auth_token
+      headers
+    });
+
+    if (res.status === 204) {
+      return { data: null, error: null, status: 204 };
     }
-  });
 
-  if (res.status === 204) {
-    return { data: null, error: null, status: 204 };
-  }
+    const json = await res.json().catch(() => ({}));
 
-  const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        data: null,
+        error: json?.error ?? `Erro ${res.status}`,
+        status: res.status
+      };
+    }
 
-  if (!res.ok) {
+    return { data: json as T, error: null, status: res.status };
+  } catch (e: any) {
+    // Tratamento de erros de rede (fetch failed, timeout, network error)
+    if (e instanceof TypeError && e.message === 'Failed to fetch') {
+      return {
+        data: null,
+        error: 'Erro de conexão. Verifique sua internet.',
+        status: 0
+      };
+    }
+    if (e.name === 'AbortError') {
+      return {
+        data: null,
+        error: 'Tempo esgotado. Tente novamente.',
+        status: 0
+      };
+    }
     return {
       data: null,
-      error: json?.error ?? `Erro ${res.status}`,
-      status: res.status
+      error: e?.message ?? 'Erro desconhecido',
+      status: 0
     };
   }
-
-  return { data: json as T, error: null, status: res.status };
 }
 
 export { request };
@@ -74,5 +102,38 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body)
       })
-  }
+  },
+
+  // --- System endpoints ---
+  dashboard: () =>
+    request<any>('/dashboard'),
+
+  notifications: () =>
+    request<any>('/notifications'),
+
+  health: () =>
+    request<any>('/health'),
+
+  version: () =>
+    request<any>('/version'),
+
+  capabilities: () =>
+    request<any>('/capabilities'),
+
+  // --- Dependency check endpoints ---
+  canDeleteProduct: (id: number) =>
+    request<any>(`/products/${id}/can-delete`),
+
+  canDeleteIngredient: (id: number) =>
+    request<any>(`/ingredients/${id}/can-delete`),
+
+  canDeleteCategory: (id: number) =>
+    request<any>(`/categories/${id}/can-delete`),
+
+  // --- Stock validation endpoint ---
+  validateStock: (body: any) =>
+    request<any>('/orders/validate', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
 };

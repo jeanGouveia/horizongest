@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { getProducts, createProduct, updateProduct, deleteProduct } from '$lib/api/product';
+  import { api } from '$lib/api/client';
   import type { Product } from '$lib/types/product';
+  import type { DependencyCheck } from '$lib/types/dependency';
   import { Card, Button, Input, Textarea, Select, Checkbox, Badge, Alert, Loading, EmptyState, Modal, Table, Skeleton, ProductCard } from '$lib/components/ui';
   import { Workspace } from '$lib/components/layout';
   import { Search, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, Activity, MoreHorizontal, Filter, ArrowUpDown } from '@lucide/svelte';
@@ -29,6 +32,11 @@
   });
   let productSaving = $state(false);
   let productError = $state('');
+
+  // Modal de dependências
+  let showDependencyModal = $state(false);
+  let dependencyCheck = $state<DependencyCheck | null>(null);
+  let deleteTargetId = $state<number | null>(null);
 
 
   onMount(async () => {
@@ -123,14 +131,41 @@
   }
 
   function openProductCreate() {
-    window.location.href = '/products/new';
+    goto('/products/new');
   }
 
   async function deleteProductById(id: number) {
-    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
     try {
+      const res = await api.canDeleteProduct(id);
+      if (res.error) {
+        error = res.error;
+        return;
+      }
+
+      const check = res.data as DependencyCheck;
+      if (!check.canDelete) {
+        dependencyCheck = check;
+        deleteTargetId = id;
+        showDependencyModal = true;
+        return;
+      }
+
+      if (!confirm('Tem certeza que deseja excluir este produto?')) return;
       await deleteProduct(id);
       products = products.filter(p => p.ID !== id);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao verificar dependências do produto.';
+    }
+  }
+
+  async function confirmDeleteProduct() {
+    if (!deleteTargetId) return;
+    try {
+      await deleteProduct(deleteTargetId);
+      products = products.filter(p => p.ID !== deleteTargetId);
+      showDependencyModal = false;
+      dependencyCheck = null;
+      deleteTargetId = null;
     } catch (e: any) {
       error = e?.message ?? 'Erro ao excluir produto.';
     }
@@ -161,6 +196,11 @@
         available_until: product.AvailableUntil,
         sku: product.SKU,
         internal_notes: product.InternalNotes,
+        slug: product.Slug,
+        meta_title: product.MetaTitle,
+        meta_description: product.MetaDescription,
+        alt_image: product.AltImage,
+        canonical: product.Canonical,
       };
       
       const created = await createProduct(payload);
@@ -448,8 +488,8 @@
         {#each paginatedProducts as product}
           <ProductCard
             product={product}
-            onClick={() => window.location.href = `/products/${product.ID}/edit`}
-            onEdit={() => window.location.href = `/products/${product.ID}/edit`}
+            onClick={() => goto(`/products/${product.ID}/edit`)}
+            onEdit={() => goto(`/products/${product.ID}/edit`)}
             onDuplicate={() => duplicateProduct(product.ID)}
             onArchive={() => archiveProduct(product.ID)}
             onToggleActive={() => toggleProductActive(product.ID)}
@@ -864,4 +904,108 @@
       flex: 1;
     }
   }
+
+  /* Dependency Modal */
+  .dependency-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dependency-list {
+    margin-top: 1rem;
+  }
+
+  .dependency-list h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+  }
+
+  .dependency-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .dependency-item {
+    padding: 0.75rem;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .dependency-type {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #92400e;
+    text-transform: uppercase;
+  }
+
+  .dependency-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .dependency-desc {
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+
+  .dependency-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
 </style>
+
+<!-- Modal de Dependências -->
+<Modal
+  open={showDependencyModal}
+  onClose={() => {
+    showDependencyModal = false;
+    dependencyCheck = null;
+    deleteTargetId = null;
+  }}
+  title="Não é possível excluir"
+>
+  <div class="dependency-modal">
+    <Alert variant="warning" dismissible={false}>
+      Este item possui dependências que impedem sua exclusão.
+    </Alert>
+
+    {#if dependencyCheck && dependencyCheck.reasons.length > 0}
+      <div class="dependency-list">
+        <h4>Dependências encontradas:</h4>
+        <ul>
+          {#each dependencyCheck.reasons as reason}
+            <li class="dependency-item">
+              <div class="dependency-type">{reason.type}</div>
+              <div class="dependency-name">{reason.name}</div>
+              <div class="dependency-desc">{reason.description}</div>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
+    <div class="dependency-actions">
+      <Button variant="ghost" onclick={() => {
+        showDependencyModal = false;
+        dependencyCheck = null;
+        deleteTargetId = null;
+      }}>
+        Fechar
+      </Button>
+    </div>
+  </div>
+</Modal>

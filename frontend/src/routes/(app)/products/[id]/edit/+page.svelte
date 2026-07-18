@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { getProduct, updateProduct } from '$lib/api/product';
   import { getCategories } from '$lib/api/category';
   import type { Product } from '$lib/types/product';
@@ -44,7 +46,7 @@
   ];
 
   onMount(async () => {
-    const id = parseInt(window.location.pathname.split('/').slice(-2)[0]);
+    const id = parseInt($page.url.pathname.split('/').slice(-2)[0]);
     productId = id;
     await Promise.all([loadProduct(), loadCategories()]);
   });
@@ -136,7 +138,7 @@
       };
 
       await updateProduct(productId, payload);
-      window.location.href = '/products';
+      goto('/products');
     } catch (e: any) {
       error = e?.message ?? 'Erro ao salvar produto.';
     } finally {
@@ -145,7 +147,7 @@
   }
 
   function handleCancel() {
-    window.location.href = '/products';
+    goto('/products');
   }
 
   function handlePhotoChange(detail: { file: File | null; previewUrl: string }) {

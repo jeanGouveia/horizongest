@@ -1,12 +1,16 @@
 <script lang="ts">
-	import { Search } from '@lucide/svelte';
+	import { Search, Menu } from '@lucide/svelte';
 
 	interface Props {
 		breadcrumb?: string;
+		onMenuToggle?: () => void;
+		showMenuButton?: boolean;
 	}
 
 	let {
 		breadcrumb = '',
+		onMenuToggle,
+		showMenuButton = false,
 	}: Props = $props();
 
 	let searchQuery = $state('');
@@ -21,6 +25,11 @@
 
 <header class="header">
 	<div class="header-left">
+		{#if showMenuButton}
+			<button class="menu-button" onclick={onMenuToggle} aria-label="Menu">
+				<Menu size={20} />
+			</button>
+		{/if}
 		{#if breadcrumb}
 			<span class="breadcrumb">{breadcrumb}</span>
 		{/if}
@@ -62,8 +71,31 @@
 	.header-left {
 		display: flex;
 		align-items: center;
+		gap: 0.5rem;
 		flex: 0 0 auto;
 		min-width: 0;
+	}
+
+	.menu-button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.5rem;
+		background: transparent;
+		border: none;
+		color: #64748b;
+		cursor: pointer;
+		border-radius: 6px;
+		transition: all 0.15s ease;
+	}
+
+	.menu-button:hover {
+		background: #f1f5f9;
+		color: #0f172a;
+	}
+
+	.menu-button:active {
+		background: #e2e8f0;
 	}
 
 	.breadcrumb {

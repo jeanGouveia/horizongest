@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from '@lucide/svelte';
+	import { browser } from '$app/environment';
 
 	type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -45,6 +46,7 @@
 
 	function startTimer() {
 		if (toast.duration === 0) return;
+		if (!browser) return;
 		
 		interval = window.setInterval(() => {
 			if (!isPaused) {

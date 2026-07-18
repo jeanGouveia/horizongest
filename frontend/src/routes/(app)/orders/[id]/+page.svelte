@@ -4,6 +4,7 @@
   import { getOrder, updateOrderStatus } from '$lib/api/order';
   import type { Order, OrderStatus } from '$lib/types/order';
   import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '$lib/types/order';
+  import { ConfirmDialog } from '$lib/components/ui';
 
   const orderId = Number($page.params.id);
 
@@ -12,6 +13,7 @@
   let error = $state('');
   let updating = $state(false);
   let updateError = $state('');
+  let showCancelConfirm = $state(false);
 
   onMount(async () => {
     loading = true;
@@ -75,6 +77,11 @@
 
   async function cancelOrder() {
     if (!order) return;
+    showCancelConfirm = true;
+  }
+
+  async function confirmCancel() {
+    showCancelConfirm = false;
     await changeStatus('cancelled');
   }
 
@@ -257,6 +264,18 @@
     </div>
   {/if}
 </div>
+
+{#if showCancelConfirm}
+  <ConfirmDialog
+    open={showCancelConfirm}
+    title="Cancelar Pedido"
+    message="Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita."
+    confirmText="Sim, Cancelar"
+    cancelText="Não"
+    onConfirm={confirmCancel}
+    onCancel={() => showCancelConfirm = false}
+  />
+{/if}
 
 <style>
   .page-wrapper    { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }

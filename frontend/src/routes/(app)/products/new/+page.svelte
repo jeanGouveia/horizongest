@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { createProduct } from '$lib/api/product';
   import { getCategories } from '$lib/api/category';
   import type { Product } from '$lib/types/product';
@@ -105,7 +106,7 @@
       };
 
       await createProduct(payload);
-      window.location.href = '/products';
+      goto('/products');
     } catch (e: any) {
       error = e?.message ?? 'Erro ao salvar produto.';
     } finally {
@@ -114,7 +115,7 @@
   }
 
   function handleCancel() {
-    window.location.href = '/products';
+    goto('/products');
   }
 
   function handlePhotoChange(detail: { file: File | null; previewUrl: string }) {

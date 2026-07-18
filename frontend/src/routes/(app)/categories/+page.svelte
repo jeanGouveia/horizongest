@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getCategories, createCategory, updateCategory, deleteCategory } from '$lib/api/category';
+  import { api } from '$lib/api/client';
   import type { Category } from '$lib/types/category';
+  import type { DependencyCheck } from '$lib/types/dependency';
   import { Card, Button, Input, Textarea, Checkbox, Badge, Alert, Loading, EmptyState, Modal } from '$lib/components/ui';
   import { Workspace } from '$lib/components/layout';
   import { Plus, Folder, AlertTriangle, MoreHorizontal } from '@lucide/svelte';
@@ -18,6 +20,11 @@
   let categoryForm = $state({ Name: '', Description: '', DisplayOrder: 0, Active: true });
   let categorySaving = $state(false);
   let categoryError = $state('');
+
+  // Modal de dependências
+  let showDependencyModal = $state(false);
+  let dependencyCheck = $state<DependencyCheck | null>(null);
+  let deleteTargetId = $state<number | null>(null);
 
   onMount(async () => {
     await loadAll();
@@ -85,10 +92,37 @@
   }
 
   async function deleteCategoryById(id: number) {
-    if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
     try {
+      const res = await api.canDeleteCategory(id);
+      if (res.error) {
+        error = res.error;
+        return;
+      }
+
+      const check = res.data as DependencyCheck;
+      if (!check.canDelete) {
+        dependencyCheck = check;
+        deleteTargetId = id;
+        showDependencyModal = true;
+        return;
+      }
+
+      if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
       await deleteCategory(id);
       categories = categories.filter(c => c.ID !== id);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao excluir categoria.';
+    }
+  }
+
+  async function confirmDeleteCategory() {
+    if (!deleteTargetId) return;
+    try {
+      await deleteCategory(deleteTargetId);
+      categories = categories.filter(c => c.ID !== deleteTargetId);
+      showDependencyModal = false;
+      dependencyCheck = null;
+      deleteTargetId = null;
     } catch (e: any) {
       error = e?.message ?? 'Erro ao excluir categoria.';
     }
@@ -418,4 +452,128 @@
     gap: 0.75rem;
     margin-top: 1.75rem;
   }
+
+  /* Dependency Modal */
+  .dependency-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dependency-list {
+    margin-top: 1rem;
+  }
+
+  .dependency-list h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+  }
+
+  .dependency-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .dependency-item {
+    padding: 0.75rem;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .dependency-type {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #92400e;
+    text-transform: uppercase;
+  }
+
+  .dependency-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .dependency-desc {
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+
+  .dependency-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .categories-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .filters-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .category-actions {
+      flex-direction: column;
+    }
+
+    .category-actions .danger {
+      color: #ef4444;
+    }
+  }
 </style>
+
+<!-- Modal de Dependências -->
+<Modal
+  open={showDependencyModal}
+  onClose={() => {
+    showDependencyModal = false;
+    dependencyCheck = null;
+    deleteTargetId = null;
+  }}
+  title="Não é possível excluir"
+>
+  <div class="dependency-modal">
+    <Alert variant="warning" dismissible={false}>
+      Este item possui dependências que impedem sua exclusão.
+    </Alert>
+
+    {#if dependencyCheck && dependencyCheck.reasons.length > 0}
+      <div class="dependency-list">
+        <h4>Dependências encontradas:</h4>
+        <ul>
+          {#each dependencyCheck.reasons as reason}
+            <li class="dependency-item">
+              <div class="dependency-type">{reason.type}</div>
+              <div class="dependency-name">{reason.name}</div>
+              <div class="dependency-desc">{reason.description}</div>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
+    <div class="dependency-actions">
+      <Button variant="ghost" onclick={() => {
+        showDependencyModal = false;
+        dependencyCheck = null;
+        deleteTargetId = null;
+      }}>
+        Fechar
+      </Button>
+    </div>
+  </div>
+</Modal>

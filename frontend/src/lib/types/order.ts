@@ -22,6 +22,7 @@ export interface Order {
 
 export type OrderCreatePayload = {
   notes?: string;
+  table_number?: number;
   items: { product_id: number; quantity: number }[];
 };
 

@@ -4,6 +4,8 @@
  * Cores adaptadas para baixo contraste e conforto visual
  */
 
+import { browser } from '$app/environment';
+
 export const darkMode = {
 	// Cores de fundo - Adaptadas para dark mode
 	background: {
@@ -52,19 +54,19 @@ export const darkModeSelector = '[data-theme="dark"]';
 
 // Função para verificar preferência do sistema
 export function prefersDarkMode(): boolean {
-	if (typeof window === 'undefined') return false;
+	if (!browser) return false;
 	return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 // Função para aplicar dark mode
 export function applyDarkMode(enabled: boolean): void {
-	if (typeof document === 'undefined') return;
+	if (!browser) return;
 	document.documentElement.setAttribute('data-theme', enabled ? 'dark' : 'light');
 }
 
 // Função para alternar dark mode
 export function toggleDarkMode(): void {
-	if (typeof document === 'undefined') return;
+	if (!browser) return;
 	const current = document.documentElement.getAttribute('data-theme');
 	const next = current === 'dark' ? 'light' : 'dark';
 	applyDarkMode(next === 'dark');
@@ -74,7 +76,7 @@ export function toggleDarkMode(): void {
 export function useDarkMode() {
 	let isDark = $state(false);
 
-	if (typeof window !== 'undefined') {
+	if (browser) {
 		isDark = prefersDarkMode();
 		applyDarkMode(isDark);
 

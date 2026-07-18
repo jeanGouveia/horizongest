@@ -9,8 +9,24 @@
   let error    = $state('');
   let loading  = $state(false);
 
+  function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
   async function handleSubmit() {
-    error   = '';
+    error = '';
+
+    if (!isValidEmail(email)) {
+      error = 'Por favor, insira um e-mail válido';
+      return;
+    }
+
+    if (password.length < 6) {
+      error = 'A senha deve ter no mínimo 6 caracteres';
+      return;
+    }
+
     loading = true;
 
     const { data, error: err } = await api.auth.login({ email, password });

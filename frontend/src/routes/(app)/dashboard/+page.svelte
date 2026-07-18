@@ -1,124 +1,28 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { request } from '$lib/api/client';
+  import { api } from '$lib/api/client';
+  import type { Dashboard } from '$lib/types/dashboard';
   import { Card, Button, Badge, Alert, Skeleton } from '$lib/components/ui';
   import { Workspace } from '$lib/components/layout';
   import { TrendingUp, TrendingDown, AlertTriangle, Package, ShoppingCart, DollarSign, ArrowUpRight, ArrowDownRight, CheckCircle, XCircle, Info, Clock, Users, Activity, MoreHorizontal } from '@lucide/svelte';
 
-  // Métricas executivas
-  let metrics = $state({
-    products: 0,
-    orders: 0,
-    pendingOrders: 0,
-    todayOrders: 0,
-    todayRevenue: 0,
-    averageTicket: 0,
-    lowStock: 0,
-    pendingAdjustments: 0,
-  });
-  let loadingMetrics = $state(true);
+  // Dashboard data
+  let dashboard = $state<Dashboard | null>(null);
+  let loading = $state(true);
   let error = $state('');
-
-  // Últimos pedidos
-  interface RecentOrder {
-    id: number;
-    table: string;
-    total: number;
-    status: string;
-    time: string;
-  }
-  let recentOrders = $state<RecentOrder[]>([]);
-  let loadingOrders = $state(true);
-
-  // Ingredientes críticos
-  interface CriticalIngredient {
-    name: string;
-    stock: number;
-    unit: string;
-    minStock: number;
-  }
-  let criticalIngredients = $state<CriticalIngredient[]>([]);
-  let loadingIngredients = $state(true);
-
-  // Atividades recentes
-  let recentActivities = $state([
-    { type: 'order', message: 'Novo pedido #1234 criado', time: '15min atrás', icon: ShoppingCart },
-    { type: 'stock', message: 'Estoque de Tomate ajustado', time: '1h atrás', icon: Package },
-    { type: 'approval', message: 'Ajuste #56 aprovado', time: '2h atrás', icon: CheckCircle },
-    { type: 'alert', message: 'Estoque baixo: Queijo', time: '3h atrás', icon: AlertTriangle },
-  ]);
 
   onMount(async () => {
     try {
-      const [productsRes, ordersRes, adjustmentsRes] = await Promise.all([
-        request('/products'),
-        request('/orders'),
-        request('/stock-adjustments'),
-      ]);
-      const products = productsRes.data;
-      const orders = ordersRes.data;
-      const adjustments = adjustmentsRes.data;
-
-      // Calcular métricas
-      const today = new Date().toISOString().split('T')[0];
-      const todayOrdersList = Array.isArray(orders)
-        ? orders.filter((o: any) => o.created_at?.startsWith(today))
-        : [];
-
-      const avgTicket = todayOrdersList.length > 0
-        ? todayOrdersList.reduce((sum: number, o: any) => sum + (o.total_price || 0), 0) / todayOrdersList.length
-        : 0;
-
-      metrics = {
-        products: Array.isArray(products) ? products.length : 0,
-        orders: Array.isArray(orders) ? orders.length : 0,
-        pendingOrders: Array.isArray(orders)
-          ? orders.filter((o: any) => o.status === 'pending' || o.status === 'confirmed').length
-          : 0,
-        todayOrders: todayOrdersList.length,
-        todayRevenue: todayOrdersList.reduce((sum: number, o: any) => sum + (o.total_price || 0), 0),
-        averageTicket: avgTicket,
-        lowStock: Array.isArray(products)
-          ? products.filter((p: any) => (p.ingredients || []).some((i: any) => i.stock < 10)).length
-          : 0,
-        pendingAdjustments: Array.isArray(adjustments)
-          ? adjustments.filter((a: any) => a.status === 'pending').length
-          : 0,
-      };
-
-      // Últimos pedidos (últimos 5)
-      recentOrders = Array.isArray(orders)
-        ? orders.slice(0, 5).map((o: any) => ({
-            id: o.id,
-            table: o.table_number || 'N/A',
-            total: o.total_price || 0,
-            status: o.status,
-            time: o.created_at ? new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—',
-          }))
-        : [];
-      loadingOrders = false;
-
-      // Ingredientes críticos (estoque < 10)
-      if (Array.isArray(products)) {
-        const allIngredients = products.flatMap((p: any) => p.ingredients || []);
-        criticalIngredients = allIngredients
-          .filter((i: any) => i.stock < 10)
-          .map((i: any) => ({
-            name: i.name,
-            stock: i.stock,
-            unit: i.unit || 'un',
-            minStock: i.min_stock || 5,
-          }))
-          .slice(0, 5);
+      const res = await api.dashboard();
+      if (res.error) {
+        error = res.error;
+      } else {
+        dashboard = res.data;
       }
-      loadingIngredients = false;
-
     } catch (e: any) {
-      error = e?.message ?? 'Erro ao carregar métricas.';
-      loadingOrders = false;
-      loadingIngredients = false;
+      error = e?.message ?? 'Erro ao carregar dashboard.';
     } finally {
-      loadingMetrics = false;
+      loading = false;
     }
   });
 
@@ -132,22 +36,31 @@
 
   function getStatusVariant(status: string) {
     switch (status) {
-      case 'completed': return 'success';
+      case 'delivered': return 'success';
       case 'pending': return 'warning';
       case 'confirmed': return 'primary';
       case 'cancelled': return 'danger';
+      case 'preparing': return 'info';
+      case 'ready': return 'success';
       default: return 'default';
     }
   }
 
   function getStatusLabel(status: string) {
     switch (status) {
-      case 'completed': return 'Concluído';
+      case 'delivered': return 'Entregue';
       case 'pending': return 'Pendente';
       case 'confirmed': return 'Confirmado';
       case 'cancelled': return 'Cancelado';
+      case 'preparing': return 'Preparando';
+      case 'ready': return 'Pronto';
       default: return status;
     }
+  }
+
+  function getAverageTicket() {
+    if (!dashboard || dashboard.metrics.todayOrders === 0) return 0;
+    return dashboard.metrics.todayRevenue / dashboard.metrics.todayOrders;
   }
 </script>
 
@@ -156,9 +69,9 @@
   title="Painel Executivo"
   description="Visão geral das operações do restaurante em tempo real"
 >
-  {#if loadingMetrics}
+  {#if loading}
     <div class="skeleton-metrics-grid">
-      {#each Array(4) as _}
+      {#each Array(6) as _}
         <Card class="skeleton-metric-card">
           <div class="skeleton-metric-header">
             <Skeleton variant="circular" width="32px" height="32px" />
@@ -172,7 +85,7 @@
     <Alert variant="error" dismissible onDismiss={() => error = ''}>
       ⚠️ {error}
     </Alert>
-  {:else}
+  {:else if dashboard}
     <!-- KPIs Executivos -->
   <div class="kpi-grid">
     <Card class="kpi-card kpi-primary">
@@ -182,13 +95,12 @@
         </div>
         <span class="kpi-label">Pedidos Hoje</span>
       </div>
-      <div class="kpi-value">{loadingMetrics ? '—' : formatNumber(metrics.todayOrders)}</div>
+      <div class="kpi-value">{formatNumber(dashboard.metrics.todayOrders)}</div>
       <div class="kpi-footer">
-        <div class="kpi-change positive">
-          <ArrowUpRight size={14} />
-          <span>+12% vs ontem</span>
+        <div class="kpi-change neutral">
+          <span>Hoje</span>
         </div>
-        <div class="kpi-sparkline positive"></div>
+        <div class="kpi-sparkline neutral"></div>
       </div>
     </Card>
 
@@ -199,13 +111,12 @@
         </div>
         <span class="kpi-label">Faturamento Hoje</span>
       </div>
-      <div class="kpi-value">{loadingMetrics ? '—' : formatCurrency(metrics.todayRevenue)}</div>
+      <div class="kpi-value">{formatCurrency(dashboard.metrics.todayRevenue)}</div>
       <div class="kpi-footer">
-        <div class="kpi-change positive">
-          <ArrowUpRight size={14} />
-          <span>+8% vs ontem</span>
+        <div class="kpi-change neutral">
+          <span>Hoje</span>
         </div>
-        <div class="kpi-sparkline positive"></div>
+        <div class="kpi-sparkline neutral"></div>
       </div>
     </Card>
 
@@ -216,10 +127,10 @@
         </div>
         <span class="kpi-label">Ticket Médio</span>
       </div>
-      <div class="kpi-value">{loadingMetrics ? '—' : formatCurrency(metrics.averageTicket)}</div>
+      <div class="kpi-value">{formatCurrency(getAverageTicket())}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
-          <span>Estável</span>
+          <span>Hoje</span>
         </div>
         <div class="kpi-sparkline neutral"></div>
       </div>
@@ -232,11 +143,10 @@
         </div>
         <span class="kpi-label">Estoque Baixo</span>
       </div>
-      <div class="kpi-value">{loadingMetrics ? '—' : formatNumber(metrics.lowStock)}</div>
+      <div class="kpi-value">{formatNumber(dashboard.metrics.lowStockCount)}</div>
       <div class="kpi-footer">
-        <div class="kpi-change negative">
-          <ArrowDownRight size={14} />
-          <span>+2 novos</span>
+        <div class="kpi-change neutral">
+          <span>Crítico</span>
         </div>
         <div class="kpi-sparkline negative"></div>
       </div>
@@ -247,14 +157,14 @@
         <div class="kpi-icon-wrapper">
           <Clock size={20} class="kpi-icon" />
         </div>
-        <span class="kpi-label">Ajustes Pendentes</span>
+        <span class="kpi-label">Pedidos Pendentes</span>
       </div>
-      <div class="kpi-value">{loadingMetrics ? '—' : formatNumber(metrics.pendingAdjustments)}</div>
+      <div class="kpi-value">{formatNumber(dashboard.metrics.pendingOrders)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Aguardando</span>
         </div>
-        <div class="kpi-sparkline neutral"></div>
+        <div class="kpi-sparkline warning"></div>
       </div>
     </Card>
 
@@ -265,7 +175,7 @@
         </div>
         <span class="kpi-label">Produtos Ativos</span>
       </div>
-      <div class="kpi-value">{loadingMetrics ? '—' : formatNumber(metrics.products)}</div>
+      <div class="kpi-value">{formatNumber(dashboard.metrics.activeProducts)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Catálogo</span>
@@ -284,30 +194,25 @@
         <Button href="/orders" variant="ghost" size="sm">Ver Todos</Button>
       </div>
       <div class="orders-list">
-        {#if loadingOrders}
-          <div class="loading-state">
-            <Activity class="spinner" size={24} />
-            <span>Carregando pedidos...</span>
-          </div>
-        {:else if recentOrders.length === 0}
+        {#if dashboard.recentOrders.length === 0}
           <div class="empty-state">
             <ShoppingCart size={32} class="empty-icon" />
             <span>Nenhum pedido encontrado</span>
           </div>
         {:else}
-          {#each recentOrders as order}
+          {#each dashboard.recentOrders as order}
             <div class="order-item">
               <div class="order-info">
                 <div class="order-id">#{order.id}</div>
-                <div class="order-table">Mesa {order.table}</div>
+                <div class="order-table">{order.itemsCount} itens</div>
               </div>
               <div class="order-status">
                 <Badge variant={getStatusVariant(order.status)} size="sm">
                   {getStatusLabel(order.status)}
                 </Badge>
               </div>
-              <div class="order-time">{order.time}</div>
-              <div class="order-total">{formatCurrency(order.total)}</div>
+              <div class="order-time">{order.createdAt}</div>
+              <div class="order-total">{formatCurrency(order.totalPrice)}</div>
             </div>
           {/each}
         {/if}
@@ -318,26 +223,21 @@
     <Card class="critical-ingredients-card">
       <div class="card-header">
         <h3 class="card-title">Ingredientes Críticos</h3>
-        <Badge variant="danger" size="sm">{criticalIngredients.length} itens</Badge>
+        <Badge variant="danger" size="sm">{dashboard.lowStock.length} itens</Badge>
       </div>
       <div class="ingredients-list">
-        {#if loadingIngredients}
-          <div class="loading-state">
-            <Activity class="spinner" size={24} />
-            <span>Carregando ingredientes...</span>
-          </div>
-        {:else if criticalIngredients.length === 0}
+        {#if dashboard.lowStock.length === 0}
           <div class="empty-state">
             <Package size={32} class="empty-icon" />
             <span>Estoque em dia</span>
           </div>
         {:else}
-          {#each criticalIngredients as ingredient}
+          {#each dashboard.lowStock as ingredient}
             <div class="ingredient-item">
               <div class="ingredient-info">
                 <div class="ingredient-name">{ingredient.name}</div>
                 <div class="ingredient-stock">
-                  <span class="stock-value">{ingredient.stock} {ingredient.unit}</span>
+                  <span class="stock-value">{ingredient.stockQuantity} {ingredient.unit}</span>
                   <span class="stock-min">mín: {ingredient.minStock}</span>
                 </div>
               </div>
@@ -350,26 +250,39 @@
       </div>
     </Card>
 
-    <!-- Atividades Recentes -->
+    <!-- Atividades Recentes - Removido (não implementado no backend) -->
     <Card class="activities-card">
       <div class="card-header">
-        <h3 class="card-title">Atividades Recentes</h3>
-        <Button variant="ghost" size="sm">
-          <MoreHorizontal size={16} />
-        </Button>
+        <h3 class="card-title">Totais</h3>
       </div>
       <div class="activities-list">
-        {#each recentActivities as activity}
-          <div class="activity-item activity-{activity.type}">
-            <div class="activity-icon-wrapper">
-              <svelte:component this={activity.icon} size={16} class="activity-icon" />
-            </div>
-            <div class="activity-content">
-              <div class="activity-message">{activity.message}</div>
-              <div class="activity-time">{activity.time}</div>
-            </div>
+        <div class="activity-item activity-order">
+          <div class="activity-icon-wrapper">
+            <Package size={16} class="activity-icon" />
           </div>
-        {/each}
+          <div class="activity-content">
+            <div class="activity-message">Total de Produtos</div>
+            <div class="activity-time">{formatNumber(dashboard.totalProducts)}</div>
+          </div>
+        </div>
+        <div class="activity-item activity-stock">
+          <div class="activity-icon-wrapper">
+            <Package size={16} class="activity-icon" />
+          </div>
+          <div class="activity-content">
+            <div class="activity-message">Total de Categorias</div>
+            <div class="activity-time">{formatNumber(dashboard.totalCategories)}</div>
+          </div>
+        </div>
+        <div class="activity-item activity-approval">
+          <div class="activity-icon-wrapper">
+            <Package size={16} class="activity-icon" />
+          </div>
+          <div class="activity-content">
+            <div class="activity-message">Total de Ingredientes</div>
+            <div class="activity-time">{formatNumber(dashboard.totalIngredients)}</div>
+          </div>
+        </div>
       </div>
     </Card>
   </div>
