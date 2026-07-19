@@ -201,8 +201,6 @@
             bind:value={description}
             placeholder="Descrição da sua empresa"
             disabled={saving}
-            multiline
-            rows={3}
           />
         </form>
       </Card>

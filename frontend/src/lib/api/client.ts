@@ -170,6 +170,29 @@ export const api = {
       })
   },
 
+  // --- Theme endpoints (White Label - Platform 2.0) ---
+  theme: {
+    getTheme: () =>
+      request<{
+        primary_color: string;
+        secondary_color: string;
+        logo_url: string;
+        font_family: string;
+        border_radius: string;
+        is_default: boolean;
+      }>('/theme'),
+
+    getDefaultTheme: () =>
+      request<{
+        primary_color: string;
+        secondary_color: string;
+        logo_url: string;
+        font_family: string;
+        border_radius: string;
+        is_default: boolean;
+      }>('/theme/default')
+  },
+
   // --- Company Users endpoints (Sprint 7) ---
   companyUsers: {
     list: () =>
@@ -181,16 +204,6 @@ export const api = {
         active: boolean;
         company_id: number | null;
       }>>('/company/users'),
-
-    get: (id: number) =>
-      request<{
-        id: number;
-        name: string;
-        email: string;
-        role: string | null;
-        active: boolean;
-        company_id: number | null;
-      }>(`/company/users/${id}`),
 
     add: (body: { email: string }) =>
       request<{
@@ -216,4 +229,4 @@ export const api = {
         method: 'DELETE'
       })
   }
-};
+} as const;

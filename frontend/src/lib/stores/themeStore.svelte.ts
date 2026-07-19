@@ -37,7 +37,7 @@ class ThemeStore {
 		this.error = null;
 
 		try {
-			const response = await api.get('/theme');
+			const response = await api.theme.getTheme();
 			if (!response.error && response.data) {
 				this.theme = response.data;
 				this.applyThemeToDOM();
@@ -60,7 +60,7 @@ class ThemeStore {
 		this.error = null;
 
 		try {
-			const response = await api.get('/theme/default');
+			const response = await api.theme.getDefaultTheme();
 			if (!response.error && response.data) {
 				this.theme = response.data;
 				this.applyThemeToDOM();

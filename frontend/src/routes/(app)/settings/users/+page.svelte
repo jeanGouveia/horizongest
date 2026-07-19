@@ -7,7 +7,14 @@
   import { rbacStore } from '$lib/stores/rbacStore.svelte';
 
   let loading = $state(true);
-  let users = $state([]);
+  let users = $state<Array<{
+    id: number;
+    name: string;
+    email: string;
+    role: string | null;
+    active: boolean;
+    company_id: number | null;
+  }>>([]);
   let error = $state('');
   let success = $state(false);
   
@@ -20,7 +27,14 @@
   // Change role modal
   let showRoleModal = $state(false);
   let changingRole = $state(false);
-  let selectedUser = $state(null);
+  let selectedUser = $state<{
+    id: number;
+    name: string;
+    email: string;
+    role: string | null;
+    active: boolean;
+    company_id: number | null;
+  } | null>(null);
   let newRole = $state('');
   let roleError = $state('');
 
@@ -89,6 +103,11 @@
   async function changeRole() {
     if (!newRole) {
       roleError = 'Cargo é obrigatório.';
+      return;
+    }
+
+    if (!selectedUser) {
+      roleError = 'Nenhum usuário selecionado.';
       return;
     }
 
