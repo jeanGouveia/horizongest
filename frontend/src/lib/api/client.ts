@@ -168,5 +168,52 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(body)
       })
+  },
+
+  // --- Company Users endpoints (Sprint 7) ---
+  companyUsers: {
+    list: () =>
+      request<Array<{
+        id: number;
+        name: string;
+        email: string;
+        role: string | null;
+        active: boolean;
+        company_id: number | null;
+      }>>('/company/users'),
+
+    get: (id: number) =>
+      request<{
+        id: number;
+        name: string;
+        email: string;
+        role: string | null;
+        active: boolean;
+        company_id: number | null;
+      }>(`/company/users/${id}`),
+
+    add: (body: { email: string }) =>
+      request<{
+        id: number;
+        name: string;
+        email: string;
+        role: string | null;
+        active: boolean;
+        company_id: number | null;
+      }>('/company/users/add', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }),
+
+    changeRole: (id: number, body: { role: string }) =>
+      request<{ message: string }>(`/company/users/${id}/role`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      }),
+
+    remove: (id: number) =>
+      request<{ message: string }>(`/company/users/${id}`, {
+        method: 'DELETE'
+      })
   }
 };

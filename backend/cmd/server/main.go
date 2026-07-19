@@ -11,6 +11,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 
+	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/handler"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/database"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/repository"
@@ -54,6 +55,7 @@ func main() {
 	themeSvc := service.NewThemeService(companyRepo, userRepo)
 	businessSvc := service.NewBusinessService(companyRepo, userRepo)
 	rbacSvc := service.NewRBACService(userRepo)
+	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	productHandler := handler.NewProductHandler(productSvc)
@@ -66,10 +68,11 @@ func main() {
 	companySettingsHandler := handler.NewCompanySettingsHandler(companySettingsSvc)
 	themeHandler := handler.NewThemeHandler(themeSvc)
 	businessHandler := handler.NewBusinessHandler(businessSvc)
+	userManagementHandler := handler.NewUserManagementHandler(userManagementSvc, userRepo)
 	systemHandler := handler.NewSystemHandler()
 	authMw := middleware.NewAuthMiddleware(authSvc)
 	tenantMw := middleware.NewTenantMiddleware(userRepo)
-	_ = middleware.NewRoleMiddleware(rbacSvc) // Infrastructure for future use (Sprint 6)
+	roleMw := middleware.NewRoleMiddleware(rbacSvc) // Infrastructure for Sprint 7
 
 	// --- Router ---
 	r := chi.NewRouter()
@@ -119,6 +122,18 @@ func main() {
 		// Company Settings (Platform 2.0 - Sprint 5)
 		r.Get("/api/company/settings", companySettingsHandler.GetSettings)
 		r.Put("/api/company/settings", companySettingsHandler.UpdateSettings)
+
+		// User Management (Platform 2.0 - Sprint 7)
+		// Apply RBAC: Only Owner and Admin can manage users
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin))
+
+			r.Get("/api/company/users", userManagementHandler.ListUsers)
+			r.Get("/api/company/users/{id}", userManagementHandler.GetUser)
+			r.Post("/api/company/users/add", userManagementHandler.AddUser)
+			r.Put("/api/company/users/{id}/role", userManagementHandler.ChangeRole)
+			r.Delete("/api/company/users/{id}", userManagementHandler.RemoveUser)
+		})
 
 		// Tema (White Label - Platform 2.0)
 		r.Get("/api/theme", themeHandler.GetTheme)

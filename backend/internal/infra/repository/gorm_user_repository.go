@@ -81,13 +81,33 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) erro
 		ID:        user.ID,
 		Name:      user.Name,
 		Email:     user.Email,
-		CompanyID: user.CompanyID, // Include CompanyID in update
+		CompanyID: user.CompanyID,
+		Role:      nil, // Will be set below
 	}
+
+	if user.Role != nil {
+		role := user.Role.String()
+		model.Role = &role
+	}
+
 	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return fmt.Errorf("UserRepository.Update: %w", err)
 	}
 	user.UpdatedAt = time.Unix(model.UpdatedAt, 0)
 	return nil
+}
+
+func (r *GormUserRepository) List(ctx context.Context) ([]*domain.User, error) {
+	var models []GormUserModel
+	if err := r.db.WithContext(ctx).Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("UserRepository.List: %w", err)
+	}
+
+	users := make([]*domain.User, len(models))
+	for i, model := range models {
+		users[i] = toDomainUser(&model)
+	}
+	return users, nil
 }
 
 func toDomainUser(m *GormUserModel) *domain.User {
