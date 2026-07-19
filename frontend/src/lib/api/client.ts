@@ -135,5 +135,38 @@ export const api = {
     request<any>('/orders/validate', {
       method: 'POST',
       body: JSON.stringify(body)
-    })
+    }),
+
+  // --- Company Settings endpoints ---
+  companySettings: {
+    getSettings: () =>
+      request<{
+        name: string;
+        slug: string;
+        description: string;
+        logo_url: string;
+        primary_color: string;
+        secondary_color: string;
+        business_type: string;
+        locale: string;
+        currency: string;
+        timezone: string;
+      }>('/company/settings'),
+
+    updateSettings: (body: {
+      name?: string;
+      description?: string;
+      logo_url?: string;
+      primary_color?: string;
+      secondary_color?: string;
+      business_type?: string;
+      locale?: string;
+      currency?: string;
+      timezone?: string;
+    }) =>
+      request<{ message: string }>('/company/settings', {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      })
+  }
 };

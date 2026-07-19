@@ -116,7 +116,7 @@
 	}
 
 	.btn:focus-visible {
-		outline: 2px solid #6366f1;
+		outline: 2px solid var(--color-primary-500);
 		outline-offset: 2px;
 	}
 
@@ -131,21 +131,21 @@
 	}
 
 	.btn-primary {
-		background-color: #6366f1;
+		background-color: var(--color-primary-500);
 		color: white;
-		border-color: #6366f1;
+		border-color: var(--color-primary-500);
 	}
 
 	.btn-primary:hover:not(:disabled) {
-		background-color: #4f46e5;
-		border-color: #4f46e5;
+		background-color: var(--color-primary-600);
+		border-color: var(--color-primary-600);
 		box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
 		transform: translateY(-1px);
 	}
 
 	.btn-primary:active:not(:disabled) {
-		background-color: #4338ca;
-		border-color: #4338ca;
+		background-color: var(--color-primary-700);
+		border-color: var(--color-primary-700);
 	}
 
 	.btn-secondary {
@@ -200,7 +200,7 @@
 
 	.btn-link {
 		background-color: transparent;
-		color: #6366f1;
+		color: var(--color-primary-500);
 		border-color: transparent;
 		padding: 0;
 		box-shadow: none;
@@ -212,7 +212,7 @@
 
 	.btn-link:active:not(:disabled) {
 		text-decoration: underline;
-		color: #4f46e5;
+		color: var(--color-primary-600);
 	}
 
 	.btn-success {

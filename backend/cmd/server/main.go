@@ -41,6 +41,7 @@ func main() {
 	orderRepo := repository.NewGormOrderRepository(db, productRepo, stockAdjustmentRepo)
 	mediaRepo := repository.NewGormMediaRepository(db)
 	dashboardRepo := repository.NewGormDashboardRepository(db)
+	companyRepo := repository.NewGormCompanyRepository(db)
 
 	authSvc := service.NewAuthService(userRepo)
 	productSvc := service.NewProductService(productRepo)
@@ -48,15 +49,27 @@ func main() {
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
 	mediaSvc := service.NewMediaService(mediaRepo)
+	companySvc := service.NewCompanyService(companyRepo)
+	companySettingsSvc := service.NewCompanySettingsService(companyRepo, userRepo)
+	themeSvc := service.NewThemeService(companyRepo, userRepo)
+	businessSvc := service.NewBusinessService(companyRepo, userRepo)
+	rbacSvc := service.NewRBACService(userRepo)
 
-	authHandler := handler.NewAuthHandler(authSvc)
+	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	productHandler := handler.NewProductHandler(productSvc)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	stockAdjustmentHandler := handler.NewStockAdjustmentHandler(stockAdjustmentSvc)
 	mediaHandler := handler.NewMediaHandler(mediaSvc)
 	dashboardHandler := handler.NewDashboardHandler(dashboardRepo)
+	companyHandler := handler.NewCompanyHandler(companySvc)
+	companySettingsHandler := handler.NewCompanySettingsHandler(companySettingsSvc)
+	themeHandler := handler.NewThemeHandler(themeSvc)
+	businessHandler := handler.NewBusinessHandler(businessSvc)
+	systemHandler := handler.NewSystemHandler()
 	authMw := middleware.NewAuthMiddleware(authSvc)
+	tenantMw := middleware.NewTenantMiddleware(userRepo)
+	_ = middleware.NewRoleMiddleware(rbacSvc) // Infrastructure for future use (Sprint 6)
 
 	// --- Router ---
 	r := chi.NewRouter()
@@ -75,6 +88,10 @@ func main() {
 		fmt.Fprintln(w, `{"status":"ok","service":"pratoOnline"}`)
 	})
 
+	r.Route("/api/system", func(r chi.Router) {
+		systemHandler.RegisterRoutes(r)
+	})
+
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
@@ -84,12 +101,32 @@ func main() {
 	// --- Rotas privadas (protegidas pelo AuthMiddleware) ---
 	r.Group(func(r chi.Router) {
 		r.Use(authMw.Auth)
+		r.Use(tenantMw.Tenant)
 
 		r.Get("/api/dashboard", dashboardHandler.GetDashboard)
 
 		r.Get("/api/me", authHandler.Me)
 		r.Put("/api/me", authHandler.UpdateProfile)
 		r.Post("/api/me/change-password", authHandler.ChangePassword)
+
+		// Empresas (Tenant Engine - Platform 2.0)
+		r.Post("/api/companies", companyHandler.CreateCompany)
+		r.Get("/api/companies", companyHandler.ListCompanies)
+		r.Get("/api/companies/{id}", companyHandler.GetCompany)
+		r.Put("/api/companies/{id}", companyHandler.UpdateCompany)
+		r.Delete("/api/companies/{id}", companyHandler.DeleteCompany)
+
+		// Company Settings (Platform 2.0 - Sprint 5)
+		r.Get("/api/company/settings", companySettingsHandler.GetSettings)
+		r.Put("/api/company/settings", companySettingsHandler.UpdateSettings)
+
+		// Tema (White Label - Platform 2.0)
+		r.Get("/api/theme", themeHandler.GetTheme)
+		r.Get("/api/theme/default", themeHandler.GetDefaultTheme)
+
+		// Business Profile (Business Engine - Platform 2.0)
+		r.Get("/api/business/profile", businessHandler.GetBusinessProfile)
+		r.Get("/api/business/profile/default", businessHandler.GetDefaultBusinessProfile)
 
 		// Produtos
 		r.Post("/api/products", productHandler.CreateProduct)

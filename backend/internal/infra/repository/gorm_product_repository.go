@@ -23,6 +23,7 @@ type GormProduct struct {
 	Active                 bool    `gorm:"not null;default:true"`
 	PhotoURL               string
 	CategoryID             *uint `gorm:"index"`
+	CompanyID              *uint `gorm:"index"` // Nullable for Core V1 compatibility
 	DisplayOrder           int   `gorm:"not null;default:0"`
 	PreparationTimeMinutes int   `gorm:"not null;default:0"`
 	Featured               bool  `gorm:"not null;default:false"`
@@ -61,6 +62,7 @@ type GormIngredient struct {
 	StockQuantity float64 `gorm:"not null;default:0"`
 	MinStock      float64 `gorm:"not null;default:0"`
 	Active        bool    `gorm:"not null;default:true"`
+	CompanyID     *uint   `gorm:"index"` // Nullable for Core V1 compatibility
 	DeletedAt     *int64  `gorm:"index"`
 	CreatedAt     int64   `gorm:"autoCreateTime"`
 	UpdatedAt     int64   `gorm:"autoUpdateTime"`
@@ -79,19 +81,6 @@ type GormProductIngredient struct {
 
 func (GormProductIngredient) TableName() string { return "product_ingredients" }
 
-type GormCategory struct {
-	ID           uint   `gorm:"primaryKey;autoIncrement"`
-	Name         string `gorm:"not null"`
-	Description  string
-	DisplayOrder int    `gorm:"not null;default:0"`
-	Active       bool   `gorm:"not null;default:true"`
-	DeletedAt    *int64 `gorm:"index"`
-	CreatedAt    int64  `gorm:"autoCreateTime"`
-	UpdatedAt    int64  `gorm:"autoUpdateTime"`
-}
-
-func (GormCategory) TableName() string { return "categories" }
-
 // ─── Repository ─────────────────────────────────────────────────────────────
 
 var _ ports.ProductRepository = (*GormProductRepository)(nil)
@@ -105,11 +94,18 @@ func NewGormProductRepository(db *gorm.DB) *GormProductRepository {
 // ── Produto ──────────────────────────────────────────────────────────────────
 
 func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Product) error {
+	// Auto-fill CompanyID from tenant context
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateProduct: %w", err)
+	}
+
 	m := GormProduct{
 		Name: p.Name, Description: p.Description,
 		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
 		PhotoURL:               p.PhotoURL,
 		CategoryID:             p.CategoryID,
+		CompanyID:              companyID, // Auto-filled from context
 		DisplayOrder:           p.DisplayOrder,
 		PreparationTimeMinutes: p.PreparationTimeMinutes,
 		Featured:               p.Featured,
@@ -140,6 +136,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 		return fmt.Errorf("CreateProduct: %w", err)
 	}
 	p.ID = m.ID
+	p.CompanyID = m.CompanyID
 	p.CreatedAt = time.Unix(m.CreatedAt, 0)
 	p.UpdatedAt = time.Unix(m.UpdatedAt, 0)
 	return nil
@@ -147,7 +144,8 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 
 func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*domain.Product, error) {
 	var m GormProduct
-	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&m, id).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -159,7 +157,8 @@ func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*
 
 func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Product, error) {
 	var ms []GormProduct
-	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
@@ -171,7 +170,8 @@ func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Prod
 
 func (r *GormProductRepository) ListActiveProducts(ctx context.Context) ([]domain.Product, error) {
 	var ms []GormProduct
-	if err := r.db.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListActiveProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
@@ -182,11 +182,23 @@ func (r *GormProductRepository) ListActiveProducts(ctx context.Context) ([]domai
 }
 
 func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Product) error {
+	// First, verify the product belongs to the tenant
+	var existing GormProduct
+	query := ApplyTenantFilterWithID(ctx, r.db, p.ID)
+	if err := query.Where("deleted_at IS NULL").First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("UpdateProduct: product not found or access denied")
+		}
+		return fmt.Errorf("UpdateProduct: %w", err)
+	}
+
+	// Update without changing CompanyID (immutable)
 	m := GormProduct{
 		ID: p.ID, Name: p.Name, Description: p.Description,
 		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
 		PhotoURL:               p.PhotoURL,
 		CategoryID:             p.CategoryID,
+		CompanyID:              existing.CompanyID, // Preserve original CompanyID
 		DisplayOrder:           p.DisplayOrder,
 		PreparationTimeMinutes: p.PreparationTimeMinutes,
 		Featured:               p.Featured,
@@ -222,8 +234,9 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) error {
 	// Soft delete: marca DeletedAt (princípio #8)
 	now := time.Now().Unix()
-	if err := r.db.WithContext(ctx).Model(&GormProduct{}).
-		Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).Model(&GormProduct{}).
+		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteProduct: %w", err)
 	}
 	return nil
@@ -281,15 +294,23 @@ func (r *GormProductRepository) CanDeleteProduct(ctx context.Context, id uint) (
 // ── Ingrediente ──────────────────────────────────────────────────────────────
 
 func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.Ingredient) error {
+	// Auto-fill CompanyID from tenant context
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateIngredient: %w", err)
+	}
+
 	m := GormIngredient{
 		Name: i.Name, Unit: i.Unit,
 		StockQuantity: i.StockQuantity, MinStock: i.MinStock,
-		Active: true,
+		Active:    true,
+		CompanyID: companyID, // Auto-filled from context
 	}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
 		return fmt.Errorf("CreateIngredient: %w", err)
 	}
 	i.ID = m.ID
+	i.CompanyID = m.CompanyID
 	i.Active = m.Active
 	i.CreatedAt = time.Unix(m.CreatedAt, 0)
 	i.UpdatedAt = time.Unix(m.UpdatedAt, 0)
@@ -298,7 +319,8 @@ func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.
 
 func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint) (*domain.Ingredient, error) {
 	var m GormIngredient
-	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&m, id).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -310,7 +332,8 @@ func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint)
 
 func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.Ingredient, error) {
 	var ms []GormIngredient
-	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListIngredients: %w", err)
 	}
 	out := make([]domain.Ingredient, len(ms))
@@ -321,10 +344,22 @@ func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.I
 }
 
 func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.Ingredient) error {
+	// First, verify the ingredient belongs to the tenant
+	var existing GormIngredient
+	query := ApplyTenantFilterWithID(ctx, r.db, i.ID)
+	if err := query.Where("deleted_at IS NULL").First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("UpdateIngredient: ingredient not found or access denied")
+		}
+		return fmt.Errorf("UpdateIngredient: %w", err)
+	}
+
+	// Update without changing CompanyID (immutable)
 	m := GormIngredient{
 		ID: i.ID, Name: i.Name, Unit: i.Unit,
 		StockQuantity: i.StockQuantity, MinStock: i.MinStock,
-		Active: i.Active,
+		Active:    i.Active,
+		CompanyID: existing.CompanyID, // Preserve original CompanyID
 	}
 	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
 		return fmt.Errorf("UpdateIngredient: %w", err)
@@ -335,8 +370,9 @@ func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.
 func (r *GormProductRepository) DeleteIngredient(ctx context.Context, id uint) error {
 	// Soft delete: marca DeletedAt (princípio #8)
 	now := time.Now().Unix()
-	if err := r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).Model(&GormIngredient{}).
+		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteIngredient: %w", err)
 	}
 	return nil
@@ -432,10 +468,13 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 		db = db.WithContext(ctx)
 	}
 
+	// Apply tenant filter to stock operations
+	query := ApplyTenantFilterWithID(ctx, db, ingredientID)
+
 	// Usa UPDATE com CHECK inline para garantir que não vai negativo
-	result := db.
+	result := query.
 		Model(&GormIngredient{}).
-		Where("id = ? AND stock_quantity >= ?", ingredientID, qty).
+		Where("stock_quantity >= ?", qty).
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity - ?", qty))
 
 	if result.Error != nil {
@@ -460,9 +499,11 @@ func (r *GormProductRepository) IncreaseIngredientStock(
 		db = db.WithContext(ctx)
 	}
 
-	result := db.
+	// Apply tenant filter to stock operations
+	query := ApplyTenantFilterWithID(ctx, db, ingredientID)
+
+	result := query.
 		Model(&GormIngredient{}).
-		Where("id = ?", ingredientID).
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity + ?", qty))
 
 	if result.Error != nil {
@@ -500,6 +541,7 @@ func productToDomain(m *GormProduct) *domain.Product {
 		Price: m.Price, IsComposto: m.IsComposto, Active: m.Active,
 		PhotoURL:               m.PhotoURL,
 		CategoryID:             m.CategoryID,
+		CompanyID:              m.CompanyID,
 		DisplayOrder:           m.DisplayOrder,
 		PreparationTimeMinutes: m.PreparationTimeMinutes,
 		Featured:               m.Featured,
@@ -535,6 +577,7 @@ func ingredientToDomain(m *GormIngredient) *domain.Ingredient {
 		ID: m.ID, Name: m.Name, Unit: m.Unit,
 		StockQuantity: m.StockQuantity, MinStock: m.MinStock,
 		Active:    m.Active,
+		CompanyID: m.CompanyID,
 		DeletedAt: deletedAt,
 		CreatedAt: time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
 	}

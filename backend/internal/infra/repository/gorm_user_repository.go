@@ -13,14 +13,16 @@ import (
 )
 
 type GormUserModel struct {
-	ID           uint   `gorm:"primaryKey;autoIncrement"`
-	Name         string `gorm:"not null"`
-	Email        string `gorm:"uniqueIndex;not null"`
-	PasswordHash string `gorm:"not null"`
-	Active       bool   `gorm:"not null;default:true"`
-	DeletedAt    *int64 `gorm:"index"`
-	CreatedAt    int64  `gorm:"autoCreateTime"`
-	UpdatedAt    int64  `gorm:"autoUpdateTime"`
+	ID           uint    `gorm:"primaryKey;autoIncrement"`
+	Name         string  `gorm:"not null"`
+	Email        string  `gorm:"uniqueIndex;not null"`
+	PasswordHash string  `gorm:"not null"`
+	Active       bool    `gorm:"not null;default:true"`
+	CompanyID    *uint   `gorm:"index"` // Nullable for Core V1 compatibility
+	Role         *string `gorm:"index"` // Nullable for Core V1 compatibility
+	DeletedAt    *int64  `gorm:"index"`
+	CreatedAt    int64   `gorm:"autoCreateTime"`
+	UpdatedAt    int64   `gorm:"autoUpdateTime"`
 }
 
 func (GormUserModel) TableName() string { return "users" }
@@ -76,9 +78,10 @@ func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 
 func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) error {
 	model := GormUserModel{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		CompanyID: user.CompanyID, // Include CompanyID in update
 	}
 	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return fmt.Errorf("UserRepository.Update: %w", err)
@@ -93,12 +96,22 @@ func toDomainUser(m *GormUserModel) *domain.User {
 		dt := time.Unix(*m.DeletedAt, 0)
 		deletedAt = &dt
 	}
+
+	var role *domain.Role
+	if m.Role != nil {
+		if r, ok := domain.ParseRole(*m.Role); ok {
+			role = &r
+		}
+	}
+
 	return &domain.User{
 		ID:           m.ID,
 		Name:         m.Name,
 		Email:        m.Email,
 		PasswordHash: m.PasswordHash,
 		Active:       m.Active,
+		CompanyID:    m.CompanyID,
+		Role:         role,
 		DeletedAt:    deletedAt,
 		CreatedAt:    time.Unix(m.CreatedAt, 0),
 		UpdatedAt:    time.Unix(m.UpdatedAt, 0),

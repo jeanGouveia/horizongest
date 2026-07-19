@@ -20,6 +20,7 @@ type GormOrder struct {
 	Status     string `gorm:"not null;default:'pending'"`
 	TotalPrice float64
 	Notes      string
+	CompanyID  *uint  `gorm:"index"` // Nullable for Core V1 compatibility
 	DeletedAt  *int64 `gorm:"index"`
 	CreatedAt  int64  `gorm:"autoCreateTime"`
 	UpdatedAt  int64  `gorm:"autoUpdateTime"`
@@ -64,6 +65,12 @@ func NewGormOrderRepository(db *gorm.DB, productRepo ports.ProductRepository, st
 // CreateOrder é a operação crítica: persiste pedido + itens + baixa de estoque
 // em uma única transação. Qualquer falha reverte tudo.
 func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Order, productIngredients map[uint][]domain.ProductIngredient) error {
+	// Auto-fill CompanyID from tenant context
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateOrder: %w", err)
+	}
+
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
 		// 1. Persiste o pedido
@@ -71,11 +78,13 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			Status:     string(order.Status),
 			TotalPrice: order.TotalPrice,
 			Notes:      order.Notes,
+			CompanyID:  companyID, // Auto-filled from context
 		}
 		if err := tx.Create(&gOrder).Error; err != nil {
 			return fmt.Errorf("CreateOrder: criar pedido: %w", err)
 		}
 		order.ID = gOrder.ID
+		order.CompanyID = gOrder.CompanyID
 		order.CreatedAt = time.Unix(gOrder.CreatedAt, 0)
 
 		// 2. Para cada item do pedido
@@ -131,7 +140,8 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 
 func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*domain.Order, error) {
 	var gOrder GormOrder
-	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&gOrder, id).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&gOrder).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -181,7 +191,8 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 
 func (r *GormOrderRepository) ListOrders(ctx context.Context) ([]domain.Order, error) {
 	var gOrders []GormOrder
-	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Order("created_at desc").Find(&gOrders).Error; err != nil {
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Order("created_at desc").Find(&gOrders).Error; err != nil {
 		return nil, fmt.Errorf("ListOrders: %w", err)
 	}
 	out := make([]domain.Order, len(gOrders))
@@ -194,8 +205,9 @@ func (r *GormOrderRepository) ListOrders(ctx context.Context) ([]domain.Order, e
 func (r *GormOrderRepository) UpdateOrderStatus(
 	ctx context.Context, id uint, status domain.OrderStatus,
 ) error {
-	if err := r.db.WithContext(ctx).Model(&GormOrder{}).
-		Where("id = ?", id).Update("status", string(status)).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
+		Where("deleted_at IS NULL").Update("status", string(status)).Error; err != nil {
 		return fmt.Errorf("UpdateOrderStatus: %w", err)
 	}
 	return nil
@@ -215,9 +227,9 @@ func (r *GormOrderRepository) UpdateOrderStatusWithAdjustments(
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		log.Printf("[REPO] Transação iniciada para order_id=%d", id)
 		// 1. Atualizar status do pedido
-		if err := tx.Model(&GormOrder{}).
-			Where("id = ?", id).
-			Update("status", string(status)).Error; err != nil {
+		query := ApplyTenantFilterWithID(ctx, tx, id)
+		if err := query.Model(&GormOrder{}).
+			Where("deleted_at IS NULL").Update("status", string(status)).Error; err != nil {
 			return fmt.Errorf("UpdateOrderStatusWithAdjustments: atualizar status: %w", err)
 		}
 		log.Printf("[REPO] Status do pedido atualizado para %s", status)
@@ -341,9 +353,13 @@ func orderToDomain(g *GormOrder) *domain.Order {
 		deletedAt = &dt
 	}
 	return &domain.Order{
-		ID: g.ID, Status: domain.OrderStatus(g.Status),
-		TotalPrice: g.TotalPrice, Notes: g.Notes,
-		DeletedAt: deletedAt,
-		CreatedAt: time.Unix(g.CreatedAt, 0), UpdatedAt: time.Unix(g.UpdatedAt, 0),
+		ID:         g.ID,
+		Status:     domain.OrderStatus(g.Status),
+		TotalPrice: g.TotalPrice,
+		Notes:      g.Notes,
+		CompanyID:  g.CompanyID,
+		DeletedAt:  deletedAt,
+		CreatedAt:  time.Unix(g.CreatedAt, 0),
+		UpdatedAt:  time.Unix(g.UpdatedAt, 0),
 	}
 }

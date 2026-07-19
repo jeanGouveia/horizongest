@@ -21,6 +21,7 @@ type GormStockAdjustmentPending struct {
 	Quantity        float64 `gorm:"not null"`
 	OrderStatus     string  `gorm:"not null"`
 	Status          string  `gorm:"not null;default:'pending';index"`
+	CompanyID       *uint   `gorm:"index"` // Nullable for Core V1 compatibility
 	CreatedAt       int64   `gorm:"autoCreateTime"`
 	ProcessedAt     *int64  `gorm:"index"`
 	ProcessedBy     *uint   `gorm:"index"`
@@ -57,6 +58,13 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 	ctx context.Context, adjustment *domain.StockAdjustmentPending, txDB *gorm.DB,
 ) error {
 	log.Printf("[STOCK_REPO] CreateStockAdjustmentPendingWithTx chamado: order_id=%d, ingredient_id=%d, quantity=%.4f", adjustment.OrderID, adjustment.IngredientID, adjustment.Quantity)
+
+	// Auto-fill CompanyID from tenant context
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateStockAdjustmentPendingWithTx: %w", err)
+	}
+
 	db := r.db
 	if txDB != nil {
 		db = txDB.WithContext(ctx)
@@ -70,6 +78,7 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 		Quantity:       adjustment.Quantity,
 		OrderStatus:    adjustment.OrderStatus,
 		Status:         string(adjustment.Status),
+		CompanyID:      companyID,                 // Auto-filled from context
 		IngredientName: adjustment.IngredientName, // snapshot
 		IngredientUnit: adjustment.IngredientUnit, // snapshot
 	}
@@ -79,6 +88,7 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 	}
 	log.Printf("[STOCK_REPO] Ajuste criado com sucesso: id=%d", gAdjustment.ID)
 	adjustment.ID = gAdjustment.ID
+	adjustment.CompanyID = gAdjustment.CompanyID
 	adjustment.CreatedAt = time.Unix(gAdjustment.CreatedAt, 0)
 	return nil
 }
@@ -87,7 +97,8 @@ func (r *GormStockAdjustmentRepository) FindPendingByOrderID(
 	ctx context.Context, orderID uint,
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).
 		Where("order_id = ? AND status = ? AND deleted_at IS NULL", orderID, domain.StockAdjustmentStatusPending).
 		Find(&gAdjustments).Error; err != nil {
 		return nil, fmt.Errorf("FindPendingByOrderID: %w", err)
@@ -99,7 +110,8 @@ func (r *GormStockAdjustmentRepository) FindByOrderID(
 	ctx context.Context, orderID uint,
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).
 		Where("order_id = ? AND deleted_at IS NULL", orderID).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
@@ -112,7 +124,8 @@ func (r *GormStockAdjustmentRepository) FindPendingByIngredientID(
 	ctx context.Context, ingredientID uint,
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).
 		Where("ingredient_id = ? AND status = ? AND deleted_at IS NULL", ingredientID, domain.StockAdjustmentStatusPending).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
@@ -125,7 +138,8 @@ func (r *GormStockAdjustmentRepository) ListPending(
 	ctx context.Context,
 ) ([]domain.StockAdjustmentPending, error) {
 	var gAdjustments []GormStockAdjustmentPending
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).
 		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
@@ -145,9 +159,10 @@ func (r *GormStockAdjustmentRepository) UpdateStatus(
 	if status != domain.StockAdjustmentStatusPending {
 		updates["processed_at"] = now
 	}
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).
 		Model(&GormStockAdjustmentPending{}).
-		Where("id = ?", id).
+		Where("deleted_at IS NULL").
 		Updates(updates).Error; err != nil {
 		return fmt.Errorf("UpdateStatus: %w", err)
 	}
@@ -177,9 +192,10 @@ func (r *GormStockAdjustmentRepository) approveWithTx(
 		"processed_by":     processedBy,
 		"processing_notes": notes,
 	}
-	result := db.
+	query := ApplyTenantFilterWithID(ctx, db, id)
+	result := query.
 		Model(&GormStockAdjustmentPending{}).
-		Where("id = ? AND status = ?", id, domain.StockAdjustmentStatusPending).
+		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Updates(updates)
 	if result.Error != nil {
 		return fmt.Errorf("approveWithTx: %w", result.Error)
@@ -196,7 +212,8 @@ func (r *GormStockAdjustmentRepository) ApproveAndRestoreStock(
 ) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var gAdjustment GormStockAdjustmentPending
-		if err := tx.Where("deleted_at IS NULL").First(&gAdjustment, id).Error; err != nil {
+		query := ApplyTenantFilterWithID(ctx, tx, id)
+		if err := query.Where("deleted_at IS NULL").First(&gAdjustment).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return fmt.Errorf("ajuste id=%d não encontrado", id)
 			}
@@ -228,9 +245,10 @@ func (r *GormStockAdjustmentRepository) Reject(
 		"processed_by":     processedBy,
 		"processing_notes": notes,
 	}
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).
 		Model(&GormStockAdjustmentPending{}).
-		Where("id = ? AND status = ?", id, domain.StockAdjustmentStatusPending).
+		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Updates(updates).Error; err != nil {
 		return fmt.Errorf("Reject: %w", err)
 	}
@@ -241,7 +259,8 @@ func (r *GormStockAdjustmentRepository) FindByID(
 	ctx context.Context, id uint,
 ) (*domain.StockAdjustmentPending, error) {
 	var gAdjustment GormStockAdjustmentPending
-	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&gAdjustment, id).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.Where("deleted_at IS NULL").First(&gAdjustment).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -265,6 +284,7 @@ func (r *GormStockAdjustmentRepository) mapToDomain(g *GormStockAdjustmentPendin
 		Quantity:        g.Quantity,
 		OrderStatus:     g.OrderStatus,
 		Status:          domain.StockAdjustmentStatus(g.Status),
+		CompanyID:       g.CompanyID,
 		CreatedAt:       time.Unix(g.CreatedAt, 0),
 		ProcessedBy:     g.ProcessedBy,
 		ProcessingNotes: g.ProcessingNotes,

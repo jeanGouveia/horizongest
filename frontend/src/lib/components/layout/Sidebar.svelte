@@ -305,8 +305,8 @@
 	}
 
 	.nav-link-active {
-		background: #eef2ff;
-		color: #6366f1;
+		background: var(--color-primary-50);
+		color: var(--color-primary-500);
 	}
 
 	.nav-link-active::before {
@@ -317,7 +317,7 @@
 		transform: translateY(-50%);
 		width: 2px;
 		height: 16px;
-		background: #6366f1;
+		background: var(--color-primary-500);
 		border-radius: 1px;
 	}
 
@@ -344,7 +344,7 @@
 		min-width: 18px;
 		height: 18px;
 		padding: 0 0.25rem;
-		background: #6366f1;
+		background: var(--color-primary-500);
 		color: white;
 		font-size: 0.625rem;
 		font-weight: 600;

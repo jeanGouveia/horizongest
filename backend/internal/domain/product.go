@@ -11,6 +11,7 @@ type Product struct {
 	Active                 bool // "Pode ser utilizado pelo negócio?"
 	PhotoURL               string
 	CategoryID             *uint
+	CompanyID              *uint // ID da empresa/tenant (null para compatibilidade com Core V1)
 	DisplayOrder           int
 	PreparationTimeMinutes int
 	Featured               bool

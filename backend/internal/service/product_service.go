@@ -106,14 +106,14 @@ type UpdateProductInput struct {
 	Name                   string     `json:"name"                    validate:"required,min=2,max=120"`
 	Description            string     `json:"description"`
 	Price                  float64    `json:"price"                   validate:"required,gt=0"`
-	IsComposto             bool       `json:"is_composto"`
-	Active                 bool       `json:"active"`
+	IsComposto             *bool      `json:"is_composto"`
+	Active                 *bool      `json:"active"`
 	PhotoURL               string     `json:"photo_url"`
 	CategoryID             *uint      `json:"category_id"`
 	DisplayOrder           int        `json:"display_order"           validate:"gte=0"`
 	PreparationTimeMinutes int        `json:"preparation_time_minutes" validate:"gte=0"`
-	Featured               bool       `json:"featured"`
-	IsNew                  bool       `json:"is_new"`
+	Featured               *bool      `json:"featured"`
+	IsNew                  *bool      `json:"is_new"`
 	PromotionPrice         *float64   `json:"promotion_price"          validate:"omitempty,gt=0"`
 	PromotionStart         *time.Time `json:"promotion_start"`
 	PromotionEnd           *time.Time `json:"promotion_end"`
@@ -155,7 +155,8 @@ type SetProductIngredientsInput struct {
 }
 
 type UpdateStockInput struct {
-	Quantity float64 `json:"quantity" validate:"required,gte=0"`
+	Quantity      float64 `json:"quantity" validate:"omitempty,gte=0"`
+	StockQuantity float64 `json:"stock_quantity" validate:"omitempty,gte=0"`
 }
 
 // ── Produto ──────────────────────────────────────────────────────────────────
@@ -254,14 +255,22 @@ func (s *ProductService) UpdateProduct(ctx context.Context, id uint, in UpdatePr
 	p.Name = in.Name
 	p.Description = in.Description
 	p.Price = in.Price
-	p.IsComposto = in.IsComposto
-	p.Active = in.Active
+	if in.IsComposto != nil {
+		p.IsComposto = *in.IsComposto
+	}
+	if in.Active != nil {
+		p.Active = *in.Active
+	}
 	p.PhotoURL = in.PhotoURL
 	p.CategoryID = in.CategoryID
 	p.DisplayOrder = in.DisplayOrder
 	p.PreparationTimeMinutes = in.PreparationTimeMinutes
-	p.Featured = in.Featured
-	p.IsNew = in.IsNew
+	if in.Featured != nil {
+		p.Featured = *in.Featured
+	}
+	if in.IsNew != nil {
+		p.IsNew = *in.IsNew
+	}
 	p.PromotionPrice = in.PromotionPrice
 	p.PromotionStart = in.PromotionStart
 	p.PromotionEnd = in.PromotionEnd
@@ -326,7 +335,16 @@ func (s *ProductService) UpdateIngredientStock(ctx context.Context, id uint, in 
 	if i == nil {
 		return nil, ErrIngredientNotFound
 	}
-	i.StockQuantity = in.Quantity
+	// Support both 'quantity' and 'stock_quantity' field names
+	// At least one must be provided
+	if in.StockQuantity == 0 && in.Quantity == 0 {
+		return nil, errors.New("quantity or stock_quantity is required")
+	}
+	if in.StockQuantity != 0 {
+		i.StockQuantity = in.StockQuantity
+	} else {
+		i.StockQuantity = in.Quantity
+	}
 	if err := s.repo.UpdateIngredient(ctx, i); err != nil {
 		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: %w", err)
 	}

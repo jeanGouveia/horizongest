@@ -4,6 +4,7 @@
 	import { Footer } from '$lib/components/layout';
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore.svelte';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 
@@ -31,6 +32,8 @@
 	onMount(() => {
 		if (browser) {
 			showMenuButton = window.innerWidth < 768;
+			// Load theme on app initialization
+			themeStore.loadTheme();
 		}
 	});
 

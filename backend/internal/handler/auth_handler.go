@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
+	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
 )
 
@@ -17,10 +18,11 @@ var validate = validator.New()
 
 type AuthHandler struct {
 	authService *service.AuthService
+	userRepo    ports.UserRepository
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *service.AuthService, userRepo ports.UserRepository) *AuthHandler {
+	return &AuthHandler{authService: authService, userRepo: userRepo}
 }
 
 // --- POST /api/auth/register ---
@@ -97,6 +99,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // --- POST /api/auth/logout ---
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	// Extract token from cookie
+	cookie, err := r.Cookie("auth_token")
+	if err == nil && cookie.Value != "" {
+		// Blacklist the token on server
+		_ = h.authService.Logout(r.Context(), cookie.Value)
+	}
+
 	// Zera o cookie com expiração no passado
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
@@ -114,15 +123,24 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // --- GET /api/me (rota protegida) ---
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		jsonError(w, "não autorizado. Faça login novamente.", http.StatusUnauthorized)
 		return
 	}
+
+	// Get full user data to include CompanyID
+	user, err := h.userRepo.FindByID(r.Context(), userID)
+	if err != nil || user == nil {
+		jsonError(w, "não foi possível carregar dados do usuário", http.StatusInternalServerError)
+		return
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"id":    claims.UserID,
-		"name":  claims.Name,
-		"email": claims.Email,
+		"id":         user.ID,
+		"name":       user.Name,
+		"email":      user.Email,
+		"company_id": user.CompanyID,
 	})
 }
 

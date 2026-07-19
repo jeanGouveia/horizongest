@@ -14,6 +14,20 @@ import (
 
 var _ ports.CategoryRepository = (*GormCategoryRepository)(nil)
 
+type GormCategory struct {
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	Name         string `gorm:"not null"`
+	Description  string `gorm:"type:text"`
+	DisplayOrder int    `gorm:"not null;default:0"`
+	Active       bool   `gorm:"not null;default:true"`
+	CompanyID    *uint  `gorm:"index"` // Nullable for Core V1 compatibility
+	DeletedAt    *int64 `gorm:"index"`
+	CreatedAt    int64  `gorm:"autoCreateTime"`
+	UpdatedAt    int64  `gorm:"autoUpdateTime"`
+}
+
+func (GormCategory) TableName() string { return "categories" }
+
 type GormCategoryRepository struct{ db *gorm.DB }
 
 func NewGormCategoryRepository(db *gorm.DB) *GormCategoryRepository {
@@ -21,16 +35,24 @@ func NewGormCategoryRepository(db *gorm.DB) *GormCategoryRepository {
 }
 
 func (r *GormCategoryRepository) CreateCategory(ctx context.Context, c *domain.Category) error {
+	// Auto-fill CompanyID from tenant context
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateCategory: %w", err)
+	}
+
 	m := GormCategory{
 		Name:         c.Name,
 		Description:  c.Description,
 		DisplayOrder: c.DisplayOrder,
 		Active:       c.Active,
+		CompanyID:    companyID, // Auto-filled from context
 	}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
 		return fmt.Errorf("CreateCategory: %w", err)
 	}
 	c.ID = m.ID
+	c.CompanyID = m.CompanyID
 	c.CreatedAt = time.Unix(m.CreatedAt, 0)
 	c.UpdatedAt = time.Unix(m.UpdatedAt, 0)
 	return nil
@@ -38,7 +60,8 @@ func (r *GormCategoryRepository) CreateCategory(ctx context.Context, c *domain.C
 
 func (r *GormCategoryRepository) FindCategoryByID(ctx context.Context, id uint) (*domain.Category, error) {
 	var m GormCategory
-	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&m, id).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -50,7 +73,8 @@ func (r *GormCategoryRepository) FindCategoryByID(ctx context.Context, id uint) 
 
 func (r *GormCategoryRepository) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	var ms []GormCategory
-	if err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Order("display_order ASC, name ASC").Find(&ms).Error; err != nil {
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Order("display_order ASC, name ASC").Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ListCategories: %w", err)
 	}
 	out := make([]domain.Category, len(ms))
@@ -61,12 +85,24 @@ func (r *GormCategoryRepository) ListCategories(ctx context.Context) ([]domain.C
 }
 
 func (r *GormCategoryRepository) UpdateCategory(ctx context.Context, c *domain.Category) error {
+	// First, verify the category belongs to the tenant
+	var existing GormCategory
+	query := ApplyTenantFilterWithID(ctx, r.db, c.ID)
+	if err := query.Where("deleted_at IS NULL").First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("UpdateCategory: category not found or access denied")
+		}
+		return fmt.Errorf("UpdateCategory: %w", err)
+	}
+
+	// Update without changing CompanyID (immutable)
 	m := GormCategory{
 		ID:           c.ID,
 		Name:         c.Name,
 		Description:  c.Description,
 		DisplayOrder: c.DisplayOrder,
 		Active:       c.Active,
+		CompanyID:    existing.CompanyID, // Preserve original CompanyID
 	}
 	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
 		return fmt.Errorf("UpdateCategory: %w", err)
@@ -76,8 +112,9 @@ func (r *GormCategoryRepository) UpdateCategory(ctx context.Context, c *domain.C
 
 func (r *GormCategoryRepository) DeleteCategory(ctx context.Context, id uint) error {
 	now := time.Now().Unix()
-	if err := r.db.WithContext(ctx).Model(&GormCategory{}).
-		Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).Model(&GormCategory{}).
+		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteCategory: %w", err)
 	}
 	return nil
@@ -86,13 +123,14 @@ func (r *GormCategoryRepository) DeleteCategory(ctx context.Context, id uint) er
 func (r *GormCategoryRepository) CanDeleteCategory(ctx context.Context, id uint) (*domain.DependencyCheck, error) {
 	check := &domain.DependencyCheck{CanDelete: true, Reasons: []domain.DependencyReason{}}
 
-	// Verificar produtos que usam esta categoria
+	// Verificar produtos que usam esta categoria (respecting tenant isolation)
 	type ProductResult struct {
 		ID   uint   `gorm:"column:id"`
 		Name string `gorm:"column:name"`
 	}
 	var products []ProductResult
-	if err := r.db.WithContext(ctx).Table("products").
+	query := ApplyTenantFilter(ctx, r.db.Table("products"))
+	if err := query.WithContext(ctx).
 		Select("id, name").
 		Where("category_id = ? AND deleted_at IS NULL", id).
 		Find(&products).Error; err != nil {
@@ -124,6 +162,7 @@ func categoryToDomain(m *GormCategory) *domain.Category {
 		Description:  m.Description,
 		DisplayOrder: m.DisplayOrder,
 		Active:       m.Active,
+		CompanyID:    m.CompanyID,
 		DeletedAt:    deletedAt,
 		CreatedAt:    time.Unix(m.CreatedAt, 0),
 		UpdatedAt:    time.Unix(m.UpdatedAt, 0),

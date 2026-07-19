@@ -31,7 +31,7 @@ type UpdateCategoryInput struct {
 	Name         string `json:"name" validate:"required,min=2,max=120"`
 	Description  string `json:"description"`
 	DisplayOrder int    `json:"display_order" validate:"gte=0"`
-	Active       bool   `json:"active"`
+	Active       *bool  `json:"active"`
 }
 
 func (s *CategoryService) CreateCategory(ctx context.Context, in CreateCategoryInput) (*domain.Category, error) {
@@ -78,7 +78,9 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id uint, in Update
 	c.Name = in.Name
 	c.Description = in.Description
 	c.DisplayOrder = in.DisplayOrder
-	c.Active = in.Active
+	if in.Active != nil {
+		c.Active = *in.Active
+	}
 
 	if err := s.repo.UpdateCategory(ctx, c); err != nil {
 		return nil, fmt.Errorf("CategoryService.UpdateCategory: %w", err)

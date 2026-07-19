@@ -26,6 +26,7 @@ type GormMedia struct {
 	AltText       string
 	EntityType    string `gorm:"not null;index"`
 	EntityID      *uint  `gorm:"index"`
+	CompanyID     *uint  `gorm:"index"` // Nullable for Core V1 compatibility
 	DeletedAt     *int64 `gorm:"index"`
 	CreatedAt     int64  `gorm:"autoCreateTime"`
 	UpdatedAt     int64  `gorm:"autoUpdateTime"`
@@ -42,6 +43,12 @@ func NewGormMediaRepository(db *gorm.DB) *GormMediaRepository {
 }
 
 func (r *GormMediaRepository) CreateMedia(ctx context.Context, m *domain.Media) error {
+	// Auto-fill CompanyID from tenant context
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateMedia: %w", err)
+	}
+
 	gm := GormMedia{
 		FileName:      m.FileName,
 		OriginalName:  m.OriginalName,
@@ -54,11 +61,13 @@ func (r *GormMediaRepository) CreateMedia(ctx context.Context, m *domain.Media) 
 		AltText:       m.AltText,
 		EntityType:    m.EntityType,
 		EntityID:      m.EntityID,
+		CompanyID:     companyID, // Auto-filled from context
 	}
 	if err := r.db.WithContext(ctx).Create(&gm).Error; err != nil {
 		return fmt.Errorf("CreateMedia: %w", err)
 	}
 	m.ID = gm.ID
+	m.CompanyID = gm.CompanyID
 	m.CreatedAt = time.Unix(gm.CreatedAt, 0)
 	m.UpdatedAt = time.Unix(gm.UpdatedAt, 0)
 	return nil
@@ -66,7 +75,8 @@ func (r *GormMediaRepository) CreateMedia(ctx context.Context, m *domain.Media) 
 
 func (r *GormMediaRepository) FindMediaByID(ctx context.Context, id uint) (*domain.Media, error) {
 	var gm GormMedia
-	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&gm, id).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&gm).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -78,7 +88,8 @@ func (r *GormMediaRepository) FindMediaByID(ctx context.Context, id uint) (*doma
 
 func (r *GormMediaRepository) FindMediaByEntity(ctx context.Context, entityType string, entityID uint) ([]domain.Media, error) {
 	var gms []GormMedia
-	if err := r.db.WithContext(ctx).
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).
 		Where("entity_type = ? AND entity_id = ? AND deleted_at IS NULL", entityType, entityID).
 		Find(&gms).Error; err != nil {
 		return nil, fmt.Errorf("FindMediaByEntity: %w", err)
@@ -92,8 +103,9 @@ func (r *GormMediaRepository) FindMediaByEntity(ctx context.Context, entityType 
 
 func (r *GormMediaRepository) DeleteMedia(ctx context.Context, id uint) error {
 	now := time.Now().Unix()
-	if err := r.db.WithContext(ctx).Model(&GormMedia{}).
-		Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.WithContext(ctx).Model(&GormMedia{}).
+		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteMedia: %w", err)
 	}
 	return nil
@@ -101,8 +113,9 @@ func (r *GormMediaRepository) DeleteMedia(ctx context.Context, id uint) error {
 
 func (r *GormMediaRepository) DeleteMediaByEntity(ctx context.Context, entityType string, entityID uint) error {
 	now := time.Now().Unix()
-	if err := r.db.WithContext(ctx).Model(&GormMedia{}).
-		Where("entity_type = ? AND entity_id = ?", entityType, entityID).
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.WithContext(ctx).Model(&GormMedia{}).
+		Where("entity_type = ? AND entity_id = ? AND deleted_at IS NULL", entityType, entityID).
 		Update("deleted_at", now).Error; err != nil {
 		return fmt.Errorf("DeleteMediaByEntity: %w", err)
 	}
@@ -130,6 +143,7 @@ func mediaToDomain(m *GormMedia) *domain.Media {
 		AltText:       m.AltText,
 		EntityType:    m.EntityType,
 		EntityID:      m.EntityID,
+		CompanyID:     m.CompanyID,
 		DeletedAt:     deletedAt,
 		CreatedAt:     time.Unix(m.CreatedAt, 0),
 		UpdatedAt:     time.Unix(m.UpdatedAt, 0),

@@ -32,6 +32,7 @@ type AuthService struct {
 	secret     []byte
 	expiry     time.Duration
 	bcryptCost int
+	blacklist  map[string]time.Time
 }
 
 func NewAuthService(userRepo ports.UserRepository) *AuthService {
@@ -44,6 +45,7 @@ func NewAuthService(userRepo ports.UserRepository) *AuthService {
 		secret:     []byte(secret),
 		expiry:     24 * time.Hour,
 		bcryptCost: bcrypt.DefaultCost,
+		blacklist:  make(map[string]time.Time),
 	}
 }
 
@@ -115,8 +117,9 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult
 // --- UpdateProfile ---
 
 type UpdateProfileInput struct {
-	Name  string `json:"name"  validate:"required,min=2,max=100"`
-	Email string `json:"email" validate:"required,email"`
+	Name      string `json:"name"  validate:"required,min=2,max=100"`
+	Email     string `json:"email" validate:"required,email"`
+	CompanyID *uint  `json:"company_id"`
 }
 
 func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input UpdateProfileInput) (*domain.User, error) {
@@ -141,6 +144,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input Upda
 	// Atualizar campos
 	user.Name = input.Name
 	user.Email = input.Email
+	user.CompanyID = input.CompanyID // Allow setting CompanyID
 
 	if err = s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("UpdateProfile: %w", err)
@@ -188,6 +192,11 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input Cha
 // Retorna *JWTClaims (exportado) para o middleware extrair UserID, Email e Name.
 
 func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTClaims, error) {
+	// Check if token is blacklisted
+	if logoutTime, blacklisted := s.blacklist[tokenStr]; blacklisted {
+		return nil, fmt.Errorf("ValidateToken: token was revoked at %v", logoutTime)
+	}
+
 	token, err := jwt.ParseWithClaims(
 		tokenStr,
 		&JWTClaims{},
@@ -209,6 +218,13 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 		return nil, fmt.Errorf("ValidateToken: claims inválidos")
 	}
 	return claims, nil
+}
+
+// --- Logout ---
+
+func (s *AuthService) Logout(ctx context.Context, tokenStr string) error {
+	s.blacklist[tokenStr] = time.Now()
+	return nil
 }
 
 // --- helper privado ---

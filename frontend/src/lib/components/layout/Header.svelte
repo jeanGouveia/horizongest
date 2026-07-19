@@ -128,7 +128,7 @@
 
 	.search-container:focus-within {
 		background: #ffffff;
-		border-color: #6366f1;
+		border-color: var(--color-primary-500);
 		box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 	}
 
