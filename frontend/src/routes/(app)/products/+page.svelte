@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { getProducts, createProduct, updateProduct, deleteProduct } from '$lib/api/product';
+  import { getProducts, createProduct, updateProduct, deleteProduct, duplicateProduct as duplicateProductApi, archiveProduct as archiveProductApi } from '$lib/api/product';
   import { api } from '$lib/api/client';
   import type { Product } from '$lib/types/product';
   import type { DependencyCheck } from '$lib/types/dependency';
@@ -32,6 +32,10 @@
   });
   let productSaving = $state(false);
   let productError = $state('');
+  let archivingProductId = $state<number | null>(null);
+  let togglingActiveId = $state<number | null>(null);
+  let togglingFeaturedId = $state<number | null>(null);
+  let duplicatingProductId = $state<number | null>(null);
 
   // Modal de dependências
   let showDependencyModal = $state(false);
@@ -171,80 +175,21 @@
     }
   }
 
-  async function duplicateProduct(id: number) {
-    if (!confirm('Tem certeza que deseja duplicar este produto?')) return;
-    try {
-      const product = products.find(p => p.ID === id);
-      if (!product) return;
-      
-      const payload = {
-        name: product.Name + ' (Cópia)',
-        description: product.Description,
-        price: product.Price,
-        is_composto: product.IsComposto,
-        active: false, // Cópia começa inativa
-        photo_url: product.PhotoURL,
-        category_id: product.CategoryID,
-        display_order: product.DisplayOrder,
-        preparation_time_minutes: product.PreparationTimeMinutes,
-        featured: false, // Cópia não destacada
-        is_new: false, // Cópia não é nova
-        promotion_price: product.PromotionPrice,
-        promotion_start: product.PromotionStart,
-        promotion_end: product.PromotionEnd,
-        available_from: product.AvailableFrom,
-        available_until: product.AvailableUntil,
-        sku: product.SKU,
-        internal_notes: product.InternalNotes,
-        slug: product.Slug,
-        meta_title: product.MetaTitle,
-        meta_description: product.MetaDescription,
-        alt_image: product.AltImage,
-        canonical: product.Canonical,
-      };
-      
-      const created = await createProduct(payload);
-      products = [...products, created];
-    } catch (e: any) {
-      error = e?.message ?? 'Erro ao duplicar produto.';
-    }
-  }
-
   async function archiveProduct(id: number) {
     if (!confirm('Tem certeza que deseja arquivar este produto?')) return;
+    archivingProductId = id;
     try {
-      const product = products.find(p => p.ID === id);
-      if (!product) return;
-      
-      const payload = {
-        name: product.Name,
-        description: product.Description,
-        price: product.Price,
-        is_composto: product.IsComposto,
-        active: false, // Arquivar = desativar
-        photo_url: product.PhotoURL,
-        category_id: product.CategoryID,
-        display_order: product.DisplayOrder,
-        preparation_time_minutes: product.PreparationTimeMinutes,
-        featured: product.Featured,
-        is_new: product.IsNew,
-        promotion_price: product.PromotionPrice,
-        promotion_start: product.PromotionStart,
-        promotion_end: product.PromotionEnd,
-        available_from: product.AvailableFrom,
-        available_until: product.AvailableUntil,
-        sku: product.SKU,
-        internal_notes: product.InternalNotes,
-      };
-      
-      const updated = await updateProduct(id, payload);
-      products = products.map(p => p.ID === id ? updated : p);
+      await archiveProductApi(id);
+      products = products.map(p => p.ID === id ? { ...p, Active: false } : p);
     } catch (e: any) {
       error = e?.message ?? 'Erro ao arquivar produto.';
+    } finally {
+      archivingProductId = null;
     }
   }
 
   async function toggleProductActive(id: number) {
+    togglingActiveId = id;
     try {
       const product = products.find(p => p.ID === id);
       if (!product) return;
@@ -274,10 +219,13 @@
       products = products.map(p => p.ID === id ? updated : p);
     } catch (e: any) {
       error = e?.message ?? 'Erro ao alterar status do produto.';
+    } finally {
+      togglingActiveId = null;
     }
   }
 
   async function toggleProductFeatured(id: number) {
+    togglingFeaturedId = id;
     try {
       const product = products.find(p => p.ID === id);
       if (!product) return;
@@ -307,14 +255,27 @@
       products = products.map(p => p.ID === id ? updated : p);
     } catch (e: any) {
       error = e?.message ?? 'Erro ao alterar destaque do produto.';
+    } finally {
+      togglingFeaturedId = null;
     }
   }
 
+  async function duplicateProduct(id: number) {
+    if (!confirm('Tem certeza que deseja duplicar este produto?')) return;
+    duplicatingProductId = id;
+    try {
+      const duplicated = await duplicateProductApi(id);
+      products = [...products, duplicated];
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao duplicar produto.';
+    } finally {
+      duplicatingProductId = null;
+    }
+  }
 
   function formatPrice(value: number) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   }
-
 
   function getProductLowStockStatus(product: Product) {
     if (!product.Ingredients || product.Ingredients.length === 0) return null;
@@ -322,7 +283,6 @@
     if (lowStockIngredients.length === 0) return null;
     return { count: lowStockIngredients.length, total: product.Ingredients.length };
   }
-
 
   const filteredProducts = $derived(
     products.filter(p => {
@@ -494,6 +454,10 @@
             onArchive={() => archiveProduct(product.ID)}
             onToggleActive={() => toggleProductActive(product.ID)}
             onToggleFeatured={() => toggleProductFeatured(product.ID)}
+            loadingArchive={archivingProductId === product.ID}
+            loadingToggleActive={togglingActiveId === product.ID}
+            loadingToggleFeatured={togglingFeaturedId === product.ID}
+            loadingDuplicate={duplicatingProductId === product.ID}
           />
         {/each}
       </div>

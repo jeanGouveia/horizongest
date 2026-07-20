@@ -50,8 +50,8 @@
 
     // Se e-mail foi alterado, exigir confirmação de senha
     if (email.trim() !== originalEmail) {
-      if (!profilePassword || profilePassword.length < 1) {
-        error = 'Confirme sua senha atual para alterar o e-mail.';
+      if (!profilePassword || profilePassword.length < 6) {
+        error = 'A senha deve ter no mínimo 6 caracteres.';
         return;
       }
     }
@@ -60,7 +60,15 @@
     error = '';
     success = false;
     try {
-      const res = await api.auth.updateProfile({ name: name.trim(), email: email.trim() });
+      const body: { name: string; email: string; current_password?: string } = {
+        name: name.trim(),
+        email: email.trim()
+      };
+      // Include current_password only when email is being changed
+      if (email.trim() !== originalEmail) {
+        body.current_password = profilePassword;
+      }
+      const res = await api.auth.updateProfile(body);
       if (res.error) throw new Error(res.error);
       success = true;
       originalEmail = email.trim();

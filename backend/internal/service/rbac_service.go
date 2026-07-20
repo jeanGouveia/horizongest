@@ -23,10 +23,10 @@ func (s *RBACService) HasRole(ctx context.Context, userID uint, role domain.Role
 	if err != nil {
 		return false, err
 	}
-	if user == nil || user.Role == nil {
+	if user == nil {
 		return false, nil
 	}
-	return *user.Role == role, nil
+	return user.Role == role, nil
 }
 
 // HasAnyRole checks if a user has any of the specified roles
@@ -35,12 +35,12 @@ func (s *RBACService) HasAnyRole(ctx context.Context, userID uint, roles ...doma
 	if err != nil {
 		return false, err
 	}
-	if user == nil || user.Role == nil {
+	if user == nil {
 		return false, nil
 	}
-	
+
 	for _, role := range roles {
-		if *user.Role == role {
+		if user.Role == role {
 			return true, nil
 		}
 	}
@@ -75,15 +75,13 @@ func (s *RBACService) CanManageProducts(ctx context.Context, userID uint) (bool,
 }
 
 // CanManageOrders checks if user can manage orders
-// Owner, Admin, Manager, Cashier, Kitchen, and Waiter can manage orders
+// Owner, Admin, Manager, and Employee can manage orders
 func (s *RBACService) CanManageOrders(ctx context.Context, userID uint) (bool, error) {
-	return s.HasAnyRole(ctx, userID, 
-		domain.RoleOwner, 
-		domain.RoleAdmin, 
-		domain.RoleManager, 
-		domain.RoleCashier, 
-		domain.RoleKitchen, 
-		domain.RoleWaiter,
+	return s.HasAnyRole(ctx, userID,
+		domain.RoleOwner,
+		domain.RoleAdmin,
+		domain.RoleManager,
+		domain.RoleEmployee,
 	)
 }
 
@@ -118,13 +116,13 @@ func (s *RBACService) CanAlterAdminRole(ctx context.Context, userID uint) (bool,
 }
 
 // GetUserRole returns the user's role
-func (s *RBACService) GetUserRole(ctx context.Context, userID uint) (*domain.Role, error) {
+func (s *RBACService) GetUserRole(ctx context.Context, userID uint) (domain.Role, error) {
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if user == nil {
-		return nil, nil
+		return "", nil
 	}
 	return user.Role, nil
 }

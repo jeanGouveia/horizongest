@@ -30,3 +30,12 @@ export async function updateOrderStatus(id: number, status: OrderStatus): Promis
   if (res.error) throw new Error(res.error);
   return res.data!;
 }
+
+export async function updateOrder(id: number, payload: OrderCreatePayload): Promise<Order> {
+  const res = await request<Order>(`/orders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+  if (res.error) throw new Error(res.error);
+  return res.data!;
+}

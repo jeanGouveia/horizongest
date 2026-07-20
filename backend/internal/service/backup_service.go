@@ -1,0 +1,132 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"time"
+)
+
+type BackupService struct {
+	dbHost     string
+	dbPort     string
+	dbUser     string
+	dbPassword string
+	dbName     string
+	backupDir  string
+}
+
+func NewBackupService(dbHost, dbPort, dbUser, dbPassword, dbName, backupDir string) *BackupService {
+	return &BackupService{
+		dbHost:     dbHost,
+		dbPort:     dbPort,
+		dbUser:     dbUser,
+		dbPassword: dbPassword,
+		dbName:     dbName,
+		backupDir:  backupDir,
+	}
+}
+
+type BackupResult struct {
+	FileName string
+	Size     int64
+	Path     string
+	CreatedAt time.Time
+}
+
+func (s *BackupService) CreateBackup(ctx context.Context) (*BackupResult, error) {
+	// Ensure backup directory exists
+	if err := os.MkdirAll(s.backupDir, 0755); err != nil {
+		return nil, fmt.Errorf("CreateBackup: failed to create backup directory: %w", err)
+	}
+
+	// Generate backup filename with timestamp
+	timestamp := time.Now().Format("20060102_150405")
+	fileName := fmt.Sprintf("pratoonline_backup_%s.sql", timestamp)
+	filePath := fmt.Sprintf("%s/%s", s.backupDir, fileName)
+
+	// Build mysqldump command
+	args := []string{
+		"-h", s.dbHost,
+		"-P", s.dbPort,
+		"-u", s.dbUser,
+		fmt.Sprintf("-p%s", s.dbPassword),
+		s.dbName,
+		"--single-transaction",
+		"--quick",
+		"--lock-tables=false",
+		"--routines",
+		"--triggers",
+		"--events",
+	}
+
+	// Execute mysqldump
+	cmd := exec.CommandContext(ctx, "mysqldump", args...)
+	cmd.Stdout = nil // We'll redirect to file
+
+	// Create output file
+	file, err := os.Create(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("CreateBackup: failed to create backup file: %w", err)
+	}
+	defer file.Close()
+
+	cmd.Stdout = file
+
+	if err := cmd.Run(); err != nil {
+		// Clean up failed backup file
+		os.Remove(filePath)
+		return nil, fmt.Errorf("CreateBackup: mysqldump failed: %w", err)
+	}
+
+	// Get file size
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("CreateBackup: failed to get file info: %w", err)
+	}
+
+	return &BackupResult{
+		FileName: fileName,
+		Size:     fileInfo.Size(),
+		Path:     filePath,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+func (s *BackupService) ListBackups(ctx context.Context) ([]BackupResult, error) {
+	entries, err := os.ReadDir(s.backupDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []BackupResult{}, nil
+		}
+		return nil, fmt.Errorf("ListBackups: failed to read backup directory: %w", err)
+	}
+
+	var backups []BackupResult
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		backups = append(backups, BackupResult{
+			FileName: entry.Name(),
+			Size:     info.Size(),
+			Path:     fmt.Sprintf("%s/%s", s.backupDir, entry.Name()),
+			CreatedAt: info.ModTime(),
+		})
+	}
+
+	return backups, nil
+}
+
+func (s *BackupService) DeleteBackup(ctx context.Context, fileName string) error {
+	filePath := fmt.Sprintf("%s/%s", s.backupDir, fileName)
+	if err := os.Remove(filePath); err != nil {
+		return fmt.Errorf("DeleteBackup: failed to delete backup: %w", err)
+	}
+	return nil
+}

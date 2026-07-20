@@ -91,7 +91,7 @@ export const api = {
     me: () =>
       request<{ id: number; name: string; email: string }>('/me'),
 
-    updateProfile: (body: { name: string; email: string }) =>
+    updateProfile: (body: { name: string; email: string; current_password?: string }) =>
       request<{ id: number; name: string; email: string }>('/me', {
         method: 'PUT',
         body: JSON.stringify(body)
@@ -99,6 +99,18 @@ export const api = {
 
     changePassword: (body: { current_password: string; new_password: string }) =>
       request<{ message: string }>('/me/change-password', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }),
+
+    requestPasswordReset: (body: { email: string }) =>
+      request<{ message: string }>('/auth/request-password-reset', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }),
+
+    resetPassword: (body: { token: string; new_password: string }) =>
+      request<{ message: string }>('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify(body)
       })
@@ -227,6 +239,74 @@ export const api = {
     remove: (id: number) =>
       request<{ message: string }>(`/company/users/${id}`, {
         method: 'DELETE'
+      }),
+
+    setActive: (id: number, body: { active: boolean }) =>
+      request<{ message: string }>(`/company/users/${id}/active`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      })
+  },
+
+  // --- Company Invitations endpoints (Sprint 8) ---
+  companyInvitations: {
+    list: () =>
+      request<Array<{
+        id: number;
+        company_id: number;
+        email: string;
+        role: string;
+        token: string;
+        status: string;
+        expires_at: string;
+        accepted_at: string | null;
+        created_by: number;
+        created_at: string;
+      }>>('/company/invitations'),
+
+    create: (body: { email: string; role: string }) =>
+      request<{
+        id: number;
+        company_id: number;
+        email: string;
+        role: string;
+        token: string;
+        status: string;
+        expires_at: string;
+        accepted_at: string | null;
+        created_by: number;
+        created_at: string;
+      }>('/company/invitations', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      }),
+
+    revoke: (id: number) =>
+      request<{ message: string }>(`/company/invitations/${id}`, {
+        method: 'DELETE'
+      })
+  },
+
+  // --- Public Invitation endpoints (Sprint 8) ---
+  invitations: {
+    getByToken: (token: string) =>
+      request<{
+        id: number;
+        company_id: number;
+        email: string;
+        role: string;
+        token: string;
+        status: string;
+        expires_at: string;
+        accepted_at: string | null;
+        created_by: number;
+        created_at: string;
+      }>(`/invitations/${token}`),
+
+    accept: (body: { token: string }) =>
+      request<{ message: string }>('/invitations/accept', {
+        method: 'POST',
+        body: JSON.stringify(body)
       })
   }
 } as const;

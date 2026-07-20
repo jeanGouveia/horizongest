@@ -20,7 +20,7 @@ type GormOrder struct {
 	Status     string `gorm:"not null;default:'pending'"`
 	TotalPrice float64
 	Notes      string
-	CompanyID  *uint  `gorm:"index"` // Nullable for Core V1 compatibility
+	CompanyID  uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
 	DeletedAt  *int64 `gorm:"index"`
 	CreatedAt  int64  `gorm:"autoCreateTime"`
 	UpdatedAt  int64  `gorm:"autoUpdateTime"`
@@ -344,6 +344,162 @@ func (r *GormOrderRepository) ValidateStock(ctx context.Context, items []domain.
 	}
 
 	return response, nil
+}
+
+// UpdateOrder updates order items and notes with stock adjustment
+func (r *GormOrderRepository) UpdateOrder(
+	ctx context.Context,
+	id uint,
+	items []domain.OrderItem,
+	total float64,
+	notes string,
+	productIngredients map[uint][]domain.ProductIngredient,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Get current order to calculate stock adjustments
+		var gOrder GormOrder
+		query := ApplyTenantFilterWithID(ctx, tx, id)
+		if err := query.Where("deleted_at IS NULL").First(&gOrder).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("pedido não encontrado")
+			}
+			return fmt.Errorf("UpdateOrder: buscar pedido: %w", err)
+		}
+
+		// Get current items
+		var gItems []GormOrderItem
+		if err := tx.Where("order_id = ? AND deleted_at IS NULL", id).Find(&gItems).Error; err != nil {
+			return fmt.Errorf("UpdateOrder: buscar itens atuais: %w", err)
+		}
+
+		// Build map of current items for easy lookup
+		currentItems := make(map[uint]domain.OrderItem)
+		for _, gi := range gItems {
+			currentItems[gi.ID] = domain.OrderItem{
+				ID:        gi.ID,
+				ProductID: gi.ProductID,
+				Quantity:  gi.Quantity,
+				UnitPrice: gi.UnitPrice,
+			}
+		}
+
+		// Step 1: Add back stock for removed items or reduced quantities
+		for _, gi := range gItems {
+			// Find if this item still exists in new items
+			var newItem *domain.OrderItem
+			for _, item := range items {
+				if item.ProductID == gi.ProductID {
+					newItem = &item
+					break
+				}
+			}
+
+			if newItem == nil {
+				// Item was completely removed - add back full stock
+				ingredients, ok := productIngredients[gi.ProductID]
+				if ok && len(ingredients) > 0 {
+					for _, pi := range ingredients {
+						consumo := pi.Quantity * gi.Quantity
+						if err := r.productRepo.IncreaseIngredientStock(ctx, pi.IngredientID, consumo, tx); err != nil {
+							return fmt.Errorf("UpdateOrder: restaurar estoque item removido: %w", err)
+						}
+					}
+				}
+			} else if newItem.Quantity < gi.Quantity {
+				// Quantity reduced - add back difference
+				difference := gi.Quantity - newItem.Quantity
+				ingredients, ok := productIngredients[gi.ProductID]
+				if ok && len(ingredients) > 0 {
+					for _, pi := range ingredients {
+						consumo := pi.Quantity * difference
+						if err := r.productRepo.IncreaseIngredientStock(ctx, pi.IngredientID, consumo, tx); err != nil {
+							return fmt.Errorf("UpdateOrder: restaurar estoque redução: %w", err)
+						}
+					}
+				}
+			}
+		}
+
+		// Step 2: Deduct stock for new items or increased quantities
+		for _, item := range items {
+			var oldItem *domain.OrderItem
+			for _, gi := range gItems {
+				if gi.ProductID == item.ProductID {
+					oldItem = &domain.OrderItem{
+						ID:       gi.ID,
+						Quantity: gi.Quantity,
+					}
+					break
+				}
+			}
+
+			if oldItem == nil {
+				// New item added - deduct full stock
+				ingredients, ok := productIngredients[item.ProductID]
+				if ok && len(ingredients) > 0 {
+					for _, pi := range ingredients {
+						consumo := pi.Quantity * item.Quantity
+						if err := r.productRepo.DecreaseIngredientStock(ctx, pi.IngredientID, consumo, tx, pi.Ingredient.Name, pi.Ingredient.StockQuantity); err != nil {
+							return fmt.Errorf("UpdateOrder: baixar estoque novo item: %w", err)
+						}
+					}
+				}
+			} else if item.Quantity > oldItem.Quantity {
+				// Quantity increased - deduct difference
+				difference := item.Quantity - oldItem.Quantity
+				ingredients, ok := productIngredients[item.ProductID]
+				if ok && len(ingredients) > 0 {
+					for _, pi := range ingredients {
+						consumo := pi.Quantity * difference
+						if err := r.productRepo.DecreaseIngredientStock(ctx, pi.IngredientID, consumo, tx, pi.Ingredient.Name, pi.Ingredient.StockQuantity); err != nil {
+							return fmt.Errorf("UpdateOrder: baixar estoque aumento: %w", err)
+						}
+					}
+				}
+			}
+		}
+
+		// Step 3: Soft delete old items
+		if err := tx.Where("order_id = ?", id).Delete(&GormOrderItem{}).Error; err != nil {
+			return fmt.Errorf("UpdateOrder: deletar itens antigos: %w", err)
+		}
+
+		// Step 4: Insert new items
+		for i := range items {
+			item := &items[i]
+			item.OrderID = id
+			gItem := GormOrderItem{
+				OrderID:               item.OrderID,
+				ProductID:             item.ProductID,
+				Quantity:              item.Quantity,
+				UnitPrice:             item.UnitPrice,
+				ProductName:           item.ProductName,
+				ProductDescription:    item.ProductDescription,
+				ProductIsComposto:     item.ProductIsComposto,
+				ProductPhotoURL:       item.ProductPhotoURL,
+				ProductCategoryID:     item.ProductCategoryID,
+				ProductPromotionPrice: item.ProductPromotionPrice,
+				ProductFeatured:       item.ProductFeatured,
+				ProductIsNew:          item.ProductIsNew,
+			}
+			if err := tx.Create(&gItem).Error; err != nil {
+				return fmt.Errorf("UpdateOrder: criar novo item: %w", err)
+			}
+			item.ID = gItem.ID
+		}
+
+		// Step 5: Update order total and notes
+		if err := query.Model(&GormOrder{}).
+			Where("deleted_at IS NULL").
+			Updates(map[string]interface{}{
+				"total_price": total,
+				"notes":       notes,
+			}).Error; err != nil {
+			return fmt.Errorf("UpdateOrder: atualizar pedido: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func orderToDomain(g *GormOrder) *domain.Order {

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
+	import { userStore } from '$lib/stores/userStore.svelte';
 	import type { Notifications } from '$lib/types/notifications';
-	import { LayoutDashboard, Plus, ShoppingCart, Utensils, Leaf, Scale, Users, User, LogOut, ChevronLeft, ChevronRight, Bell } from '@lucide/svelte';
+	import { LayoutDashboard, Plus, ShoppingCart, Utensils, Leaf, Scale, Users, User, LogOut, ChevronLeft, ChevronRight, Bell, Building2 } from '@lucide/svelte';
 
 	interface NavItem {
 		label: string;
@@ -64,6 +66,9 @@
 		{
 			title: 'ADMINISTRAÇÃO',
 			items: [
+				{ label: 'Empresa', href: '/settings/company', icon: Building2 },
+				{ label: 'Usuários', href: '/settings/users', icon: Users },
+				{ label: 'Convites', href: '/settings/invitations', icon: User },
 				{ label: 'Perfil', href: '/profile', icon: User },
 			],
 		},
@@ -89,6 +94,19 @@
 			console.error('Failed to load notifications:', e);
 		}
 	});
+
+	async function handleLogout() {
+		try {
+			await api.auth.logout();
+			userStore.logout();
+			goto('/login');
+		} catch (e) {
+			console.error('Logout error:', e);
+			// Even if API call fails, clear local state and redirect
+			userStore.logout();
+			goto('/login');
+		}
+	}
 </script>
 
 <aside class="sidebar {collapsed ? 'sidebar-collapsed' : ''} {open ? 'mobile-open' : ''}">
@@ -172,9 +190,9 @@
 				<button class="sidebar-action-btn" title="Notificações">
 					<Bell size={14} />
 				</button>
-				<a href="/logout" class="sidebar-action-btn danger" title="Sair">
+				<button class="sidebar-action-btn danger" onclick={handleLogout} title="Sair">
 					<LogOut size={14} />
-				</a>
+				</button>
 			</div>
 		</div>
 	</div>

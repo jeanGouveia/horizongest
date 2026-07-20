@@ -1,0 +1,241 @@
+/**
+ * Variáveis CSS do tema PratoOnline - Redesign Visual
+ * Importe este arquivo no app.html ou no layout principal
+ * Inspirado em produtos profissionais como Stripe, Linear e Vercel
+ * 
+ * Theme Engine - Plataforma 2.0:
+ * As variáveis --color-primary-500 e --color-primary-600 são dinâmicas
+ * e podem ser atualizadas via JavaScript pelo Theme Engine
+ */
+
+:root {
+	/* Cor primária - Índigo sofisticado (inspirado em Stripe)
+	 * Theme Engine: --color-primary-500 é atualizado dinamicamente
+	 */
+	--color-primary-50: #eef2ff;
+	--color-primary-100: #e0e7ff;
+	--color-primary-200: #c7d2fe;
+	--color-primary-300: #a5b4fc;
+	--color-primary-400: #818cf8;
+	--color-primary-500: #6366f1; /* DYNAMIC - Theme Engine */
+	--color-primary-600: #4f46e5; /* DYNAMIC - Theme Engine */
+	--color-primary-700: #4338ca;
+	--color-primary-800: #3730a3;
+	--color-primary-900: #312e81;
+	--color-primary-950: #1e1b4b;
+
+	/* Cores de sucesso - Verde esmeralda (mais sofisticado) */
+	--color-success-50: #ecfdf5;
+	--color-success-100: #d1fae5;
+	--color-success-200: #a7f3d0;
+	--color-success-300: #6ee7b7;
+	--color-success-400: #34d399;
+	--color-success-500: #10b981;
+	--color-success-600: #059669;
+	--color-success-700: #047857;
+	--color-success-800: #065f46;
+	--color-success-900: #064e3b;
+	--color-success-950: #022c22;
+
+	/* Cores de erro - Vermelho coral (mais moderno) */
+	--color-error-50: #fef2f2;
+	--color-error-100: #fee2e2;
+	--color-error-200: #fecaca;
+	--color-error-300: #fca5a5;
+	--color-error-400: #f87171;
+	--color-error-500: #ef4444;
+	--color-error-600: #dc2626;
+	--color-error-700: #b91c1c;
+	--color-error-800: #991b1b;
+	--color-error-900: #7f1d1d;
+	--color-error-950: #450a0a;
+
+	/* Cores de aviso - Âmbar dourado (mais elegante) */
+	--color-warning-50: #fffbeb;
+	--color-warning-100: #fef3c7;
+	--color-warning-200: #fde68a;
+	--color-warning-300: #fcd34d;
+	--color-warning-400: #fbbf24;
+	--color-warning-500: #f59e0b;
+	--color-warning-600: #d97706;
+	--color-warning-700: #b45309;
+	--color-warning-800: #92400e;
+	--color-warning-900: #78350f;
+	--color-warning-950: #451a03;
+
+	/* Cores neutras - Cinza ardesia (inspirado em Linear) */
+	--color-neutral-50: #f8fafc;
+	--color-neutral-100: #f1f5f9;
+	--color-neutral-200: #e2e8f0;
+	--color-neutral-300: #cbd5e1;
+	--color-neutral-400: #94a3b8;
+	--color-neutral-500: #64748b;
+	--color-neutral-600: #475569;
+	--color-neutral-700: #334155;
+	--color-neutral-800: #1e293b;
+	--color-neutral-900: #0f172a;
+	--color-neutral-950: #020617;
+
+	/* Cores de fundo - Mais contraste para separação visual */
+	--color-background-default: #ffffff;
+	--color-background-secondary: #f8fafc;
+	--color-background-tertiary: #f1f5f9;
+	--color-background-elevated: #ffffff;
+	--color-background-surface: #ffffff;
+	--color-background-accent: #eef2ff;
+	--color-background-success: #ecfdf5;
+	--color-background-warning: #fffbeb;
+	--color-background-error: #fef2f2;
+
+	/* Cores de texto - Hierarquia visual clara com mais contraste */
+	--color-text-primary: #0f172a;
+	--color-text-secondary: #334155;
+	--color-text-tertiary: #64748b;
+	--color-text-inverse: #ffffff;
+	--color-text-disabled: #94a3b8;
+	--color-text-accent: #6366f1;
+	--color-text-success: #059669;
+	--color-text-warning: #d97706;
+	--color-text-error: #dc2626;
+
+	/* Cores de borda - Mais visíveis para melhor separação visual */
+	--color-border-default: #cbd5e1;
+	--color-border-light: #e2e8f0;
+	--color-border-dark: #334155;
+	--color-border-focus: #6366f1;
+	--color-border-subtle: #94a3b8;
+
+	/* Cores de acento - Para destacar elementos importantes */
+	--color-accent-blue: #3b82f6;
+	--color-accent-purple: #8b5cf6;
+	--color-accent-pink: #ec4899;
+	--color-accent-cyan: #06b6d4;
+
+	/* Espaçamentos - Sistema de Grid consistente (8, 12, 16, 24, 32, 48, 64) */
+	--spacing-0: 0px;
+	--spacing-1: 8px;
+	--spacing-2: 12px;
+	--spacing-3: 16px;
+	--spacing-4: 24px;
+	--spacing-5: 32px;
+	--spacing-6: 48px;
+	--spacing-7: 64px;
+	
+	/* Espaçamentos granulares para uso específico */
+	--spacing-0-5: 2px;
+	--spacing-1-5: 6px;
+	--spacing-2-5: 10px;
+	--spacing-3-5: 14px;
+	--spacing-4-5: 20px;
+	--spacing-5-5: 28px;
+	--spacing-6-5: 36px;
+	--spacing-7-5: 40px;
+	--spacing-8: 56px;
+	--spacing-9: 72px;
+	--spacing-10: 80px;
+	--spacing-11: 96px;
+	--spacing-12: 112px;
+	--spacing-13: 128px;
+	--spacing-14: 144px;
+	--spacing-15: 160px;
+	--spacing-16: 192px;
+	--spacing-17: 208px;
+	--spacing-18: 224px;
+	--spacing-19: 240px;
+	--spacing-20: 256px;
+	--spacing-21: 288px;
+	--spacing-22: 320px;
+	--spacing-23: 384px;
+
+	/* Bordas arredondadas - Mais refinadas para look profissional */
+	--radius-none: 0px;
+	--radius-xs: 2px;
+	--radius-sm: 4px;
+	--radius-base: 6px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-xl: 16px;
+	--radius-2xl: 20px;
+	--radius-3xl: 24px;
+	--radius-full: 9999px;
+
+	/* Sombras - Mais profundas para melhor contraste */
+	--shadow-none: none;
+	--shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.08);
+	--shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.12), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+	--shadow-base: 0 4px 6px -1px rgb(0 0 0 / 0.12), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+	--shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+	--shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+	--shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+	--shadow-2xl: 0 50px 100px -20px rgb(0 0 0 / 0.25);
+	--shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.08);
+
+	/* Tipografia - Inter para UI, JetBrains Mono para código */
+	--font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-family-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+
+	--font-size-xs: 0.75rem;
+	--font-size-sm: 0.875rem;
+	--font-size-base: 1rem;
+	--font-size-lg: 1.125rem;
+	--font-size-xl: 1.25rem;
+	--font-size-2xl: 1.5rem;
+	--font-size-3xl: 1.875rem;
+	--font-size-4xl: 2.25rem;
+	--font-size-5xl: 3rem;
+	--font-size-6xl: 3.75rem;
+	--font-size-7xl: 4.5rem;
+	--font-size-8xl: 6rem;
+	--font-size-9xl: 8rem;
+
+	--line-height-none: 1;
+	--line-height-tight: 1.2;
+	--line-height-snug: 1.35;
+	--line-height-normal: 1.5;
+	--line-height-relaxed: 1.625;
+	--line-height-loose: 2;
+
+	--font-weight-thin: 100;
+	--font-weight-extralight: 200;
+	--font-weight-light: 300;
+	--font-weight-normal: 400;
+	--font-weight-medium: 500;
+	--font-weight-semibold: 600;
+	--font-weight-bold: 700;
+	--font-weight-extrabold: 800;
+	--font-weight-black: 900;
+
+	--letter-spacing-tighter: -0.05em;
+	--letter-spacing-tight: -0.025em;
+	--letter-spacing-normal: 0em;
+	--letter-spacing-wide: 0.025em;
+	--letter-spacing-wider: 0.05em;
+	--letter-spacing-widest: 0.1em;
+
+	/* Transições */
+	--transition-duration-fast: 150ms;
+	--transition-duration-base: 200ms;
+	--transition-duration-slow: 300ms;
+	--transition-duration-slower: 400ms;
+	--transition-easing-base: cubic-bezier(0.4, 0, 0.2, 1);
+	--transition-easing-in: cubic-bezier(0.4, 0, 1, 1);
+	--transition-easing-out: cubic-bezier(0, 0, 0.2, 1);
+	--transition-easing-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset básico */
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	font-family: var(--font-family-sans);
+	font-size: var(--font-size-base);
+	line-height: var(--line-height-normal);
+	color: var(--color-text-primary);
+	background-color: var(--color-background-default);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}

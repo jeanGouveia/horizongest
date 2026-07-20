@@ -12,6 +12,13 @@ export type Permission =
   | 'manage_settings'
   | 'view_reports';
 
+interface MeResponse {
+  id: number;
+  name: string;
+  email: string;
+  role?: Role | null;
+}
+
 interface RBACState {
   role: Role | null;
   permissions: Permission[];
@@ -44,7 +51,7 @@ class RBACStore {
       if (res.data) {
         // Role will be included in /api/me response in future sprints
         // For now, we'll set it to null and derive permissions from it
-        this.state.role = (res.data as any).role || null;
+        this.state.role = (res.data as MeResponse).role || null;
         this.state.permissions = this.derivePermissions(this.state.role);
         this.state.loaded = true;
       }

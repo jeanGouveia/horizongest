@@ -26,7 +26,7 @@ type GormMedia struct {
 	AltText       string
 	EntityType    string `gorm:"not null;index"`
 	EntityID      *uint  `gorm:"index"`
-	CompanyID     *uint  `gorm:"index"` // Nullable for Core V1 compatibility
+	CompanyID     uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
 	DeletedAt     *int64 `gorm:"index"`
 	CreatedAt     int64  `gorm:"autoCreateTime"`
 	UpdatedAt     int64  `gorm:"autoUpdateTime"`

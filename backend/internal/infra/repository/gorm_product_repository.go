@@ -23,7 +23,7 @@ type GormProduct struct {
 	Active                 bool    `gorm:"not null;default:true"`
 	PhotoURL               string
 	CategoryID             *uint `gorm:"index"`
-	CompanyID              *uint `gorm:"index"` // Nullable for Core V1 compatibility
+	CompanyID              uint  `gorm:"index;not null"` // Sprint 3: NOT NULL
 	DisplayOrder           int   `gorm:"not null;default:0"`
 	PreparationTimeMinutes int   `gorm:"not null;default:0"`
 	Featured               bool  `gorm:"not null;default:false"`
@@ -38,6 +38,13 @@ type GormProduct struct {
 	DeletedAt              *int64 `gorm:"index"`
 	CreatedAt              int64  `gorm:"autoCreateTime"`
 	UpdatedAt              int64  `gorm:"autoUpdateTime"`
+
+	// Sprint 4 - Ficha Técnica Avançada
+	Cost           float64 `gorm:"default:0.0"`
+	CMV            float64 `gorm:"default:0.0"`
+	Margin         float64 `gorm:"default:0.0"`
+	Profit         float64 `gorm:"default:0.0"`
+	SuggestedPrice float64 `gorm:"default:0.0"`
 
 	// SEO fields para Cardápio Digital
 	Slug            string `gorm:"uniqueIndex"`
@@ -62,7 +69,7 @@ type GormIngredient struct {
 	StockQuantity float64 `gorm:"not null;default:0"`
 	MinStock      float64 `gorm:"not null;default:0"`
 	Active        bool    `gorm:"not null;default:true"`
-	CompanyID     *uint   `gorm:"index"` // Nullable for Core V1 compatibility
+	CompanyID     uint    `gorm:"index;not null"` // Sprint 3: NOT NULL
 	DeletedAt     *int64  `gorm:"index"`
 	CreatedAt     int64   `gorm:"autoCreateTime"`
 	UpdatedAt     int64   `gorm:"autoUpdateTime"`
@@ -71,12 +78,17 @@ type GormIngredient struct {
 func (GormIngredient) TableName() string { return "ingredients" }
 
 type GormProductIngredient struct {
-	ID           uint           `gorm:"primaryKey;autoIncrement"`
-	ProductID    uint           `gorm:"not null;index"`
-	IngredientID uint           `gorm:"not null"`
-	Quantity     float64        `gorm:"not null"`
-	DeletedAt    *int64         `gorm:"index"`
-	Ingredient   GormIngredient `gorm:"foreignKey:IngredientID"`
+	ID           uint    `gorm:"primaryKey;autoIncrement"`
+	ProductID    uint    `gorm:"not null;index"`
+	IngredientID uint    `gorm:"not null"`
+	Quantity     float64 `gorm:"not null"`
+	// Sprint 4 - Ficha Técnica Avançada
+	Loss       float64        `gorm:"default:0.0"`
+	Yield      float64        `gorm:"default:1.0"`
+	UnitCost   float64        `gorm:"default:0.0"`
+	TotalCost  float64        `gorm:"default:0.0"`
+	DeletedAt  *int64         `gorm:"index"`
+	Ingredient GormIngredient `gorm:"foreignKey:IngredientID"`
 }
 
 func (GormProductIngredient) TableName() string { return "product_ingredients" }
@@ -98,6 +110,18 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 	companyID, err := GetCompanyIDFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("CreateProduct: %w", err)
+	}
+
+	// Check for slug collision
+	if p.Slug != "" {
+		var existing GormProduct
+		err := r.db.WithContext(ctx).Where("slug = ?", p.Slug).First(&existing).Error
+		if err == nil {
+			return fmt.Errorf("CreateProduct: slug '%s' já está em uso", p.Slug)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("CreateProduct: verificar slug: %w", err)
+		}
 	}
 
 	m := GormProduct{
@@ -190,6 +214,18 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 			return fmt.Errorf("UpdateProduct: product not found or access denied")
 		}
 		return fmt.Errorf("UpdateProduct: %w", err)
+	}
+
+	// Check for slug collision (excluding current product)
+	if p.Slug != "" && p.Slug != existing.Slug {
+		var slugConflict GormProduct
+		err := r.db.WithContext(ctx).Where("slug = ? AND id != ?", p.Slug, p.ID).First(&slugConflict).Error
+		if err == nil {
+			return fmt.Errorf("UpdateProduct: slug '%s' já está em uso", p.Slug)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("UpdateProduct: verificar slug: %w", err)
+		}
 	}
 
 	// Update without changing CompanyID (immutable)
@@ -424,6 +460,10 @@ func (r *GormProductRepository) SetProductIngredients(
 				ProductID:    productID,
 				IngredientID: item.IngredientID,
 				Quantity:     item.Quantity,
+				Loss:         item.Loss,
+				Yield:        item.Yield,
+				UnitCost:     item.UnitCost,
+				TotalCost:    item.TotalCost,
 			}
 			if err := tx.Create(&m).Error; err != nil {
 				return fmt.Errorf("SetProductIngredients insert: %w", err)
@@ -446,9 +486,15 @@ func (r *GormProductRepository) GetProductIngredients(
 	for i, m := range ms {
 		ing := ingredientToDomain(&m.Ingredient)
 		out[i] = domain.ProductIngredient{
-			ID: m.ID, ProductID: m.ProductID,
-			IngredientID: m.IngredientID, Quantity: m.Quantity,
-			Ingredient: ing,
+			ID:           m.ID,
+			ProductID:    m.ProductID,
+			IngredientID: m.IngredientID,
+			Quantity:     m.Quantity,
+			Loss:         m.Loss,
+			Yield:        m.Yield,
+			UnitCost:     m.UnitCost,
+			TotalCost:    m.TotalCost,
+			Ingredient:   ing,
 		}
 	}
 	return out, nil

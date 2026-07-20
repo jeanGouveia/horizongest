@@ -69,12 +69,12 @@ func (s *CompanySettingsService) GetSettings(ctx context.Context, userID uint) (
 		return nil, ErrUserNoCompany
 	}
 
-	if user.CompanyID == nil {
+	if user.CompanyID == 0 {
 		return nil, ErrUserNoCompany
 	}
 
 	// Get company
-	company, err := s.companyRepo.FindByID(ctx, *user.CompanyID)
+	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
 		return nil, fmt.Errorf("GetSettings: failed to get company: %w", err)
 	}
@@ -109,12 +109,12 @@ func (s *CompanySettingsService) UpdateSettings(ctx context.Context, userID uint
 		return ErrUserNoCompany
 	}
 
-	if user.CompanyID == nil {
+	if user.CompanyID == 0 {
 		return ErrUserNoCompany
 	}
 
 	// Get current company
-	company, err := s.companyRepo.FindByID(ctx, *user.CompanyID)
+	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
 		return fmt.Errorf("UpdateSettings: failed to get company: %w", err)
 	}

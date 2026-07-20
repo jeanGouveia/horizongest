@@ -44,7 +44,12 @@ class ThemeStore {
 			}
 		} catch (e) {
 			console.error('Failed to load theme:', e);
-			this.error = 'Failed to load theme';
+			const errorMessage = e instanceof Error ? e.message : String(e);
+			if (e instanceof TypeError && errorMessage.includes('fetch')) {
+				this.error = 'Erro de conexão ao carregar tema. Usando tema padrão.';
+			} else {
+				this.error = `Erro ao carregar tema: ${errorMessage || 'Erro desconhecido'}. Usando tema padrão.`;
+			}
 			// Fall back to default theme
 			this.theme = DEFAULT_THEME;
 			this.applyThemeToDOM();
@@ -106,13 +111,29 @@ class ThemeStore {
 	}
 
 	private lightenColor(color: string, percent: number): string {
-		// Simplified color lightening - in production use a proper color library
-		return color; // Placeholder
+		const num = parseInt(color.replace('#', ''), 16);
+		const amt = Math.round(2.55 * percent);
+		const R = (num >> 16) + amt;
+		const G = (num >> 8 & 0x00FF) + amt;
+		const B = (num & 0x0000FF) + amt;
+		return '#' + (0x1000000 + 
+			(R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 + 
+			(G < 255 ? G < 1 ? 0 : G : 255) * 0x100 + 
+			(B < 255 ? B < 1 ? 0 : B : 255)
+		).toString(16).slice(1);
 	}
 
 	private darkenColor(color: string, percent: number): string {
-		// Simplified color darkening - in production use a proper color library
-		return color; // Placeholder
+		const num = parseInt(color.replace('#', ''), 16);
+		const amt = Math.round(2.55 * percent);
+		const R = (num >> 16) - amt;
+		const G = (num >> 8 & 0x00FF) - amt;
+		const B = (num & 0x0000FF) - amt;
+		return '#' + (0x1000000 + 
+			(R > 0 ? R > 255 ? 255 : R : 0) * 0x10000 + 
+			(G > 0 ? G > 255 ? 255 : G : 0) * 0x100 + 
+			(B > 0 ? B > 255 ? 255 : B : 0)
+		).toString(16).slice(1);
 	}
 
 	get primaryColor(): string {

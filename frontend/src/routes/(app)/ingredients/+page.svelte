@@ -82,7 +82,7 @@
       if (e?.message) {
         try {
           const errorData = JSON.parse(e.message);
-          if (errorData.fields) {
+          if (errorData && typeof errorData === 'object' && errorData.fields) {
             const fieldMessages = Object.entries(errorData.fields).map(([field, msg]) => {
               const fieldMap: Record<string, string> = {
                 name: 'Nome',
@@ -97,7 +97,7 @@
             ingError = e.message;
           }
         } catch {
-          ingError = e.message;
+          ingError = e.message || 'Erro ao salvar ingrediente.';
         }
       } else {
         ingError = 'Erro ao salvar ingrediente.';

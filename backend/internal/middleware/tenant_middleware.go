@@ -46,9 +46,8 @@ func (m *TenantMiddleware) Tenant(next http.Handler) http.Handler {
 
 		// Create TenantContext
 		tenantCtx := &domain.TenantContext{
-			UserID:       userID,
-			CompanyID:    user.CompanyID, // nil for Core V1 users
-			IsSystemAdmin: false,          // reserved for future RBAC
+			UserID:    userID,
+			CompanyID: user.CompanyID, // Always required - Sprint 3
 		}
 
 		// Inject TenantContext into request context

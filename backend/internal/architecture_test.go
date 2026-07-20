@@ -15,8 +15,8 @@ import (
 )
 
 func TestDomainDoesNotImportInfra(t *testing.T) {
-	domainDir := "internal/domain"
-	infraDir := "internal/infra"
+	domainDir := "domain"
+	infraDir := "infra"
 
 	err := filepath.Walk(domainDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -47,8 +47,8 @@ func TestDomainDoesNotImportInfra(t *testing.T) {
 }
 
 func TestDomainDoesNotImportRepository(t *testing.T) {
-	domainDir := "internal/domain"
-	repoDir := "internal/repository"
+	domainDir := "domain"
+	repoDir := "repository"
 
 	err := filepath.Walk(domainDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -79,8 +79,8 @@ func TestDomainDoesNotImportRepository(t *testing.T) {
 }
 
 func TestServiceDoesNotImportHandler(t *testing.T) {
-	serviceDir := "internal/service"
-	handlerDir := "internal/handler"
+	serviceDir := "service"
+	handlerDir := "handler"
 
 	err := filepath.Walk(serviceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -111,8 +111,8 @@ func TestServiceDoesNotImportHandler(t *testing.T) {
 }
 
 func TestRepositoryDoesNotImportHandler(t *testing.T) {
-	repoDir := "internal/repository"
-	handlerDir := "internal/handler"
+	repoDir := "infra/repository"
+	handlerDir := "handler"
 
 	err := filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -143,8 +143,8 @@ func TestRepositoryDoesNotImportHandler(t *testing.T) {
 }
 
 func TestRepositoryDoesNotImportService(t *testing.T) {
-	repoDir := "internal/repository"
-	serviceDir := "internal/service"
+	repoDir := "infra/repository"
+	serviceDir := "service"
 
 	err := filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

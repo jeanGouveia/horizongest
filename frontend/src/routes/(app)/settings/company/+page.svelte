@@ -31,6 +31,22 @@
   let previewPrimaryColor = $state('');
   let previewSecondaryColor = $state('');
 
+  function generateSlug(text: string): string {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+
+  // Auto-generate slug from name when slug is empty
+  $effect(() => {
+    if (!slug && name) {
+      slug = generateSlug(name);
+    }
+  });
+
   const businessTypes = [
     { value: 'restaurant', label: 'Restaurante' },
     { value: 'bakery', label: 'Padaria' },

@@ -31,6 +31,7 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 		// Estratégia 1: Cookie HttpOnly (produção)
 		if cookie, err := r.Cookie("auth_token"); err == nil {
 			token = cookie.Value
+			// Sprint 3.4 - Security Hardening: Remove sensitive data from logs
 			log.Printf("[MIDDLEWARE] Token encontrado no cookie")
 		} else {
 			log.Printf("[MIDDLEWARE] Cookie não encontrado: %v", err)

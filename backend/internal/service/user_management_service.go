@@ -10,13 +10,14 @@ import (
 )
 
 var (
-	ErrUserNotFound       = errors.New("usuário não encontrado")
-	ErrUserNotInCompany   = errors.New("usuário não pertence à empresa")
-	ErrCannotAlterOwner   = errors.New("apenas Owner pode alterar papel de Owner")
-	ErrCannotAlterAdmin   = errors.New("apenas Owner pode alterar papel de Admin")
-	ErrCannotRemoveOwner  = errors.New("não é possível remover Owner da empresa")
+	ErrUserNotFound         = errors.New("usuário não encontrado")
+	ErrUserNotInCompany     = errors.New("usuário não pertence à empresa")
+	ErrCannotAlterOwner     = errors.New("apenas Owner pode alterar papel de Owner")
+	ErrCannotAlterAdmin     = errors.New("apenas Owner pode alterar papel de Admin")
+	ErrCannotRemoveOwner    = errors.New("não é possível remover Owner da empresa")
 	ErrUserAlreadyInCompany = errors.New("usuário já pertence a esta empresa")
-	ErrPermissionDenied   = errors.New("permissão negada")
+	ErrPermissionDenied     = errors.New("permissão negada")
+	ErrCannotDeactivateSelf = errors.New("não é possível desativar o próprio usuário")
 )
 
 type UserManagementService struct {
@@ -54,19 +55,15 @@ func (s *UserManagementService) ListUsers(ctx context.Context, companyID uint) (
 	var result []UserOutput
 	for _, user := range users {
 		// Filter by companyID
-		if user.CompanyID != nil && *user.CompanyID == companyID {
-			var role *string
-			if user.Role != nil {
-				r := user.Role.String()
-				role = &r
-			}
+		if user.CompanyID == companyID {
+			role := user.Role.String()
 			result = append(result, UserOutput{
 				ID:        user.ID,
 				Name:      user.Name,
 				Email:     user.Email,
-				Role:      role,
+				Role:      &role,
 				Active:    user.Active,
-				CompanyID: user.CompanyID,
+				CompanyID: &user.CompanyID,
 			})
 		}
 	}
@@ -85,23 +82,19 @@ func (s *UserManagementService) GetUser(ctx context.Context, companyID uint, use
 	}
 
 	// Check if user belongs to the company
-	if user.CompanyID == nil || *user.CompanyID != companyID {
+	if user.CompanyID != companyID {
 		return nil, ErrUserNotInCompany
 	}
 
-	var role *string
-	if user.Role != nil {
-		r := user.Role.String()
-		role = &r
-	}
+	role := user.Role.String()
 
 	return &UserOutput{
 		ID:        user.ID,
 		Name:      user.Name,
 		Email:     user.Email,
-		Role:      role,
+		Role:      &role,
 		Active:    user.Active,
-		CompanyID: user.CompanyID,
+		CompanyID: &user.CompanyID,
 	}, nil
 }
 
@@ -112,7 +105,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	if err != nil {
 		return fmt.Errorf("ChangeRole: failed to get actor: %w", err)
 	}
-	if actor == nil || actor.CompanyID == nil {
+	if actor == nil {
 		return ErrPermissionDenied
 	}
 
@@ -126,12 +119,12 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	}
 
 	// Check if target belongs to same company
-	if target.CompanyID == nil || *target.CompanyID != *actor.CompanyID {
+	if target.CompanyID != actor.CompanyID {
 		return ErrUserNotInCompany
 	}
 
 	// RBAC Validation: Only Owner can alter Owner role
-	if target.Role != nil && *target.Role == domain.RoleOwner {
+	if target.Role == domain.RoleOwner {
 		canAlter, err := s.rbacService.CanAlterOwnerRole(ctx, actorUserID)
 		if err != nil {
 			return err
@@ -142,7 +135,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	}
 
 	// RBAC Validation: Only Owner can alter Admin role
-	if target.Role != nil && *target.Role == domain.RoleAdmin {
+	if target.Role == domain.RoleAdmin {
 		canAlter, err := s.rbacService.CanAlterAdminRole(ctx, actorUserID)
 		if err != nil {
 			return err
@@ -162,7 +155,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	}
 
 	// Update target user's role
-	target.Role = &newRole
+	target.Role = newRole
 	if err := s.userRepo.Update(ctx, target); err != nil {
 		return fmt.Errorf("ChangeRole: failed to update user: %w", err)
 	}
@@ -177,7 +170,7 @@ func (s *UserManagementService) RemoveFromCompany(ctx context.Context, actorUser
 	if err != nil {
 		return fmt.Errorf("RemoveFromCompany: failed to get actor: %w", err)
 	}
-	if actor == nil || actor.CompanyID == nil {
+	if actor == nil {
 		return ErrPermissionDenied
 	}
 
@@ -191,12 +184,12 @@ func (s *UserManagementService) RemoveFromCompany(ctx context.Context, actorUser
 	}
 
 	// Check if target belongs to same company
-	if target.CompanyID == nil || *target.CompanyID != *actor.CompanyID {
+	if target.CompanyID != actor.CompanyID {
 		return ErrUserNotInCompany
 	}
 
 	// RBAC Validation: Cannot remove Owner from company
-	if target.Role != nil && *target.Role == domain.RoleOwner {
+	if target.Role == domain.RoleOwner {
 		return ErrCannotRemoveOwner
 	}
 
@@ -209,14 +202,9 @@ func (s *UserManagementService) RemoveFromCompany(ctx context.Context, actorUser
 		return ErrPermissionDenied
 	}
 
-	// Remove user from company by setting CompanyID to null
-	target.CompanyID = nil
-	target.Role = nil // Also remove role when leaving company
-	if err := s.userRepo.Update(ctx, target); err != nil {
-		return fmt.Errorf("RemoveFromCompany: failed to update user: %w", err)
-	}
-
-	return nil
+	// Remove user from company - NOT ALLOWED in Sprint 3
+	// Users must always belong to a company. Use deletion instead.
+	return errors.New("RemoveFromCompany não permitido - usuários devem pertencer a uma empresa")
 }
 
 // AddExistingUser adds an existing user to the company by email
@@ -226,7 +214,7 @@ func (s *UserManagementService) AddExistingUser(ctx context.Context, actorUserID
 	if err != nil {
 		return nil, fmt.Errorf("AddExistingUser: failed to get actor: %w", err)
 	}
-	if actor == nil || actor.CompanyID == nil {
+	if actor == nil {
 		return nil, ErrPermissionDenied
 	}
 
@@ -249,34 +237,85 @@ func (s *UserManagementService) AddExistingUser(ctx context.Context, actorUserID
 	}
 
 	// Check if user already belongs to this company
-	if target.CompanyID != nil && *target.CompanyID == *actor.CompanyID {
+	if target.CompanyID == actor.CompanyID {
 		return nil, ErrUserAlreadyInCompany
 	}
 
 	// Check if user belongs to another company
-	if target.CompanyID != nil {
+	if target.CompanyID != 0 {
 		return nil, errors.New("usuário já pertence a outra empresa")
 	}
 
 	// Add user to company with default role (Manager)
 	target.CompanyID = actor.CompanyID
 	defaultRole := domain.RoleManager
-	target.Role = &defaultRole
+	target.Role = defaultRole
 
 	if err := s.userRepo.Update(ctx, target); err != nil {
 		return nil, fmt.Errorf("AddExistingUser: failed to update user: %w", err)
 	}
 
-	var role *string
-	r := target.Role.String()
-	role = &r
+	role := target.Role.String()
 
 	return &UserOutput{
 		ID:        target.ID,
 		Name:      target.Name,
 		Email:     target.Email,
-		Role:      role,
+		Role:      &role,
 		Active:    target.Active,
-		CompanyID: target.CompanyID,
+		CompanyID: &target.CompanyID,
 	}, nil
+}
+
+// SetUserActive sets the active status of a user
+func (s *UserManagementService) SetUserActive(ctx context.Context, actorUserID uint, targetUserID uint, active bool) error {
+	// Get actor user
+	actor, err := s.userRepo.FindByID(ctx, actorUserID)
+	if err != nil {
+		return fmt.Errorf("SetUserActive: failed to get actor: %w", err)
+	}
+	if actor == nil {
+		return ErrPermissionDenied
+	}
+
+	// Check if actor is trying to deactivate themselves
+	if actorUserID == targetUserID && !active {
+		return ErrCannotDeactivateSelf
+	}
+
+	// Get target user
+	target, err := s.userRepo.FindByID(ctx, targetUserID)
+	if err != nil {
+		return fmt.Errorf("SetUserActive: failed to get target: %w", err)
+	}
+	if target == nil {
+		return ErrUserNotFound
+	}
+
+	// Check if target belongs to same company
+	if target.CompanyID != actor.CompanyID {
+		return ErrUserNotInCompany
+	}
+
+	// RBAC Validation: Cannot deactivate Owner
+	if !active && target.Role == domain.RoleOwner {
+		return errors.New("não é possível desativar Owner da empresa")
+	}
+
+	// RBAC Validation: Only Owner and Admin can activate/deactivate users
+	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
+	if err != nil {
+		return err
+	}
+	if !canManage {
+		return ErrPermissionDenied
+	}
+
+	// Update target user's active status
+	target.Active = active
+	if err := s.userRepo.Update(ctx, target); err != nil {
+		return fmt.Errorf("SetUserActive: failed to update user: %w", err)
+	}
+
+	return nil
 }

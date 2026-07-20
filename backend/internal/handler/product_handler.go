@@ -9,14 +9,19 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/pratoOnline/backend/internal/util"
 )
 
 type ProductHandler struct {
-	svc *service.ProductService
+	svc       *service.ProductService
+	sanitizer *util.Sanitizer
 }
 
 func NewProductHandler(svc *service.ProductService) *ProductHandler {
-	return &ProductHandler{svc: svc}
+	return &ProductHandler{
+		svc:       svc,
+		sanitizer: util.NewSanitizer(),
+	}
 }
 
 // ── Produto ──────────────────────────────────────────────────────────────────
@@ -28,6 +33,33 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
+
+	// Sanitize inputs (Sprint 3.4 - Security Hardening)
+	sanitizedName, err := h.sanitizer.SanitizeName(in.Name)
+	if err != nil {
+		jsonError(w, "nome inválido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	in.Name = sanitizedName
+
+	if in.Description != "" {
+		sanitizedDesc, err := h.sanitizer.SanitizeDescription(in.Description)
+		if err != nil {
+			jsonError(w, "descrição inválida: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		in.Description = sanitizedDesc
+	}
+
+	if in.Slug != "" {
+		sanitizedSlug, err := h.sanitizer.SanitizeSlug(in.Slug)
+		if err != nil {
+			jsonError(w, "slug inválido: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		in.Slug = sanitizedSlug
+	}
+
 	if err := validate.Struct(in); err != nil {
 		jsonValidationError(w, err)
 		return
@@ -295,6 +327,43 @@ func (h *ProductHandler) GetProductIngredients(w http.ResponseWriter, r *http.Re
 		return
 	}
 	jsonResponse(w, http.StatusOK, p.Ingredients)
+}
+
+// POST /api/products/{id}/duplicate
+func (h *ProductHandler) DuplicateProduct(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r, "id")
+	if err != nil {
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
+		return
+	}
+	product, err := h.svc.DuplicateProduct(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, service.ErrProductNotFound) {
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "não foi possível duplicar o produto. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, http.StatusCreated, product)
+}
+
+// POST /api/products/{id}/archive
+func (h *ProductHandler) ArchiveProduct(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r, "id")
+	if err != nil {
+		jsonError(w, "ID do produto inválido. Verifique o valor informado.", http.StatusBadRequest)
+		return
+	}
+	if err := h.svc.ArchiveProduct(r.Context(), id); err != nil {
+		if errors.Is(err, service.ErrProductNotFound) {
+			jsonError(w, "produto não encontrado. Verifique o ID informado.", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "não foi possível arquivar o produto. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "produto arquivado com sucesso"})
 }
 
 // ── helper ───────────────────────────────────────────────────────────────────

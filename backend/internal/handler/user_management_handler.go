@@ -33,10 +33,10 @@ func (h *UserManagementHandler) getUserCompanyID(ctx context.Context, userID uin
 	if err != nil {
 		return 0, err
 	}
-	if user == nil || user.CompanyID == nil {
-		return 0, errors.New("usuário não possui empresa")
+	if user == nil {
+		return 0, errors.New("usuário não encontrado")
 	}
-	return *user.CompanyID, nil
+	return user.CompanyID, nil
 }
 
 // ListUsers handles GET /api/company/users
@@ -213,4 +213,43 @@ func (h *UserManagementHandler) RemoveUser(w http.ResponseWriter, r *http.Reques
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "usuário removido da empresa com sucesso"})
+}
+
+// SetUserActive handles PUT /api/company/users/{id}/active
+func (h *UserManagementHandler) SetUserActive(w http.ResponseWriter, r *http.Request) {
+	actorUserID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "não autorizado", http.StatusUnauthorized)
+		return
+	}
+
+	targetIDStr := chi.URLParam(r, "id")
+	targetID, err := strconv.ParseUint(targetIDStr, 10, 32)
+	if err != nil {
+		jsonError(w, "ID inválido", http.StatusBadRequest)
+		return
+	}
+
+	var input struct {
+		Active bool `json:"active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonError(w, "formato dos dados inválido", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.userManagementService.SetUserActive(r.Context(), actorUserID, uint(targetID), input.Active); err != nil {
+		if err == service.ErrUserNotFound || err == service.ErrUserNotInCompany {
+			jsonError(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if err == service.ErrPermissionDenied || err == service.ErrCannotDeactivateSelf {
+			jsonError(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		jsonError(w, "não foi possível alterar status do usuário", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "status do usuário alterado com sucesso"})
 }

@@ -23,6 +23,9 @@ func RunMigrations(db *gorm.DB) error {
 		&repository.GormStockAdjustmentPending{},
 		&repository.GormMedia{},
 		&repository.GormCompanyModel{},
+		&repository.GormInvitationModel{},
+		&repository.GormTokenBlacklist{},
+		&repository.GormPasswordResetTokenModel{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {

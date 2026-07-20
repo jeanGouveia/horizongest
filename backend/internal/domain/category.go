@@ -8,7 +8,7 @@ type Category struct {
 	Description  string
 	DisplayOrder int
 	Active       bool
-	CompanyID    *uint // ID da empresa/tenant (null para compatibilidade com Core V1)
+	CompanyID    uint // ID da empresa/tenant (obrigatório - Sprint 3)
 	DeletedAt    *time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

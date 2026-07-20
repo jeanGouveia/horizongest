@@ -47,6 +47,21 @@ export async function deleteProduct(id: number): Promise<void> {
   if (res.error) throw new Error(res.error);
 }
 
+export async function duplicateProduct(id: number): Promise<Product> {
+  const res = await request<Product>(`/products/${id}/duplicate`, {
+    method: 'POST'
+  });
+  if (res.error) throw new Error(res.error);
+  return res.data!;
+}
+
+export async function archiveProduct(id: number): Promise<void> {
+  const res = await request<{ message: string }>(`/products/${id}/archive`, {
+    method: 'POST'
+  });
+  if (res.error) throw new Error(res.error);
+}
+
 export async function getProductIngredients(id: number): Promise<Ingredient[]> {
   const res = await request<Ingredient[]>(`/products/${id}/ingredients`);
   if (res.error) throw new Error(res.error);

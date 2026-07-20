@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -12,6 +13,7 @@ import (
 	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/pratoOnline/backend/internal/util"
 )
 
 var validate = validator.New()
@@ -19,41 +21,19 @@ var validate = validator.New()
 type AuthHandler struct {
 	authService *service.AuthService
 	userRepo    ports.UserRepository
+	sanitizer   *util.Sanitizer
 }
 
 func NewAuthHandler(authService *service.AuthService, userRepo ports.UserRepository) *AuthHandler {
-	return &AuthHandler{authService: authService, userRepo: userRepo}
+	return &AuthHandler{
+		authService: authService,
+		userRepo:    userRepo,
+		sanitizer:   util.NewSanitizer(),
+	}
 }
 
-// --- POST /api/auth/register ---
-
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var input service.RegisterInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
-		return
-	}
-	if err := validate.Struct(input); err != nil {
-		jsonValidationError(w, err)
-		return
-	}
-
-	user, err := h.authService.Register(r.Context(), input)
-	if err != nil {
-		if errors.Is(err, service.ErrEmailAlreadyExists) {
-			jsonError(w, "este e-mail já está cadastrado. Tente fazer login ou use outro e-mail.", http.StatusConflict)
-			return
-		}
-		jsonError(w, "não foi possível criar a conta. Tente novamente.", http.StatusInternalServerError)
-		return
-	}
-
-	jsonResponse(w, http.StatusCreated, map[string]interface{}{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
-	})
-}
+// --- POST /api/auth/register (REMOVED - Sprint 3) ---
+// Public registration has been removed. Companies are now created by platform administrators only.
 
 // --- POST /api/auth/login ---
 
@@ -63,6 +43,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
+
+	// Sanitize inputs (Sprint 3.4 - Security Hardening)
+	sanitizedEmail, err := h.sanitizer.SanitizeEmail(input.Email)
+	if err != nil {
+		jsonError(w, fmt.Sprintf("email inválido: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	input.Email = sanitizedEmail
+
 	if err := validate.Struct(input); err != nil {
 		jsonValidationError(w, err)
 		return
@@ -79,12 +68,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Seta o JWT como Cookie HttpOnly — nunca exposto ao JavaScript
+	secureCookie := os.Getenv("ENVIRONMENT") == "production"
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    result.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false, // true em produção (HTTPS)
+		Secure:   secureCookie,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
@@ -158,6 +148,22 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
 		return
 	}
+
+	// Sanitize inputs (Sprint 3.4 - Security Hardening)
+	sanitizedName, err := h.sanitizer.SanitizeName(input.Name)
+	if err != nil {
+		jsonError(w, fmt.Sprintf("nome inválido: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	input.Name = sanitizedName
+
+	sanitizedEmail, err := h.sanitizer.SanitizeEmail(input.Email)
+	if err != nil {
+		jsonError(w, fmt.Sprintf("email inválido: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	input.Email = sanitizedEmail
+
 	if err := validate.Struct(input); err != nil {
 		jsonValidationError(w, err)
 		return
@@ -210,6 +216,68 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "senha alterada com sucesso"})
+}
+
+// --- POST /api/auth/request-password-reset ---
+
+func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var input service.RequestPasswordResetInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
+		return
+	}
+
+	// Sanitize inputs (Sprint 3.4 - Security Hardening)
+	sanitizedEmail, err := h.sanitizer.SanitizeEmail(input.Email)
+	if err != nil {
+		jsonError(w, fmt.Sprintf("email inválido: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	input.Email = sanitizedEmail
+
+	if err := validate.Struct(input); err != nil {
+		jsonValidationError(w, err)
+		return
+	}
+
+	err = h.authService.RequestPasswordReset(r.Context(), input)
+	if err != nil {
+		jsonError(w, "não foi possível solicitar recuperação de senha. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+
+	// Always return success to avoid email enumeration
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "se o e-mail estiver cadastrado, você receberá instruções para recuperar sua senha"})
+}
+
+// --- POST /api/auth/reset-password ---
+
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var input service.ResetPasswordInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
+		return
+	}
+	if err := validate.Struct(input); err != nil {
+		jsonValidationError(w, err)
+		return
+	}
+
+	err := h.authService.ResetPassword(r.Context(), input)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidResetToken) {
+			jsonError(w, "token inválido ou expirado. Solicite uma nova recuperação de senha.", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, service.ErrResetTokenAlreadyUsed) {
+			jsonError(w, "este token já foi utilizado. Solicite uma nova recuperação de senha.", http.StatusBadRequest)
+			return
+		}
+		jsonError(w, "não foi possível redefinir a senha. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "senha redefinida com sucesso"})
 }
 
 // --- helpers de resposta ---

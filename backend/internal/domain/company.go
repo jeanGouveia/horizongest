@@ -26,4 +26,9 @@ type Company struct {
 	DeletedAt *time.Time // "O registro foi removido logicamente"
 	CreatedAt time.Time
 	UpdatedAt time.Time
+
+	// Plan and Status (Sprint 3.2)
+	PlanID      *uint      `json:"plan_id,omitempty" gorm:"index"`
+	Status      string     `json:"status" gorm:"size:20;default:'active'"` // active, trial, suspended, cancelled
+	TrialEndsAt *time.Time `json:"trial_ends_at,omitempty"`
 }

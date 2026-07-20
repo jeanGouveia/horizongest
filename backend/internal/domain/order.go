@@ -18,7 +18,7 @@ type Order struct {
 	Status     OrderStatus
 	TotalPrice float64
 	Notes      string
-	CompanyID  *uint      // ID da empresa/tenant (null para compatibilidade com Core V1)
+	CompanyID  uint       // ID da empresa/tenant (obrigatório - Sprint 3)
 	DeletedAt  *time.Time // "O registro foi removido logicamente"
 	CreatedAt  time.Time
 	UpdatedAt  time.Time

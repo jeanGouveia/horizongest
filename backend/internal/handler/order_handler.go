@@ -100,3 +100,31 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 	jsonResponse(w, http.StatusOK, order)
 }
+
+// PUT /api/orders/{id}
+func (h *OrderHandler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r, "id")
+	if err != nil {
+		jsonError(w, "ID do pedido inválido. Verifique o valor informado.", http.StatusBadRequest)
+		return
+	}
+	var in service.UpdateOrderInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		jsonError(w, "formato dos dados inválido. Verifique o JSON enviado.", http.StatusBadRequest)
+		return
+	}
+	if err := validate.Struct(in); err != nil {
+		jsonValidationError(w, err)
+		return
+	}
+	order, err := h.svc.UpdateOrder(r.Context(), id, in)
+	if err != nil {
+		if errors.Is(err, service.ErrOrderNotFound) {
+			jsonError(w, "pedido não encontrado. Verifique o ID informado.", http.StatusNotFound)
+			return
+		}
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonResponse(w, http.StatusOK, order)
+}

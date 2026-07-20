@@ -13,16 +13,16 @@ import (
 )
 
 type GormUserModel struct {
-	ID           uint    `gorm:"primaryKey;autoIncrement"`
-	Name         string  `gorm:"not null"`
-	Email        string  `gorm:"uniqueIndex;not null"`
-	PasswordHash string  `gorm:"not null"`
-	Active       bool    `gorm:"not null;default:true"`
-	CompanyID    *uint   `gorm:"index"` // Nullable for Core V1 compatibility
-	Role         *string `gorm:"index"` // Nullable for Core V1 compatibility
-	DeletedAt    *int64  `gorm:"index"`
-	CreatedAt    int64   `gorm:"autoCreateTime"`
-	UpdatedAt    int64   `gorm:"autoUpdateTime"`
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	Name         string `gorm:"not null"`
+	Email        string `gorm:"uniqueIndex;not null"`
+	PasswordHash string `gorm:"not null"`
+	Active       bool   `gorm:"not null;default:true"`
+	CompanyID    uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
+	Role         string `gorm:"index;not null"` // Sprint 3: NOT NULL
+	DeletedAt    *int64 `gorm:"index"`
+	CreatedAt    int64  `gorm:"autoCreateTime"`
+	UpdatedAt    int64  `gorm:"autoUpdateTime"`
 }
 
 func (GormUserModel) TableName() string { return "users" }
@@ -38,10 +38,14 @@ func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 }
 
 func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) error {
+	role := user.Role.String()
 	model := GormUserModel{
 		Name:         user.Name,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
+		Active:       user.Active,
+		CompanyID:    user.CompanyID,
+		Role:         role,
 	}
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return fmt.Errorf("UserRepository.Create: %w", err)
@@ -77,17 +81,15 @@ func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 }
 
 func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) error {
+	role := user.Role.String()
 	model := GormUserModel{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		CompanyID: user.CompanyID,
-		Role:      nil, // Will be set below
-	}
-
-	if user.Role != nil {
-		role := user.Role.String()
-		model.Role = &role
+		ID:           user.ID,
+		Name:         user.Name,
+		Email:        user.Email,
+		PasswordHash: user.PasswordHash,
+		Active:       user.Active,
+		CompanyID:    user.CompanyID,
+		Role:         role,
 	}
 
 	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
@@ -117,12 +119,7 @@ func toDomainUser(m *GormUserModel) *domain.User {
 		deletedAt = &dt
 	}
 
-	var role *domain.Role
-	if m.Role != nil {
-		if r, ok := domain.ParseRole(*m.Role); ok {
-			role = &r
-		}
-	}
+	role, _ := domain.ParseRole(m.Role)
 
 	return &domain.User{
 		ID:           m.ID,

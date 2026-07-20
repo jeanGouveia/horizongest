@@ -89,6 +89,9 @@
       <p class="auth-link">
         Não tem conta? <a href="/register">Cadastrar</a>
       </p>
+      <p class="auth-link">
+        <a href="/forgot-password">Esqueci minha senha</a>
+      </p>
     </div>
   </div>
 </PageContainer>

@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/handler"
@@ -43,12 +44,26 @@ func main() {
 	mediaRepo := repository.NewGormMediaRepository(db)
 	dashboardRepo := repository.NewGormDashboardRepository(db)
 	companyRepo := repository.NewGormCompanyRepository(db)
+	tokenBlacklistRepo := repository.NewGormTokenBlacklistRepository(db)
+	passwordResetRepo := repository.NewGormPasswordResetRepository(db)
+	stockMovementRepo := repository.NewGormStockMovementRepository(db)
 
-	authSvc := service.NewAuthService(userRepo)
+	// Platform repositories (Sprint 3.2)
+	platformUserRepo := repository.NewGormPlatformUserRepository(db)
+	platformSessionRepo := repository.NewGormPlatformSessionRepository(db)
+	platformAuditRepo := repository.NewGormPlatformAuditRepository(db)
+	planRepo := repository.NewGormPlanRepository(db)
+
+	// JWT secrets (Sprint 3.4 - Security Hardening)
+	jwtPlatformSecret := getEnv("JWT_PLATFORM_SECRET", "your-platform-secret-key-change-in-production")
+	jwtTenantSecret := getEnv("JWT_TENANT_SECRET", "your-tenant-secret-key-change-in-production")
+
+	authSvc := service.NewAuthService(userRepo, companyRepo, tokenBlacklistRepo, passwordResetRepo, jwtTenantSecret)
 	productSvc := service.NewProductService(productRepo)
 	categorySvc := service.NewCategoryService(categoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
+	stockMovementSvc := service.NewStockMovementService(stockMovementRepo, productRepo)
 	mediaSvc := service.NewMediaService(mediaRepo)
 	companySvc := service.NewCompanyService(companyRepo)
 	companySettingsSvc := service.NewCompanySettingsService(companyRepo, userRepo)
@@ -57,11 +72,28 @@ func main() {
 	rbacSvc := service.NewRBACService(userRepo)
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 
+	// Platform services (Sprint 3.2)
+	sessionDuration := 24 * time.Hour
+	platformAuthSvc := service.NewPlatformAuthService(platformUserRepo, platformSessionRepo, jwtPlatformSecret, sessionDuration, bcrypt.DefaultCost)
+	emailSvc := service.NewEmailService(false, "noreply@pratoonline.com") // Email disabled by default
+	platformSvc := service.NewPlatformService(companyRepo, userRepo, platformUserRepo, platformAuditRepo, emailSvc)
+	planSvc := service.NewPlanService(planRepo)
+	backupSvc := service.NewBackupService(
+		getEnv("DB_HOST", "localhost"),
+		getEnv("DB_PORT", "3306"),
+		getEnv("DB_USER", "root"),
+		getEnv("DB_PASSWORD", ""),
+		getEnv("DB_NAME", "pratoonline"),
+		getEnv("BACKUP_DIR", "./backups"),
+	)
+	exportSvc := service.NewExportService(companyRepo, userRepo, getEnv("EXPORT_DIR", "./exports"))
+
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	productHandler := handler.NewProductHandler(productSvc)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	stockAdjustmentHandler := handler.NewStockAdjustmentHandler(stockAdjustmentSvc)
+	stockMovementHandler := handler.NewStockMovementHandler(stockMovementSvc)
 	mediaHandler := handler.NewMediaHandler(mediaSvc)
 	dashboardHandler := handler.NewDashboardHandler(dashboardRepo)
 	companyHandler := handler.NewCompanyHandler(companySvc)
@@ -70,9 +102,20 @@ func main() {
 	businessHandler := handler.NewBusinessHandler(businessSvc)
 	userManagementHandler := handler.NewUserManagementHandler(userManagementSvc, userRepo)
 	systemHandler := handler.NewSystemHandler()
+
+	// Platform handlers (Sprint 3.2)
+	platformAuthHandler := handler.NewPlatformAuthHandler(platformAuthSvc)
+	platformCompanyHandler := handler.NewPlatformCompanyHandler(platformSvc)
+	platformDashboardHandler := handler.NewPlatformDashboardHandler(platformSvc)
+	planHandler := handler.NewPlanHandler(planSvc)
+	backupHandler := handler.NewBackupHandler(backupSvc)
+	exportHandler := handler.NewExportHandler(exportSvc)
+
 	authMw := middleware.NewAuthMiddleware(authSvc)
 	tenantMw := middleware.NewTenantMiddleware(userRepo)
-	roleMw := middleware.NewRoleMiddleware(rbacSvc) // Infrastructure for Sprint 7
+	roleMw := middleware.NewRoleMiddleware(rbacSvc)                         // Infrastructure for Sprint 7
+	platformAuthMw := middleware.NewPlatformAuthMiddleware(platformAuthSvc) // Sprint 3.2
+	rateLimiter := middleware.NewRateLimiter(5, 30)                         // 5 req/min per IP, 30 req/hour per user (Sprint 3.4)
 
 	// --- Router ---
 	r := chi.NewRouter()
@@ -81,6 +124,7 @@ func main() {
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
+	r.Use(middleware.SecurityHeaders) // Sprint 3.4 - Security headers
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.Timeout(30 * time.Second))
 
@@ -95,10 +139,77 @@ func main() {
 		systemHandler.RegisterRoutes(r)
 	})
 
+	// Platform routes (Sprint 3.2)
+	r.Route("/api/platform/auth", func(r chi.Router) {
+		r.Use(rateLimiter.RateLimitByIP) // Sprint 3.4 - Rate limiting
+		r.Post("/login", platformAuthHandler.Login)
+		r.Post("/logout", platformAuthHandler.Logout)
+		r.Get("/me", platformAuthHandler.Me)
+	})
+
+	r.Route("/api/platform/dashboard", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Get("/stats", platformDashboardHandler.GetStats)
+	})
+
+	r.Route("/api/platform/companies", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Post("/", platformCompanyHandler.CreateCompany)
+		r.Get("/", platformCompanyHandler.ListCompanies)
+		r.Get("/{id}", platformCompanyHandler.GetCompany)
+		r.Put("/{id}", platformCompanyHandler.UpdateCompany)
+		r.Post("/{id}/deactivate", platformCompanyHandler.DeactivateCompany)
+		r.Post("/{id}/activate", platformCompanyHandler.ActivateCompany)
+		r.Get("/{id}/owner", platformCompanyHandler.GetCompanyOwner)
+		r.Post("/{id}/owner/reset-password", platformCompanyHandler.ResetOwnerPassword)
+		r.Post("/{id}/login-as", platformCompanyHandler.LoginAsCompany)
+		r.Post("/{id}/trial", platformCompanyHandler.SetCompanyTrial)
+		r.Post("/{id}/suspend", platformCompanyHandler.SuspendCompany)
+		r.Post("/{id}/cancel", platformCompanyHandler.CancelCompany)
+		r.Post("/{id}/reactivate", platformCompanyHandler.ReactivateCompany)
+	})
+
+	r.Route("/api/platform/users", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Post("/{id}/block", platformCompanyHandler.BlockUser)
+		r.Post("/{id}/unblock", platformCompanyHandler.UnblockUser)
+	})
+
+	r.Route("/api/platform/plans", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Post("/", planHandler.CreatePlan)
+		r.Get("/", planHandler.ListPlans)
+		r.Get("/active", planHandler.ListActivePlans)
+		r.Get("/{id}", planHandler.GetPlan)
+		r.Put("/{id}", planHandler.UpdatePlan)
+		r.Delete("/{id}", planHandler.DeletePlan)
+	})
+
+	r.Route("/api/platform/backup", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Post("/", backupHandler.CreateBackup)
+		r.Get("/", backupHandler.ListBackups)
+		r.Delete("/", backupHandler.DeleteBackup)
+	})
+
+	r.Route("/api/platform/export", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Post("/companies", exportHandler.ExportCompanies)
+		r.Post("/users", exportHandler.ExportUsers)
+	})
+
 	r.Route("/api/auth", func(r chi.Router) {
-		r.Post("/register", authHandler.Register)
+		r.Use(rateLimiter.RateLimitByIP) // Sprint 3.4 - Rate limiting
 		r.Post("/login", authHandler.Login)
 		r.Post("/logout", authHandler.Logout)
+		r.Post("/request-password-reset", authHandler.RequestPasswordReset)
+		r.Post("/reset-password", authHandler.ResetPassword)
 	})
 
 	// --- Rotas privadas (protegidas pelo AuthMiddleware) ---
@@ -113,7 +224,7 @@ func main() {
 		r.Post("/api/me/change-password", authHandler.ChangePassword)
 
 		// Empresas (Tenant Engine - Platform 2.0)
-		r.Post("/api/companies", companyHandler.CreateCompany)
+		// REMOVED: POST /api/companies - Company creation is platform-only (Sprint 3.2)
 		r.Get("/api/companies", companyHandler.ListCompanies)
 		r.Get("/api/companies/{id}", companyHandler.GetCompany)
 		r.Put("/api/companies/{id}", companyHandler.UpdateCompany)
@@ -132,6 +243,7 @@ func main() {
 			r.Get("/api/company/users/{id}", userManagementHandler.GetUser)
 			r.Post("/api/company/users/add", userManagementHandler.AddUser)
 			r.Put("/api/company/users/{id}/role", userManagementHandler.ChangeRole)
+			r.Put("/api/company/users/{id}/active", userManagementHandler.SetUserActive)
 			r.Delete("/api/company/users/{id}", userManagementHandler.RemoveUser)
 		})
 
@@ -150,6 +262,8 @@ func main() {
 		r.Get("/api/products/{id}", productHandler.GetProduct)
 		r.Put("/api/products/{id}", productHandler.UpdateProduct)
 		r.Delete("/api/products/{id}", productHandler.DeleteProduct)
+		r.Post("/api/products/{id}/duplicate", productHandler.DuplicateProduct)
+		r.Post("/api/products/{id}/archive", productHandler.ArchiveProduct)
 		r.Put("/api/products/{id}/ingredients", productHandler.SetProductIngredients)
 		r.Get("/api/products/{id}/ingredients", productHandler.GetProductIngredients)
 
@@ -172,12 +286,16 @@ func main() {
 		r.Post("/api/orders", orderHandler.CreateOrder)
 		r.Get("/api/orders", orderHandler.ListOrders)
 		r.Get("/api/orders/{id}", orderHandler.GetOrder)
+		r.Put("/api/orders/{id}", orderHandler.UpdateOrder)
 		r.Patch("/api/orders/{id}/status", orderHandler.UpdateOrderStatus)
 
 		// Ajustes de Estoque
 		r.Get("/api/stock-adjustments/pending", stockAdjustmentHandler.ListPendingAdjustments)
 		r.Post("/api/stock-adjustments/{id}/approve", stockAdjustmentHandler.ApproveAdjustment)
 		r.Post("/api/stock-adjustments/{id}/reject", stockAdjustmentHandler.RejectAdjustment)
+
+		// Stock Movements (Sprint 4)
+		stockMovementHandler.RegisterRoutes(r)
 
 		// Mídia
 		r.Post("/api/media/upload", mediaHandler.UploadMedia)

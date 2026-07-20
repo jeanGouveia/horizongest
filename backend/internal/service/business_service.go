@@ -28,28 +28,28 @@ func (s *BusinessService) GetBusinessProfile(ctx context.Context, userID uint) (
 	if err != nil {
 		return nil, fmt.Errorf("BusinessService.GetBusinessProfile: failed to get user: %w", err)
 	}
-	
+
 	if user == nil {
 		// User not found, return default profile
 		return domain.DefaultBusinessProfile(), nil
 	}
-	
-	// If user has no company, return default profile
-	if user.CompanyID == nil {
+
+	// If user has no company (CompanyID = 0), return default profile
+	if user.CompanyID == 0 {
 		return domain.DefaultBusinessProfile(), nil
 	}
-	
+
 	// Get company to retrieve business profile
-	company, err := s.companyRepo.FindByID(ctx, *user.CompanyID)
+	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
 		return nil, fmt.Errorf("BusinessService.GetBusinessProfile: failed to get company: %w", err)
 	}
-	
+
 	if company == nil {
 		// Company not found, return default profile
 		return domain.DefaultBusinessProfile(), nil
 	}
-	
+
 	// Create business profile from company
 	return domain.BusinessProfileFromCompany(company), nil
 }

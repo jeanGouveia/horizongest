@@ -4,6 +4,8 @@ import type { Handle } from '@sveltejs/kit';
 // Aqui validamos o cookie e populamos event.locals.user
 // para que os layouts e pages acessem sem refazer fetch.
 
+const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
+
 export const handle: Handle = async ({ event, resolve }) => {
   const token = event.cookies.get('auth_token');
 
@@ -11,7 +13,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     try {
       // Chama o próprio backend Go para validar o token
       // (o cookie é repassado manualmente pois estamos no servidor Node)
-      const res = await fetch('http://localhost:8080/api/me', {
+      const res = await fetch(`${backendUrl}/api/me`, {
         headers: { Cookie: `auth_token=${token}` }
       });
 

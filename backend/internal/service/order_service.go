@@ -72,6 +72,11 @@ type UpdateOrderStatusInput struct {
 	Status string `json:"status" validate:"required,oneof=pending confirmed preparing ready delivered cancelled"`
 }
 
+type UpdateOrderInput struct {
+	Items []OrderItemInput `json:"items" validate:"required,min=1,dive"`
+	Notes string           `json:"notes"`
+}
+
 // ── Operações ────────────────────────────────────────────────────────────────
 
 func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*domain.Order, error) {
@@ -280,6 +285,86 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 
 	order.Status = newStatus
 	return order, nil
+}
+
+// UpdateOrder allows editing order items and notes
+// Only allowed for orders in pending or confirmed status
+func (s *OrderService) UpdateOrder(ctx context.Context, id uint, in UpdateOrderInput) (*domain.Order, error) {
+	log.Printf("[SERVICE] UpdateOrder chamado: order_id=%d", id)
+
+	order, err := s.orderRepo.FindOrderByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("OrderService.UpdateOrder: %w", err)
+	}
+	if order == nil {
+		return nil, ErrOrderNotFound
+	}
+
+	// Only allow editing pending or confirmed orders
+	if order.Status != domain.OrderStatusPending && order.Status != domain.OrderStatusConfirmed {
+		return nil, errors.New("não é possível editar pedidos que não estejam pendentes ou confirmados")
+	}
+
+	// Pre-load products and ingredients
+	productData := make(map[uint]*domain.Product)
+	productIngredients := make(map[uint][]domain.ProductIngredient)
+
+	for _, itemIn := range in.Items {
+		p, err := s.productRepo.FindProductByID(ctx, itemIn.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("OrderService.UpdateOrder: buscar produto: %w", err)
+		}
+		if p == nil || !p.Active {
+			return nil, fmt.Errorf("produto id=%d não encontrado ou inativo", itemIn.ProductID)
+		}
+		productData[itemIn.ProductID] = p
+
+		ingredients, err := s.productRepo.GetProductIngredients(ctx, itemIn.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("OrderService.UpdateOrder: ficha técnica produto_id=%d: %w", itemIn.ProductID, err)
+		}
+		productIngredients[itemIn.ProductID] = ingredients
+	}
+
+	// Calculate new total and build items
+	var total float64
+	items := make([]domain.OrderItem, len(in.Items))
+	for i, itemIn := range in.Items {
+		p := productData[itemIn.ProductID]
+		items[i] = domain.OrderItem{
+			ProductID:             p.ID,
+			Quantity:              itemIn.Quantity,
+			UnitPrice:             p.Price,
+			ProductName:           p.Name,
+			ProductDescription:    p.Description,
+			ProductIsComposto:     p.IsComposto,
+			ProductPhotoURL:       p.PhotoURL,
+			ProductCategoryID:     p.CategoryID,
+			ProductPromotionPrice: p.PromotionPrice,
+			ProductFeatured:       p.Featured,
+			ProductIsNew:          p.IsNew,
+		}
+		total += p.Price * itemIn.Quantity
+	}
+
+	// Validate stock for new items
+	insufficientIngredients := s.validateStock(ctx, in.Items, productIngredients)
+	if len(insufficientIngredients) > 0 {
+		return nil, NewInsufficientStockError(insufficientIngredients)
+	}
+
+	// Update order with transaction to handle stock adjustments
+	if err := s.orderRepo.UpdateOrder(ctx, id, items, total, in.Notes, productIngredients); err != nil {
+		return nil, fmt.Errorf("OrderService.UpdateOrder: %w", err)
+	}
+
+	// Reload order to return updated state
+	updatedOrder, err := s.orderRepo.FindOrderByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("OrderService.UpdateOrder: reload order: %w", err)
+	}
+
+	return updatedOrder, nil
 }
 
 // isValidTransition valida se a transição entre status é permitida

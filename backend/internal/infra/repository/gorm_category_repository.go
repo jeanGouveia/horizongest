@@ -20,7 +20,7 @@ type GormCategory struct {
 	Description  string `gorm:"type:text"`
 	DisplayOrder int    `gorm:"not null;default:0"`
 	Active       bool   `gorm:"not null;default:true"`
-	CompanyID    *uint  `gorm:"index"` // Nullable for Core V1 compatibility
+	CompanyID    uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
 	DeletedAt    *int64 `gorm:"index"`
 	CreatedAt    int64  `gorm:"autoCreateTime"`
 	UpdatedAt    int64  `gorm:"autoUpdateTime"`

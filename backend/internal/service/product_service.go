@@ -279,8 +279,8 @@ func (s *ProductService) UpdateProduct(ctx context.Context, id uint, in UpdatePr
 	p.SKU = in.SKU
 	p.InternalNotes = in.InternalNotes
 
-	// Gerar slug automaticamente se não fornecido ou se nome mudou
-	if in.Slug == "" || in.Slug != p.Slug {
+	// Gerar slug automaticamente se não fornecido
+	if in.Slug == "" {
 		p.Slug = generateSlug(in.Name)
 	} else {
 		p.Slug = in.Slug
@@ -412,4 +412,90 @@ func (s *ProductService) SetProductIngredients(
 		}
 	}
 	return s.repo.SetProductIngredients(ctx, productID, items)
+}
+
+// DuplicateProduct creates a copy of an existing product
+func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain.Product, error) {
+	// Get the original product
+	original, err := s.repo.FindProductByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("ProductService.DuplicateProduct: %w", err)
+	}
+	if original == nil {
+		return nil, ErrProductNotFound
+	}
+
+	// Get original ingredients
+	ingredients, err := s.repo.GetProductIngredients(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("ProductService.DuplicateProduct: failed to get ingredients: %w", err)
+	}
+
+	// Create duplicate with modified name
+	duplicate := &domain.Product{
+		Name:                   original.Name + " (Cópia)",
+		Description:            original.Description,
+		Price:                  original.Price,
+		IsComposto:             original.IsComposto,
+		Active:                 true, // Always activate duplicates
+		PhotoURL:               original.PhotoURL,
+		CategoryID:             original.CategoryID,
+		DisplayOrder:           original.DisplayOrder,
+		PreparationTimeMinutes: original.PreparationTimeMinutes,
+		Featured:               false, // Reset featured flag
+		IsNew:                  true,  // Mark as new
+		PromotionPrice:         nil,   // Reset promotions
+		PromotionStart:         nil,
+		PromotionEnd:           nil,
+		AvailableFrom:          original.AvailableFrom,
+		AvailableUntil:         original.AvailableUntil,
+		SKU:                    "", // Reset SKU
+		InternalNotes:          original.InternalNotes,
+		Slug:                   generateSlug(original.Name + "-copia"),
+		MetaTitle:              original.MetaTitle,
+		MetaDescription:        original.MetaDescription,
+		AltImage:               original.AltImage,
+		Canonical:              original.Canonical,
+		ExternalID:             original.ExternalID,
+		MarketplaceID:          original.MarketplaceID,
+		SyncStatus:             original.SyncStatus,
+	}
+
+	if err := s.repo.CreateProduct(ctx, duplicate); err != nil {
+		return nil, fmt.Errorf("ProductService.DuplicateProduct: failed to create duplicate: %w", err)
+	}
+
+	// Copy ingredients if it's a composite product
+	if len(ingredients) > 0 {
+		duplicateIngredients := make([]domain.ProductIngredient, len(ingredients))
+		for i, ing := range ingredients {
+			duplicateIngredients[i] = domain.ProductIngredient{
+				ProductID:    duplicate.ID,
+				IngredientID: ing.IngredientID,
+				Quantity:     ing.Quantity,
+			}
+		}
+		if err := s.repo.SetProductIngredients(ctx, duplicate.ID, duplicateIngredients); err != nil {
+			return nil, fmt.Errorf("ProductService.DuplicateProduct: failed to copy ingredients: %w", err)
+		}
+	}
+
+	return duplicate, nil
+}
+
+// ArchiveProduct sets a product's active status to false
+func (s *ProductService) ArchiveProduct(ctx context.Context, id uint) error {
+	p, err := s.repo.FindProductByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("ProductService.ArchiveProduct: %w", err)
+	}
+	if p == nil {
+		return ErrProductNotFound
+	}
+
+	p.Active = false
+	if err := s.repo.UpdateProduct(ctx, p); err != nil {
+		return fmt.Errorf("ProductService.ArchiveProduct: %w", err)
+	}
+	return nil
 }

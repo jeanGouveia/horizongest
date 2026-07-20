@@ -30,4 +30,16 @@ type OrderRepository interface {
 		productIngredients map[uint][]domain.ProductIngredient,
 		orderItems []domain.OrderItem,
 	) error
+
+	// UpdateOrder atualiza os itens e notas de um pedido existente
+	// Ajusta o estoque automaticamente para refletir as mudanças nos itens
+	// productIngredients é um mapa de product_id -> ingredientes pré-carregados
+	UpdateOrder(
+		ctx context.Context,
+		id uint,
+		items []domain.OrderItem,
+		total float64,
+		notes string,
+		productIngredients map[uint][]domain.ProductIngredient,
+	) error
 }

@@ -5,18 +5,16 @@ package domain
 type Role string
 
 const (
-	RoleOwner   Role = "owner"   // Full access to everything, can manage other users
-	RoleAdmin   Role = "admin"   // Full access except cannot alter Owner role
-	RoleManager Role = "manager" // Can manage orders, products, and view reports
-	RoleCashier Role = "cashier" // Can manage orders and payments
-	RoleKitchen Role = "kitchen" // Can view and manage kitchen orders
-	RoleWaiter  Role = "waiter"  // Can view and manage waiter orders
+	RoleOwner    Role = "owner"    // Full access to everything, can manage other users
+	RoleAdmin    Role = "admin"    // Full access except cannot alter Owner role
+	RoleManager  Role = "manager"  // Can manage orders, products, and view reports
+	RoleEmployee Role = "employee" // Limited operational access
 )
 
 // IsValid checks if the role is valid
 func (r Role) IsValid() bool {
 	switch r {
-	case RoleOwner, RoleAdmin, RoleManager, RoleCashier, RoleKitchen, RoleWaiter:
+	case RoleOwner, RoleAdmin, RoleManager, RoleEmployee:
 		return true
 	default:
 		return false
@@ -37,12 +35,8 @@ func (r Role) DisplayName() string {
 		return "Administrador"
 	case RoleManager:
 		return "Gerente"
-	case RoleCashier:
-		return "Caixa"
-	case RoleKitchen:
-		return "Cozinha"
-	case RoleWaiter:
-		return "Garçom"
+	case RoleEmployee:
+		return "Funcionário"
 	default:
 		return "Desconhecido"
 	}
@@ -54,9 +48,7 @@ func AllRoles() []Role {
 		RoleOwner,
 		RoleAdmin,
 		RoleManager,
-		RoleCashier,
-		RoleKitchen,
-		RoleWaiter,
+		RoleEmployee,
 	}
 }
 

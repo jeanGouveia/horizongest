@@ -83,8 +83,7 @@ func (s *MediaService) UploadMedia(
 		return nil, fmt.Errorf("UploadMedia: salvar arquivo: %w", err)
 	}
 
-	// TODO: Implementar compressão e thumbnail
-	// Por enquanto, salvar sem processamento
+	// Thumbnail generation to be implemented in future sprint
 	thumbnailPath := ""
 
 	// Criar registro no banco

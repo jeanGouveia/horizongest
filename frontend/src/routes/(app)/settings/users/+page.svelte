@@ -145,6 +145,18 @@
     }
   }
 
+  async function toggleUserActive(userId: number, currentActive: boolean) {
+    try {
+      const res = await api.companyUsers.setActive(userId, { active: !currentActive });
+      if (res.error) throw new Error(res.error);
+      success = true;
+      await loadUsers();
+      setTimeout(() => (success = false), 3000);
+    } catch (e: any) {
+      error = e?.message ?? 'Erro ao alterar status do usuário.';
+    }
+  }
+
   function openRoleModal(user: any) {
     selectedUser = user;
     newRole = user.role || '';
@@ -253,10 +265,13 @@
                   </td>
                   <td>
                     <div class="actions">
-                      <Button onclick={() => openRoleModal(user)} variant="ghost" size="sm">
+                      <Button onclick={() => openRoleModal(user)} variant="ghost" size="sm" title="Alterar cargo">
                         <Shield size={16} />
                       </Button>
-                      <Button onclick={() => removeUser(user.id)} variant="ghost" size="sm">
+                      <Button onclick={() => toggleUserActive(user.id, user.active)} variant="ghost" size="sm" title={user.active ? 'Desativar usuário' : 'Ativar usuário'}>
+                        {user.active ? '🔴' : '🟢'}
+                      </Button>
+                      <Button onclick={() => removeUser(user.id)} variant="ghost" size="sm" title="Remover usuário">
                         <Trash2 size={16} />
                       </Button>
                     </div>

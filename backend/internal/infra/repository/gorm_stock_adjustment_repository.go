@@ -21,7 +21,7 @@ type GormStockAdjustmentPending struct {
 	Quantity        float64 `gorm:"not null"`
 	OrderStatus     string  `gorm:"not null"`
 	Status          string  `gorm:"not null;default:'pending';index"`
-	CompanyID       *uint   `gorm:"index"` // Nullable for Core V1 compatibility
+	CompanyID       uint    `gorm:"index;not null"` // Sprint 3: NOT NULL
 	CreatedAt       int64   `gorm:"autoCreateTime"`
 	ProcessedAt     *int64  `gorm:"index"`
 	ProcessedBy     *uint   `gorm:"index"`

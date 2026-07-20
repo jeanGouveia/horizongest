@@ -1,6 +1,8 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+const backendUrl = process.env.VITE_BACKEND_URL || 'http://localhost:8080';
+
 export default defineConfig({
   plugins: [sveltekit()],
   server: {
@@ -8,12 +10,12 @@ export default defineConfig({
     proxy: {
       // Todo /api/* é repassado ao Go — mesmo domínio, sem CORS
       '/api': {
-        target: 'http://localhost:8080',
+        target: backendUrl,
         changeOrigin: true
       },
       // Arquivos estáticos de upload (imagens)
       '/uploads': {
-        target: 'http://localhost:8080',
+        target: backendUrl,
         changeOrigin: true
       }
     }

@@ -25,6 +25,9 @@
 		if (path === '/products') return 'Produtos';
 		if (path === '/ingredients') return 'Ingredientes';
 		if (path === '/stock-adjustments') return 'Ajustes de Estoque';
+		if (path === '/settings/company') return 'Empresa';
+		if (path === '/settings/users') return 'Usuários';
+		if (path === '/settings/invitations') return 'Convites';
 		if (path === '/profile') return 'Perfil';
 		return '';
 	});

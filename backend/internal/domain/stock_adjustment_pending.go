@@ -23,7 +23,7 @@ type StockAdjustmentPending struct {
 	Quantity        float64               `json:"quantity"`     // Quantidade que poderia ser devolvida ao estoque
 	OrderStatus     string                `json:"order_status"` // Status do pedido no momento do cancelamento (para contexto)
 	Status          StockAdjustmentStatus `json:"status"`
-	CompanyID       *uint                 `json:"company_id,omitempty"` // ID da empresa/tenant (null para compatibilidade com Core V1)
+	CompanyID       uint                  `json:"company_id"` // ID da empresa/tenant (obrigatório - Sprint 3)
 	CreatedAt       time.Time             `json:"created_at"`
 	ProcessedAt     *time.Time            `json:"processed_at,omitempty"`     // Quando foi aprovado/rejeitado (null se pending)
 	ProcessedBy     *uint                 `json:"processed_by,omitempty"`     // ID do usuário que aprovou/rejeitou (null se pending)

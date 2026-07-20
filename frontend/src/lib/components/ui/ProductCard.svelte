@@ -11,9 +11,13 @@
     onArchive?: () => void;
     onToggleActive?: () => void;
     onToggleFeatured?: () => void;
+    loadingArchive?: boolean;
+    loadingToggleActive?: boolean;
+    loadingToggleFeatured?: boolean;
+    loadingDuplicate?: boolean;
   }
 
-  let { product, onClick, onEdit, onDuplicate, onArchive, onToggleActive, onToggleFeatured }: Props = $props();
+  let { product, onClick, onEdit, onDuplicate, onArchive, onToggleActive, onToggleFeatured, loadingArchive, loadingToggleActive, loadingToggleFeatured, loadingDuplicate }: Props = $props();
 
   let showMenu = $state(false);
 
@@ -84,17 +88,17 @@
           <button onclick={(e) => { e.stopPropagation(); showMenu = false; onEdit?.(); }}>
             Editar
           </button>
-          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onDuplicate?.(); }}>
-            Duplicar
+          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onDuplicate?.(); }} disabled={loadingDuplicate}>
+            {loadingDuplicate ? 'Duplicando...' : 'Duplicar'}
           </button>
-          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onToggleActive?.(); }}>
-            {product.Active ? 'Desativar' : 'Ativar'}
+          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onToggleActive?.(); }} disabled={loadingToggleActive}>
+            {loadingToggleActive ? 'Processando...' : (product.Active ? 'Desativar' : 'Ativar')}
           </button>
-          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onToggleFeatured?.(); }}>
-            {product.Featured ? 'Remover destaque' : 'Destacar'}
+          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onToggleFeatured?.(); }} disabled={loadingToggleFeatured}>
+            {loadingToggleFeatured ? 'Processando...' : (product.Featured ? 'Remover destaque' : 'Destacar')}
           </button>
-          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onArchive?.(); }}>
-            Arquivar
+          <button onclick={(e) => { e.stopPropagation(); showMenu = false; onArchive?.(); }} disabled={loadingArchive}>
+            {loadingArchive ? 'Arquivando...' : 'Arquivar'}
           </button>
         </div>
       {/if}

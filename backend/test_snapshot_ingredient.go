@@ -11,6 +11,7 @@ import (
 	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/database"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/repository"
+	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
 	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
 )
 
@@ -39,7 +40,13 @@ func main() {
 	// Cria services
 	stockAdjustmentService := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
 
-	ctx := context.Background()
+	// Create tenant context for testing
+	companyID := uint(1)
+	tenantCtx := &domain.TenantContext{
+		UserID:    1,
+		CompanyID: companyID, // Sprint 3: non-nullable
+	}
+	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
 
 	// PASSO 1: Criar Ingrediente
 	fmt.Println("=== PASSO 1: Criar Ingrediente ===")

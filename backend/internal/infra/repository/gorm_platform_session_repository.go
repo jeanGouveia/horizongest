@@ -1,0 +1,83 @@
+package repository
+
+import (
+	"context"
+	"time"
+
+	"gorm.io/gorm"
+
+	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+)
+
+type GormPlatformSession struct {
+	ID            uint   `gorm:"primaryKey;autoIncrement"`
+	PlatformUserID uint  `gorm:"not null;index"`
+	Token         string `gorm:"not null;uniqueIndex"`
+	ExpiresAt     int64  `gorm:"not null;index"`
+	CreatedAt     int64  `gorm:"autoCreateTime"`
+}
+
+func (GormPlatformSession) TableName() string {
+	return "platform_sessions"
+}
+
+type GormPlatformSessionRepository struct {
+	db *gorm.DB
+}
+
+func NewGormPlatformSessionRepository(db *gorm.DB) *GormPlatformSessionRepository {
+	return &GormPlatformSessionRepository{db: db}
+}
+
+func (r *GormPlatformSessionRepository) Create(ctx context.Context, session *domain.PlatformSession) error {
+	gormSession := r.toGorm(session)
+	if err := r.db.WithContext(ctx).Create(gormSession).Error; err != nil {
+		return err
+	}
+	session.ID = gormSession.ID
+	return nil
+}
+
+func (r *GormPlatformSessionRepository) FindByToken(ctx context.Context, token string) (*domain.PlatformSession, error) {
+	var gormSession GormPlatformSession
+	err := r.db.WithContext(ctx).Where("token = ?", token).First(&gormSession).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return r.toDomain(&gormSession), nil
+}
+
+func (r *GormPlatformSessionRepository) DeleteByToken(ctx context.Context, token string) error {
+	return r.db.WithContext(ctx).Where("token = ?", token).Delete(&GormPlatformSession{}).Error
+}
+
+func (r *GormPlatformSessionRepository) DeleteByPlatformUserID(ctx context.Context, platformUserID uint) error {
+	return r.db.WithContext(ctx).Where("platform_user_id = ?", platformUserID).Delete(&GormPlatformSession{}).Error
+}
+
+func (r *GormPlatformSessionRepository) DeleteExpired(ctx context.Context) error {
+	return r.db.WithContext(ctx).Where("expires_at < ?", time.Now().Unix()).Delete(&GormPlatformSession{}).Error
+}
+
+func (r *GormPlatformSessionRepository) toGorm(session *domain.PlatformSession) *GormPlatformSession {
+	return &GormPlatformSession{
+		ID:            session.ID,
+		PlatformUserID: session.PlatformUserID,
+		Token:         session.Token,
+		ExpiresAt:     session.ExpiresAt.Unix(),
+		CreatedAt:     session.CreatedAt.Unix(),
+	}
+}
+
+func (r *GormPlatformSessionRepository) toDomain(gormSession *GormPlatformSession) *domain.PlatformSession {
+	return &domain.PlatformSession{
+		ID:            gormSession.ID,
+		PlatformUserID: gormSession.PlatformUserID,
+		Token:         gormSession.Token,
+		ExpiresAt:     time.Unix(gormSession.ExpiresAt, 0),
+		CreatedAt:     time.Unix(gormSession.CreatedAt, 0),
+	}
+}

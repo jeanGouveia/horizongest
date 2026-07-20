@@ -70,7 +70,7 @@
     }
     
     if (form.promotion_price && form.promotion_price >= form.price) {
-      errors.promotion_price = 'Preço promocional deve ser menor que o preço normal';
+      errors.promotion_price = 'Preço promocional deve ser estritamente menor que o preço normal';
     }
     
     return Object.keys(errors).length === 0;

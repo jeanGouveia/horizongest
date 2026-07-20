@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { getOrder, updateOrderStatus } from '$lib/api/order';
+  import { getOrder, updateOrderStatus, updateOrder } from '$lib/api/order';
   import type { Order, OrderStatus } from '$lib/types/order';
   import { ORDER_STATUS_LABEL, ORDER_STATUS_COLOR } from '$lib/types/order';
   import { ConfirmDialog } from '$lib/components/ui';
@@ -14,6 +14,11 @@
   let updating = $state(false);
   let updateError = $state('');
   let showCancelConfirm = $state(false);
+  let showEditModal = $state(false);
+  let editItems = $state<{ product_id: number; quantity: number }[]>([]);
+  let editNotes = $state('');
+  let editSaving = $state(false);
+  let editError = $state('');
 
   onMount(async () => {
     loading = true;
@@ -97,6 +102,61 @@
       updating = false;
     }
   }
+
+  function openEditModal() {
+    if (!order) return;
+    editItems = order.Items.map(item => ({
+      product_id: item.ProductID,
+      quantity: item.Quantity
+    }));
+    editNotes = order.Notes || '';
+    editError = '';
+    showEditModal = true;
+  }
+
+  function closeEditModal() {
+    showEditModal = false;
+    editItems = [];
+    editNotes = '';
+    editError = '';
+  }
+
+  function addEditItem() {
+    editItems = [...editItems, { product_id: 0, quantity: 1 }];
+  }
+
+  function removeEditItem(index: number) {
+    editItems = editItems.filter((_, i) => i !== index);
+  }
+
+  function updateEditItem(index: number, field: 'product_id' | 'quantity', value: number) {
+    editItems = editItems.map((item, i) => 
+      i === index ? { ...item, [field]: value } : item
+    );
+  }
+
+  async function saveEdit() {
+    if (!order) return;
+    editSaving = true;
+    editError = '';
+    try {
+      const payload = {
+        items: editItems,
+        notes: editNotes
+      };
+      const updated = await updateOrder(orderId, payload);
+      order = updated;
+      closeEditModal();
+    } catch (e: any) {
+      editError = e?.message ?? 'Erro ao editar pedido.';
+    } finally {
+      editSaving = false;
+    }
+  }
+
+  const canEdit = $derived(
+    currentStatus === 'pending' || currentStatus === 'confirmed'
+  );
 </script>
 
 <div class="page-wrapper">
@@ -229,11 +289,19 @@
         {/if}
 
         <!-- Ações de status -->
-        {#if nextStatus || canCancel}
+        {#if nextStatus || canCancel || canEdit}
           <div class="status-actions-card">
             <h3 class="info-title">Ações</h3>
             {#if updateError}
               <p class="form-error">{updateError}</p>
+            {/if}
+            {#if canEdit}
+              <button
+                class="btn btn-secondary btn-full"
+                onclick={openEditModal}
+              >
+                ✏️ Editar Pedido
+              </button>
             {/if}
             {#if nextStatus}
               <button
@@ -275,6 +343,60 @@
     onConfirm={confirmCancel}
     onCancel={() => showCancelConfirm = false}
   />
+{/if}
+
+{#if showEditModal}
+  <div class="modal-overlay" onclick={closeEditModal}>
+    <div class="modal" onclick={(e) => e.stopPropagation()}>
+      <div class="modal-header">
+        <h3>Editar Pedido</h3>
+        <button class="modal-close" onclick={closeEditModal}>✕</button>
+      </div>
+      <div class="modal-body">
+        {#if editError}
+          <p class="form-error">{editError}</p>
+        {/if}
+        
+        <div class="form-group">
+          <label>Itens</label>
+          {#each editItems as item, index}
+            <div class="edit-item-row">
+              <input
+                type="number"
+                placeholder="ID do Produto"
+                bind:value={item.product_id}
+                class="edit-input product-input"
+              />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Quantidade"
+                bind:value={item.quantity}
+                class="edit-input quantity-input"
+              />
+              <button class="btn btn-danger btn-sm" onclick={() => removeEditItem(index)}>✕</button>
+            </div>
+          {/each}
+          <button class="btn btn-secondary btn-sm" onclick={addEditItem}>+ Adicionar Item</button>
+        </div>
+        
+        <div class="form-group">
+          <label>Observações</label>
+          <textarea
+            bind:value={editNotes}
+            placeholder="Observações do pedido..."
+            class="edit-textarea"
+          />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick={closeEditModal}>Cancelar</button>
+        <button class="btn btn-primary" onclick={saveEdit} disabled={editSaving}>
+          {editSaving ? 'Salvando...' : 'Salvar Alterações'}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>

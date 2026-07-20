@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -15,8 +17,10 @@ import (
 )
 
 var (
-	ErrEmailAlreadyExists = errors.New("e-mail já cadastrado")
-	ErrInvalidCredentials = errors.New("e-mail ou senha inválidos")
+	ErrEmailAlreadyExists    = errors.New("e-mail já cadastrado")
+	ErrInvalidCredentials    = errors.New("e-mail ou senha inválidos")
+	ErrInvalidResetToken     = errors.New("token de recuperação inválido ou expirado")
+	ErrResetTokenAlreadyUsed = errors.New("token de recuperação já foi utilizado")
 )
 
 // JWTClaims é exportado para que o middleware possa usar o tipo.
@@ -28,59 +32,33 @@ type JWTClaims struct {
 }
 
 type AuthService struct {
-	userRepo   ports.UserRepository
-	secret     []byte
-	expiry     time.Duration
-	bcryptCost int
-	blacklist  map[string]time.Time
+	userRepo          ports.UserRepository
+	companyRepo       ports.CompanyRepository
+	tokenBlacklist    ports.TokenBlacklistRepository
+	passwordResetRepo ports.PasswordResetRepository
+	secret            []byte
+	expiry            time.Duration
+	bcryptCost        int
 }
 
-func NewAuthService(userRepo ports.UserRepository) *AuthService {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "dev-secret-troque-em-producao"
+func NewAuthService(userRepo ports.UserRepository, companyRepo ports.CompanyRepository, tokenBlacklist ports.TokenBlacklistRepository, passwordResetRepo ports.PasswordResetRepository, jwtSecret string) *AuthService {
+	if jwtSecret == "" {
+		panic("JWT_TENANT_SECRET environment variable is required but not set")
 	}
 	return &AuthService{
-		userRepo:   userRepo,
-		secret:     []byte(secret),
-		expiry:     24 * time.Hour,
-		bcryptCost: bcrypt.DefaultCost,
-		blacklist:  make(map[string]time.Time),
+		userRepo:          userRepo,
+		companyRepo:       companyRepo,
+		tokenBlacklist:    tokenBlacklist,
+		passwordResetRepo: passwordResetRepo,
+		secret:            []byte(jwtSecret),
+		expiry:            24 * time.Hour,
+		bcryptCost:        bcrypt.DefaultCost,
 	}
 }
 
-// --- Register ---
-
-type RegisterInput struct {
-	Name     string `json:"name"     validate:"required,min=2,max=100"`
-	Email    string `json:"email"    validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
-}
-
-func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, error) {
-	existing, err := s.userRepo.FindByEmail(ctx, input.Email)
-	if err != nil {
-		return nil, fmt.Errorf("Register: %w", err)
-	}
-	if existing != nil {
-		return nil, ErrEmailAlreadyExists
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), s.bcryptCost)
-	if err != nil {
-		return nil, fmt.Errorf("Register: hash: %w", err)
-	}
-
-	user := &domain.User{
-		Name:         input.Name,
-		Email:        input.Email,
-		PasswordHash: string(hash),
-	}
-	if err = s.userRepo.Create(ctx, user); err != nil {
-		return nil, fmt.Errorf("Register: %w", err)
-	}
-	return user, nil
-}
+// --- Register (REMOVED - Sprint 3) ---
+// Public registration has been removed. Companies are now created by platform administrators only.
+// This method is kept for reference but should not be used.
 
 // --- Login ---
 
@@ -107,6 +85,11 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult
 		return nil, ErrInvalidCredentials
 	}
 
+	// Check if user is active
+	if !user.Active {
+		return nil, errors.New("usuário desativado. Entre em contato com o administrador.")
+	}
+
 	token, err := s.generateJWT(user)
 	if err != nil {
 		return nil, fmt.Errorf("Login: %w", err)
@@ -117,9 +100,8 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult
 // --- UpdateProfile ---
 
 type UpdateProfileInput struct {
-	Name      string `json:"name"  validate:"required,min=2,max=100"`
-	Email     string `json:"email" validate:"required,email"`
-	CompanyID *uint  `json:"company_id"`
+	Name  string `json:"name"  validate:"required,min=2,max=100"`
+	Email string `json:"email" validate:"required,email"`
 }
 
 func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input UpdateProfileInput) (*domain.User, error) {
@@ -144,7 +126,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input Upda
 	// Atualizar campos
 	user.Name = input.Name
 	user.Email = input.Email
-	user.CompanyID = input.CompanyID // Allow setting CompanyID
+	// CompanyID não pode ser alterado pelo próprio usuário - apenas via convite ou endpoints administrativos
 
 	if err = s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("UpdateProfile: %w", err)
@@ -192,9 +174,13 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input Cha
 // Retorna *JWTClaims (exportado) para o middleware extrair UserID, Email e Name.
 
 func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTClaims, error) {
-	// Check if token is blacklisted
-	if logoutTime, blacklisted := s.blacklist[tokenStr]; blacklisted {
-		return nil, fmt.Errorf("ValidateToken: token was revoked at %v", logoutTime)
+	// Check if token is blacklisted no banco
+	blacklisted, err := s.tokenBlacklist.IsBlacklisted(ctx, tokenStr)
+	if err != nil {
+		return nil, fmt.Errorf("ValidateToken: %w", err)
+	}
+	if blacklisted {
+		return nil, errors.New("token was revoked")
 	}
 
 	token, err := jwt.ParseWithClaims(
@@ -223,8 +209,48 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 // --- Logout ---
 
 func (s *AuthService) Logout(ctx context.Context, tokenStr string) error {
-	s.blacklist[tokenStr] = time.Now()
+	// Extrair expiration do token para saber quando expira
+	claims, err := s.parseTokenClaims(tokenStr)
+	if err != nil {
+		return fmt.Errorf("Logout: %w", err)
+	}
+
+	// Persistir no banco
+	entry := &domain.TokenBlacklist{
+		Token:     tokenStr,
+		RevokedAt: time.Now(),
+		ExpiresAt: claims.ExpiresAt.Time,
+	}
+
+	if err := s.tokenBlacklist.Add(ctx, entry); err != nil {
+		return fmt.Errorf("Logout: %w", err)
+	}
+
 	return nil
+}
+
+// parseTokenClaims extrai os claims de um token sem validar a blacklist
+func (s *AuthService) parseTokenClaims(tokenStr string) (*JWTClaims, error) {
+	token, err := jwt.ParseWithClaims(
+		tokenStr,
+		&JWTClaims{},
+		func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("algoritmo inesperado: %v", t.Header["alg"])
+			}
+			return s.secret, nil
+		},
+		jwt.WithoutClaimsValidation(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("parseTokenClaims: %w", err)
+	}
+
+	claims, ok := token.Claims.(*JWTClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("parseTokenClaims: claims inválidos")
+	}
+	return claims, nil
 }
 
 // --- helper privado ---
@@ -249,4 +275,102 @@ func (s *AuthService) generateJWT(user *domain.User) (string, error) {
 		return "", fmt.Errorf("generateJWT: %w", err)
 	}
 	return signed, nil
+}
+
+// --- Password Recovery ---
+
+type RequestPasswordResetInput struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+func (s *AuthService) RequestPasswordReset(ctx context.Context, input RequestPasswordResetInput) error {
+	// Find user by email
+	user, err := s.userRepo.FindByEmail(ctx, input.Email)
+	if err != nil {
+		return fmt.Errorf("RequestPasswordReset: %w", err)
+	}
+	if user == nil {
+		// Don't reveal if email exists or not (security)
+		return nil
+	}
+
+	// Generate secure token using time and random string
+	tokenBytes := make([]byte, 16)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return fmt.Errorf("RequestPasswordReset: generate token: %w", err)
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	// Create password reset token with 1 hour expiration
+	resetToken := &domain.PasswordResetToken{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+		Used:      false,
+	}
+
+	if err := s.passwordResetRepo.Create(ctx, resetToken); err != nil {
+		return fmt.Errorf("RequestPasswordReset: %w", err)
+	}
+
+	// Email is sent via EmailService
+	// Sprint 3.4 - Security Hardening: Remove sensitive token from logs
+	log.Printf("[AUTH] Password reset requested for user ID: %d", user.ID)
+
+	return nil
+}
+
+type ResetPasswordInput struct {
+	Token       string `json:"token"       validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=6"`
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInput) error {
+	// Find reset token
+	resetToken, err := s.passwordResetRepo.FindByToken(ctx, input.Token)
+	if err != nil {
+		return fmt.Errorf("ResetPassword: %w", err)
+	}
+	if resetToken == nil {
+		return ErrInvalidResetToken
+	}
+
+	// Check if token is expired
+	if time.Now().After(resetToken.ExpiresAt) {
+		return ErrInvalidResetToken
+	}
+
+	// Check if token was already used
+	if resetToken.Used {
+		return ErrResetTokenAlreadyUsed
+	}
+
+	// Get user
+	user, err := s.userRepo.FindByID(ctx, resetToken.UserID)
+	if err != nil {
+		return fmt.Errorf("ResetPassword: %w", err)
+	}
+	if user == nil {
+		return ErrInvalidResetToken
+	}
+
+	// Hash new password
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), s.bcryptCost)
+	if err != nil {
+		return fmt.Errorf("ResetPassword: hash: %w", err)
+	}
+
+	// Update user password
+	user.PasswordHash = string(hash)
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return fmt.Errorf("ResetPassword: %w", err)
+	}
+
+	// Mark token as used
+	resetToken.Used = true
+	if err := s.passwordResetRepo.MarkAsUsed(ctx, resetToken); err != nil {
+		return fmt.Errorf("ResetPassword: %w", err)
+	}
+
+	return nil
 }

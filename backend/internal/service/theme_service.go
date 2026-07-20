@@ -28,28 +28,28 @@ func (s *ThemeService) GetThemeForUser(ctx context.Context, userID uint) (*domai
 	if err != nil {
 		return nil, fmt.Errorf("ThemeService.GetThemeForUser: failed to get user: %w", err)
 	}
-	
+
 	if user == nil {
 		// User not found, return default theme
 		return domain.DefaultTheme(), nil
 	}
-	
-	// If user has no company, return default theme
-	if user.CompanyID == nil {
+
+	// If user has no company (CompanyID = 0), return default theme
+	if user.CompanyID == 0 {
 		return domain.DefaultTheme(), nil
 	}
-	
+
 	// Get company to retrieve theme configuration
-	company, err := s.companyRepo.FindByID(ctx, *user.CompanyID)
+	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
 		return nil, fmt.Errorf("ThemeService.GetThemeForUser: failed to get company: %w", err)
 	}
-	
+
 	if company == nil {
 		// Company not found, return default theme
 		return domain.DefaultTheme(), nil
 	}
-	
+
 	// Create theme from company
 	return domain.ThemeFromCompany(company), nil
 }

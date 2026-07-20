@@ -9,7 +9,7 @@ type Ingredient struct {
 	StockQuantity float64    // quantidade atual em estoque
 	MinStock      float64    // alerta de estoque mínimo (opcional)
 	Active        bool       // "Pode ser utilizado pelo negócio?"
-	CompanyID     *uint      // ID da empresa/tenant (null para compatibilidade com Core V1)
+	CompanyID     uint       // ID da empresa/tenant (obrigatório - Sprint 3)
 	DeletedAt     *time.Time // "O registro foi removido logicamente"
 	CreatedAt     time.Time
 	UpdatedAt     time.Time

@@ -3,21 +3,13 @@ package domain
 // TenantContext represents the tenant context for a request
 // It contains information about the authenticated user and their company
 // This context is populated by the Tenant middleware and is available throughout the request
+// Sprint 3: CompanyID is always required (NOT NULL) - no more Core V1 users without company
 type TenantContext struct {
-	UserID       uint
-	CompanyID    *uint // nil for Core V1 users (no company)
-	IsSystemAdmin bool // reserved for future RBAC implementation
+	UserID    uint
+	CompanyID uint // Always required - Sprint 3
 }
 
-// HasCompany returns true if the user has a company assigned
-func (tc *TenantContext) HasCompany() bool {
-	return tc.CompanyID != nil
-}
-
-// GetCompanyID returns the company ID, or 0 if nil
+// GetCompanyID returns the company ID
 func (tc *TenantContext) GetCompanyID() uint {
-	if tc.CompanyID == nil {
-		return 0
-	}
-	return *tc.CompanyID
+	return tc.CompanyID
 }
