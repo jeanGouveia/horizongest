@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -53,12 +54,18 @@ func main() {
 	platformSessionRepo := repository.NewGormPlatformSessionRepository(db)
 	platformAuditRepo := repository.NewGormPlatformAuditRepository(db)
 	planRepo := repository.NewGormPlanRepository(db)
+	platformBrandRepo := repository.NewGormPlatformBrandRepository(db) // Sprint 3.5
 
 	// JWT secrets (Sprint 3.4 - Security Hardening)
 	jwtPlatformSecret := getEnv("JWT_PLATFORM_SECRET", "your-platform-secret-key-change-in-production")
 	jwtTenantSecret := getEnv("JWT_TENANT_SECRET", "your-tenant-secret-key-change-in-production")
 
-	authSvc := service.NewAuthService(userRepo, companyRepo, tokenBlacklistRepo, passwordResetRepo, jwtTenantSecret)
+	// Platform services (Sprint 3.2)
+	sessionDuration := 24 * time.Hour
+	platformAuthSvc := service.NewPlatformAuthService(platformUserRepo, platformSessionRepo, jwtPlatformSecret, sessionDuration, bcrypt.DefaultCost)
+	platformBrandSvc := service.NewPlatformBrandService(platformBrandRepo) // Sprint 3.5
+
+	// Tenant services
 	productSvc := service.NewProductService(productRepo)
 	categorySvc := service.NewCategoryService(categoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
@@ -72,10 +79,26 @@ func main() {
 	rbacSvc := service.NewRBACService(userRepo)
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 
-	// Platform services (Sprint 3.2)
-	sessionDuration := 24 * time.Hour
-	platformAuthSvc := service.NewPlatformAuthService(platformUserRepo, platformSessionRepo, jwtPlatformSecret, sessionDuration, bcrypt.DefaultCost)
-	emailSvc := service.NewEmailService(false, "noreply@pratoonline.com") // Email disabled by default
+	// Initialize platform brand config (Sprint 3.6)
+	if err := platformBrandSvc.Initialize(context.Background()); err != nil {
+		log.Printf("WARNING: failed to initialize platform brand config: %v", err)
+	}
+
+	// Get platform brand for email and JWT issuer (Sprint 3.6)
+	platformBrand, err := platformBrandSvc.Get(context.Background())
+	if err != nil {
+		log.Printf("WARNING: failed to get platform brand config: %v", err)
+		// Fallback to environment variables
+		platformBrand = &domain.PlatformBrandConfig{
+			SupportEmail: getEnv("SUPPORT_EMAIL", "noreply@localhost"),
+			PlatformName: getEnv("PLATFORM_NAME", "HorizonGest"),
+		}
+	}
+
+	// Initialize auth service with platform brand as JWT issuer (Sprint 3.6)
+	authSvc := service.NewAuthService(userRepo, companyRepo, tokenBlacklistRepo, passwordResetRepo, jwtTenantSecret, platformBrand.PlatformName)
+
+	emailSvc := service.NewEmailService(false, platformBrand.SupportEmail, platformBrand.PlatformName) // Email disabled by default
 	platformSvc := service.NewPlatformService(companyRepo, userRepo, platformUserRepo, platformAuditRepo, emailSvc)
 	planSvc := service.NewPlanService(planRepo)
 	backupSvc := service.NewBackupService(
@@ -83,8 +106,9 @@ func main() {
 		getEnv("DB_PORT", "3306"),
 		getEnv("DB_USER", "root"),
 		getEnv("DB_PASSWORD", ""),
-		getEnv("DB_NAME", "pratoonline"),
+		getEnv("DB_NAME", "horizongest"), // Default DB name - should be configured via environment
 		getEnv("BACKUP_DIR", "./backups"),
+		platformBrand.PlatformName, // Backup filename prefix from platform brand (Sprint 3.6)
 	)
 	exportSvc := service.NewExportService(companyRepo, userRepo, getEnv("EXPORT_DIR", "./exports"))
 
@@ -110,6 +134,7 @@ func main() {
 	planHandler := handler.NewPlanHandler(planSvc)
 	backupHandler := handler.NewBackupHandler(backupSvc)
 	exportHandler := handler.NewExportHandler(exportSvc)
+	platformBrandHandler := handler.NewPlatformBrandHandler(platformBrandSvc) // Sprint 3.5
 
 	authMw := middleware.NewAuthMiddleware(authSvc)
 	tenantMw := middleware.NewTenantMiddleware(userRepo)
@@ -134,6 +159,9 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, `{"status":"ok","service":"pratoOnline"}`)
 	})
+
+	// Public platform branding endpoint (Sprint 3.6 - White Label)
+	r.Get("/api/public/brand", platformBrandHandler.GetPublicPlatformBrand)
 
 	r.Route("/api/system", func(r chi.Router) {
 		systemHandler.RegisterRoutes(r)
@@ -203,6 +231,13 @@ func main() {
 		r.Post("/companies", exportHandler.ExportCompanies)
 		r.Post("/users", exportHandler.ExportUsers)
 	})
+
+	r.Route("/api/platform/brand", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Use(platformAuthMw.RequireAdmin)
+		r.Get("/", platformBrandHandler.GetPlatformBrand)
+		r.Put("/", platformBrandHandler.UpdatePlatformBrand)
+	}) // Sprint 3.5
 
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Use(rateLimiter.RateLimitByIP) // Sprint 3.4 - Rate limiting
@@ -309,7 +344,7 @@ func main() {
 
 	// --- Servidor ---
 	port := getEnv("PORT", "8080")
-	log.Printf("✅ PratoOnline backend iniciado em http://localhost:%s", port)
+	log.Printf("✅ %s backend iniciado em http://localhost:%s", platformBrand.PlatformName, port)
 
 	if err := http.ListenAndServe(":"+port, r); err != nil {
 		log.Fatalf("FATAL: servidor encerrado: %v", err)

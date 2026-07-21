@@ -54,7 +54,7 @@ func (s *ThemeService) GetThemeForUser(ctx context.Context, userID uint) (*domai
 	return domain.ThemeFromCompany(company), nil
 }
 
-// GetDefaultTheme returns the default PratoOnline theme
+// GetDefaultTheme returns the default tenant theme
 func (s *ThemeService) GetDefaultTheme() *domain.Theme {
 	return domain.DefaultTheme()
 }

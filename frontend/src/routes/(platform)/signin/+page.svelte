@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui';
 	import { Card } from '$lib/components/ui';
 	import { showSuccess, showError } from '$lib/stores/toast';
+	import { platformName } from '$lib/stores/brandStore';
 
 	let email = '';
 	let password = '';
@@ -48,7 +49,7 @@
 <div class="login-container">
 	<Card class="login-card">
 		<div class="login-header">
-			<h1>PratoOnline Platform</h1>
+			<h1>{$platformName} Platform</h1>
 			<p>Área Administrativa</p>
 		</div>
 
@@ -58,7 +59,7 @@
 				<Input
 					id="email"
 					type="email"
-					placeholder="admin@pratoonline.com"
+					placeholder="admin@example.com"
 					bind:value={email}
 					disabled={loading}
 					required

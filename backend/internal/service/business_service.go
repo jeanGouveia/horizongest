@@ -54,7 +54,7 @@ func (s *BusinessService) GetBusinessProfile(ctx context.Context, userID uint) (
 	return domain.BusinessProfileFromCompany(company), nil
 }
 
-// GetDefaultBusinessProfile returns the default PratoOnline business profile
+// GetDefaultBusinessProfile returns the default tenant business profile
 func (s *BusinessService) GetDefaultBusinessProfile() *domain.BusinessProfile {
 	return domain.DefaultBusinessProfile()
 }

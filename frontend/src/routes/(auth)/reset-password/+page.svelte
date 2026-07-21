@@ -5,6 +5,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Alert from '$lib/components/ui/Alert.svelte';
+	import { platformName } from '$lib/stores/brandStore';
 
 	let newPassword = '';
 	let confirmPassword = '';
@@ -56,7 +57,7 @@
 </script>
 
 <svelte:head>
-	<title>Redefinir Senha - PratoOnline</title>
+	<title>Redefinir Senha - {$platformName}</title>
 </svelte:head>
 
 <div class="auth-container">

@@ -8,17 +8,17 @@ type Theme struct {
 	PrimaryColor   string
 	SecondaryColor string
 	LogoURL        string
-	
+
 	// Extended theme configuration (future expansion)
-	FontFamily     string
-	BorderRadius   string
-	
+	FontFamily   string
+	BorderRadius string
+
 	// Metadata
-	LoadedAt       time.Time
-	IsDefault      bool // true if using default theme (no company configured)
+	LoadedAt  time.Time
+	IsDefault bool // true if using default theme (no company configured)
 }
 
-// DefaultTheme returns the default PratoOnline theme
+// DefaultTheme returns the default tenant theme
 func DefaultTheme() *Theme {
 	return &Theme{
 		PrimaryColor:   "#6366f1", // Indigo-500
@@ -36,17 +36,17 @@ func ThemeFromCompany(company *Company) *Theme {
 	if company == nil {
 		return DefaultTheme()
 	}
-	
+
 	primaryColor := company.PrimaryColor
 	if primaryColor == "" {
 		primaryColor = "#6366f1" // Default
 	}
-	
+
 	secondaryColor := company.SecondaryColor
 	if secondaryColor == "" {
 		secondaryColor = "#4f46e5" // Default
 	}
-	
+
 	return &Theme{
 		PrimaryColor:   primaryColor,
 		SecondaryColor: secondaryColor,

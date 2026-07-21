@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import { userStore } from '$lib/stores/userStore.svelte';
+	import { platformName } from '$lib/stores/brandStore';
 	import type { Notifications } from '$lib/types/notifications';
 	import { LayoutDashboard, Plus, ShoppingCart, Utensils, Leaf, Scale, Users, User, LogOut, ChevronLeft, ChevronRight, Bell, Building2 } from '@lucide/svelte';
 
@@ -120,7 +121,7 @@
 		</button>
 		{#if !collapsed}
 			<div class="sidebar-brand">
-				<span class="brand-text">PratoOnline</span>
+				<span class="brand-text">{$platformName}</span>
 			</div>
 		{/if}
 	</div>

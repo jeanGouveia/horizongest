@@ -7,15 +7,17 @@ import (
 
 // EmailService handles sending emails
 type EmailService struct {
-	enabled bool
-	from    string
+	enabled      bool
+	from         string
+	platformName string // Platform name for email templates (Sprint 3.6)
 }
 
 // NewEmailService creates a new email service
-func NewEmailService(enabled bool, from string) *EmailService {
+func NewEmailService(enabled bool, from, platformName string) *EmailService {
 	return &EmailService{
-		enabled: enabled,
-		from:    from,
+		enabled:      enabled,
+		from:         from,
+		platformName: platformName,
 	}
 }
 
@@ -26,10 +28,16 @@ func (s *EmailService) SendWelcomeEmail(to, name, companyName, tempPassword stri
 		return nil
 	}
 
-	subject := "Bem-vindo ao PratoOnline - Sua conta foi criada"
+	// Use dynamic platform name from brand config (Sprint 3.6)
+	platformName := s.platformName
+	if platformName == "" {
+		platformName = "HorizonGest" // Fallback
+	}
+
+	subject := fmt.Sprintf("Bem-vindo ao %s - Sua conta foi criada", platformName)
 	_ = fmt.Sprintf(`Olá %s,
 
-Sua empresa "%s" foi criada com sucesso no PratoOnline.
+Sua empresa "%s" foi criada com sucesso no %s.
 
 Abaixo estão suas credenciais de acesso temporárias:
 - E-mail: %s
@@ -38,7 +46,7 @@ Abaixo estão suas credenciais de acesso temporárias:
 Por favor, faça login e altere sua senha imediatamente por motivos de segurança.
 
 Atenciosamente,
-Equipe PratoOnline`, name, companyName, to, tempPassword)
+Equipe %s`, name, companyName, platformName, to, tempPassword, platformName)
 
 	// Email sending is not implemented in this version (Sprint 3.4)
 	// SMTP implementation is deferred to future sprint
@@ -55,10 +63,16 @@ func (s *EmailService) SendPasswordResetEmail(to, name, resetLink string) error 
 		return nil
 	}
 
-	subject := "Redefinição de Senha - PratoOnline"
+	// Use dynamic platform name from brand config (Sprint 3.6)
+	platformName := s.platformName
+	if platformName == "" {
+		platformName = "HorizonGest" // Fallback
+	}
+
+	subject := fmt.Sprintf("Redefinição de Senha - %s", platformName)
 	body := fmt.Sprintf(`Olá %s,
 
-Recebemos uma solicitação para redefinir sua senha no PratoOnline.
+Recebemos uma solicitação para redefinir sua senha no %s.
 
 Clique no link abaixo para redefinir sua senha:
 %s
@@ -66,7 +80,7 @@ Clique no link abaixo para redefinir sua senha:
 Se você não solicitou esta redefinição, ignore este email.
 
 Atenciosamente,
-Equipe PratoOnline`, name, resetLink)
+Equipe %s`, name, platformName, resetLink, platformName)
 
 	log.Printf("[EMAIL] To: %s, Subject: %s, Body: %s", to, subject, body)
 

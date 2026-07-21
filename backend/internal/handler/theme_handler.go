@@ -34,7 +34,7 @@ func (h *ThemeHandler) GetTheme(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, theme)
 }
 
-// GetDefaultTheme returns the default PratoOnline theme
+// GetDefaultTheme returns the default tenant theme
 // GET /api/theme/default
 func (h *ThemeHandler) GetDefaultTheme(w http.ResponseWriter, r *http.Request) {
 	theme := h.themeService.GetDefaultTheme()

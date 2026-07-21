@@ -9,29 +9,31 @@ import (
 )
 
 type BackupService struct {
-	dbHost     string
-	dbPort     string
-	dbUser     string
-	dbPassword string
-	dbName     string
-	backupDir  string
+	dbHost       string
+	dbPort       string
+	dbUser       string
+	dbPassword   string
+	dbName       string
+	backupDir    string
+	platformName string // Platform name for backup filename prefix (Sprint 3.6)
 }
 
-func NewBackupService(dbHost, dbPort, dbUser, dbPassword, dbName, backupDir string) *BackupService {
+func NewBackupService(dbHost, dbPort, dbUser, dbPassword, dbName, backupDir, platformName string) *BackupService {
 	return &BackupService{
-		dbHost:     dbHost,
-		dbPort:     dbPort,
-		dbUser:     dbUser,
-		dbPassword: dbPassword,
-		dbName:     dbName,
-		backupDir:  backupDir,
+		dbHost:       dbHost,
+		dbPort:       dbPort,
+		dbUser:       dbUser,
+		dbPassword:   dbPassword,
+		dbName:       dbName,
+		backupDir:    backupDir,
+		platformName: platformName,
 	}
 }
 
 type BackupResult struct {
-	FileName string
-	Size     int64
-	Path     string
+	FileName  string
+	Size      int64
+	Path      string
 	CreatedAt time.Time
 }
 
@@ -43,7 +45,12 @@ func (s *BackupService) CreateBackup(ctx context.Context) (*BackupResult, error)
 
 	// Generate backup filename with timestamp
 	timestamp := time.Now().Format("20060102_150405")
-	fileName := fmt.Sprintf("pratoonline_backup_%s.sql", timestamp)
+	// Use platform name for backup filename prefix (Sprint 3.6)
+	platformPrefix := s.platformName
+	if platformPrefix == "" {
+		platformPrefix = "platform" // Fallback if platform name is empty
+	}
+	fileName := fmt.Sprintf("%s_backup_%s.sql", platformPrefix, timestamp)
 	filePath := fmt.Sprintf("%s/%s", s.backupDir, fileName)
 
 	// Build mysqldump command
@@ -87,9 +94,9 @@ func (s *BackupService) CreateBackup(ctx context.Context) (*BackupResult, error)
 	}
 
 	return &BackupResult{
-		FileName: fileName,
-		Size:     fileInfo.Size(),
-		Path:     filePath,
+		FileName:  fileName,
+		Size:      fileInfo.Size(),
+		Path:      filePath,
 		CreatedAt: time.Now(),
 	}, nil
 }
@@ -113,9 +120,9 @@ func (s *BackupService) ListBackups(ctx context.Context) ([]BackupResult, error)
 			continue
 		}
 		backups = append(backups, BackupResult{
-			FileName: entry.Name(),
-			Size:     info.Size(),
-			Path:     fmt.Sprintf("%s/%s", s.backupDir, entry.Name()),
+			FileName:  entry.Name(),
+			Size:      info.Size(),
+			Path:      fmt.Sprintf("%s/%s", s.backupDir, entry.Name()),
 			CreatedAt: info.ModTime(),
 		})
 	}

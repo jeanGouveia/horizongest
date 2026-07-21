@@ -1,6 +1,6 @@
-# My App - Full Stack Application
+# HorizonGest - Full Stack Application
 
-Full-stack application with Go backend and SvelteKit frontend.
+Full-stack SaaS application with Go backend and SvelteKit frontend for restaurant management.
 
 ## Prerequisites
 

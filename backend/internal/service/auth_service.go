@@ -39,9 +39,10 @@ type AuthService struct {
 	secret            []byte
 	expiry            time.Duration
 	bcryptCost        int
+	issuer            string // JWT issuer (platform name) - Sprint 3.6
 }
 
-func NewAuthService(userRepo ports.UserRepository, companyRepo ports.CompanyRepository, tokenBlacklist ports.TokenBlacklistRepository, passwordResetRepo ports.PasswordResetRepository, jwtSecret string) *AuthService {
+func NewAuthService(userRepo ports.UserRepository, companyRepo ports.CompanyRepository, tokenBlacklist ports.TokenBlacklistRepository, passwordResetRepo ports.PasswordResetRepository, jwtSecret string, issuer string) *AuthService {
 	if jwtSecret == "" {
 		panic("JWT_TENANT_SECRET environment variable is required but not set")
 	}
@@ -53,6 +54,7 @@ func NewAuthService(userRepo ports.UserRepository, companyRepo ports.CompanyRepo
 		secret:            []byte(jwtSecret),
 		expiry:            24 * time.Hour,
 		bcryptCost:        bcrypt.DefaultCost,
+		issuer:            issuer, // JWT issuer from platform brand (Sprint 3.6)
 	}
 }
 
@@ -257,12 +259,17 @@ func (s *AuthService) parseTokenClaims(tokenStr string) (*JWTClaims, error) {
 
 func (s *AuthService) generateJWT(user *domain.User) (string, error) {
 	now := time.Now()
+	// Use dynamic issuer from platform brand (Sprint 3.6)
+	issuer := s.issuer
+	if issuer == "" {
+		issuer = "platform" // Fallback if issuer is empty
+	}
 	claims := JWTClaims{
 		UserID: user.ID,
 		Email:  user.Email,
 		Name:   user.Name,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "pratoOnline",
+			Issuer:    issuer,
 			Subject:   fmt.Sprintf("%d", user.ID),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(s.expiry)),

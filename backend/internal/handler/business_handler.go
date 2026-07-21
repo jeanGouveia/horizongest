@@ -34,7 +34,7 @@ func (h *BusinessHandler) GetBusinessProfile(w http.ResponseWriter, r *http.Requ
 	jsonResponse(w, http.StatusOK, profile)
 }
 
-// GetDefaultBusinessProfile returns the default PratoOnline business profile
+// GetDefaultBusinessProfile returns the default tenant business profile
 // GET /api/business/profile/default
 func (h *BusinessHandler) GetDefaultBusinessProfile(w http.ResponseWriter, r *http.Request) {
 	profile := h.businessService.GetDefaultBusinessProfile()

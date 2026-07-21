@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { platformName, copyright } from '$lib/stores/brandStore';
+
 	interface Props {
 		version?: string;
 		year?: number;
@@ -13,11 +15,11 @@
 <footer class="footer">
 	<div class="footer-content">
 		<div class="footer-brand">
-			<span class="footer-logo">🍽️ PratoOnline</span>
+			<span class="footer-logo">🍽️ {$platformName}</span>
 			<span class="footer-version">v{version}</span>
 		</div>
 		<div class="footer-copyright">
-			© {year} PratoOnline. Todos os direitos reservados.
+			{$copyright}
 		</div>
 	</div>
 </footer>

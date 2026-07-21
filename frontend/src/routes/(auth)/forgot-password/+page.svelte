@@ -4,6 +4,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Alert from '$lib/components/ui/Alert.svelte';
+	import { platformName } from '$lib/stores/brandStore';
 
 	let email = '';
 	let error = '';
@@ -34,7 +35,7 @@
 </script>
 
 <svelte:head>
-	<title>Recuperar Senha - PratoOnline</title>
+	<title>Recuperar Senha - {$platformName}</title>
 </svelte:head>
 
 <div class="auth-container">
