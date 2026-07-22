@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 var validatePlatform = validator.New()

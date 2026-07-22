@@ -5,8 +5,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/ports"
 )
 
 var _ ports.PurchaseRepository = (*GormPurchaseRepository)(nil)

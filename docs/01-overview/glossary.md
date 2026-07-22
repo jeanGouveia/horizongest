@@ -1,4 +1,4 @@
-# DOMÍNIO DO PRATOONLINE
+# DOMÍNIO DO horizongest
 
 > Este documento define os princípios permanentes do domínio do sistema.
 >

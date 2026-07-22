@@ -30,7 +30,7 @@ Check if the API is running.
 ```json
 {
   "status": "ok",
-  "service": "pratoOnline"
+  "service": "horizongest"
 }
 ```
 

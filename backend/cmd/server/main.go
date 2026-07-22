@@ -14,12 +14,12 @@ import (
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/handler"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/database"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/repository"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/handler"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/database"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 func main() {
@@ -194,7 +194,7 @@ func main() {
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"status":"ok","service":"pratoOnline"}`)
+		fmt.Fprintln(w, `{"status":"ok","service":"horizongest"}`)
 	})
 
 	// Public platform branding endpoint (Sprint 3.6 - White Label)

@@ -242,7 +242,7 @@ import (
     "context"
     "sync"
 
-    "github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+    "github.com/jeanGouveia/horizongest/backend/internal/domain"
     "gorm.io/gorm"
 )
 
@@ -294,7 +294,7 @@ import (
     "context"
     "errors"
 
-    "github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+    "github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 type YourEntityService struct {
@@ -348,7 +348,7 @@ import (
     "net/http"
 
     "github.com/go-chi/chi/v5"
-    "github.com/jeanGouveia/pratoOnline/backend/internal/service"
+    "github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 type YourEntityHandler struct {
@@ -595,7 +595,7 @@ import (
     "errors"
     "testing"
 
-    "github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+    "github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 type mockRepository struct {

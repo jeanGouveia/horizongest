@@ -2,7 +2,7 @@
 
 ## Resumo Executivo
 
-A Sprint 8B foi dedicada ao redesign visual completo do frontend do PratoOnline, inspirado em padrões modernos de UI/UX utilizados por empresas como Stripe e Linear. O objetivo foi criar uma identidade visual profissional, consistente e responsiva, melhorando significativamente a experiência do usuário.
+A Sprint 8B foi dedicada ao redesign visual completo do frontend do horizongest, inspirado em padrões modernos de UI/UX utilizados por empresas como Stripe e Linear. O objetivo foi criar uma identidade visual profissional, consistente e responsiva, melhorando significativamente a experiência do usuário.
 
 ## Objetivos da Sprint
 
@@ -263,7 +263,7 @@ Executado com sucesso:
 
 ## Conclusão
 
-A Sprint 8B foi concluída com sucesso, entregando um redesign visual completo e moderno para o PratoOnline. A nova identidade visual é consistente, profissional e responsiva, seguindo as melhores práticas de UI/UX atuais. O projeto está pronto para deploy em produção.
+A Sprint 8B foi concluída com sucesso, entregando um redesign visual completo e moderno para o horizongest. A nova identidade visual é consistente, profissional e responsiva, seguindo as melhores práticas de UI/UX atuais. O projeto está pronto para deploy em produção.
 
 **Data de Conclusão:** 15 de Julho de 2026
 **Status:** ✅ APROVADO PARA PRODUÇÃO

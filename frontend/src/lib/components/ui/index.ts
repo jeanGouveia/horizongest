@@ -1,5 +1,5 @@
 /**
- * Design System - PratoOnline
+ * Design System - horizongest
  * Componentes UI reutilizáveis
  */
 

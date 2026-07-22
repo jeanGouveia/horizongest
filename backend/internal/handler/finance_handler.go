@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 type FinanceHandler struct {

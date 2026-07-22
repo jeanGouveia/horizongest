@@ -1,5 +1,5 @@
 /**
- * Sistema de tipografia do PratoOnline - Redesign Visual
+ * Sistema de tipografia do horizongest - Redesign Visual
  * Tokens de fontes para consistência visual
  * Inspirado em sistemas modernos como Stripe, Linear e Vercel
  */

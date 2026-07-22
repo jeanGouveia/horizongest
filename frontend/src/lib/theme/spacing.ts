@@ -1,5 +1,5 @@
 /**
- * Sistema de espaçamentos do PratoOnline - Redesign Visual
+ * Sistema de espaçamentos do horizongest - Redesign Visual
  * Tokens de espaçamento para consistência visual
  * Inspirado em sistemas modernos como Tailwind CSS
  */

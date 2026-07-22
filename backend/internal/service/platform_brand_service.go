@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 var (

@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 type PlatformDashboardHandler struct {

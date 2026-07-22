@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 // Simplified test for AuthService focusing on JWT generation with dynamic issuer

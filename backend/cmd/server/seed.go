@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/repository"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
 	"gorm.io/gorm"
 )
 

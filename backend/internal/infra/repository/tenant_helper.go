@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"gorm.io/gorm"
 )
 

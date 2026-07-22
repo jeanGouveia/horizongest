@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 // StockMovementRepository define a interface para repositório de movimentações de estoque

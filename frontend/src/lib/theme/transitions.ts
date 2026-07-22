@@ -1,5 +1,5 @@
 /**
- * Sistema de transições do PratoOnline - Sprint 9 PX
+ * Sistema de transições do horizongest - Sprint 9 PX
  * Tokens de transição para consistência visual
  * Transições suaves e profissionais
  */

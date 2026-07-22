@@ -1,8 +1,8 @@
-# BACKLOG OFICIAL PRATOONLINE
+# BACKLOG OFICIAL horizongest
 
 **Fase 11 — Hardening do Produto**  
 **Data:** 16/07/2026  
-**Arquiteto-Chefe:** PratoOnline
+**Arquiteto-Chefe:** horizongest
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * Sistema de sombras do PratoOnline - Redesign Visual
+ * Sistema de sombras do horizongest - Redesign Visual
  * Tokens de shadow para consistência visual
  * Inspirado em sistemas modernos como Linear e Vercel
  * Sombras mais sutis e elegantes para look profissional

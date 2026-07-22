@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 // ErrorResponseMiddleware padroniza todas as respostas de erro

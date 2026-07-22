@@ -1,5 +1,5 @@
 /**
- * Sistema de bordas arredondadas do PratoOnline - Redesign Visual
+ * Sistema de bordas arredondadas do horizongest - Redesign Visual
  * Tokens de border-radius para consistência visual
  * Inspirado em sistemas modernos como Linear e Vercel
  */

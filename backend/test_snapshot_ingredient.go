@@ -8,11 +8,11 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/database"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/repository"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/database"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 func main() {

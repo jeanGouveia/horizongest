@@ -1,5 +1,5 @@
 /**
- * Sistema de Dark Mode do PratoOnline - Sprint 9 PX
+ * Sistema de Dark Mode do horizongest - Sprint 9 PX
  * Tokens preparados para implementação futura
  * Cores adaptadas para baixo contraste e conforto visual
  */

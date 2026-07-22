@@ -1,4 +1,4 @@
-module github.com/jeanGouveia/pratoOnline/backend
+module github.com/jeanGouveia/horizongest/backend
 
 go 1.26.3
 

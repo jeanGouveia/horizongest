@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 // ReportRepository define a interface para repositório de relatórios

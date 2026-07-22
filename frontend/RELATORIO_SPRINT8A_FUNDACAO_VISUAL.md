@@ -2,7 +2,7 @@
 
 ## Resumo Executivo
 
-Esta sprint teve como objetivo estabelecer uma fundação visual sólida para o PratoOnline através da criação de um Design System completo e refatoração das páginas principais da aplicação. O foco foi padronizar a interface, melhorar a experiência do usuário e facilitar a manutenção futura do código.
+Esta sprint teve como objetivo estabelecer uma fundação visual sólida para o horizongest através da criação de um Design System completo e refatoração das páginas principais da aplicação. O foco foi padronizar a interface, melhorar a experiência do usuário e facilitar a manutenção futura do código.
 
 ## Objetivos da Sprint
 
@@ -62,7 +62,7 @@ Esta sprint teve como objetivo estabelecer uma fundação visual sólida para o 
 ## Layout Mestre
 
 ### Header
-- Logo do PratoOnline
+- Logo do horizongest
 - Breadcrumb de navegação
 - Nome do usuário
 - Avatar
@@ -79,7 +79,7 @@ Esta sprint teve como objetivo estabelecer uma fundação visual sólida para o 
   - Logout
 
 ### Footer
-- Nome do sistema: PratoOnline
+- Nome do sistema: horizongest
 - Versão: MVP
 - Ano atual
 
@@ -275,7 +275,7 @@ Os warnings restantes são principalmente:
 
 ## Conclusão
 
-A Sprint 8A foi bem-sucedida em estabelecer uma fundação visual sólida para o PratoOnline. O Design System criado fornece uma base consistente e reutilizável para desenvolvimento futuro, melhorando significativamente a manutenibilidade e experiência do usuário. A refatoração das páginas principais demonstrou a eficácia dos componentes em simplificar o código e padronizar a interface.
+A Sprint 8A foi bem-sucedida em estabelecer uma fundação visual sólida para o horizongest. O Design System criado fornece uma base consistente e reutilizável para desenvolvimento futuro, melhorando significativamente a manutenibilidade e experiência do usuário. A refatoração das páginas principais demonstrou a eficácia dos componentes em simplificar o código e padronizar a interface.
 
 ---
 

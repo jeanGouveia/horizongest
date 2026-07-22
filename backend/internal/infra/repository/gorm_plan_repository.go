@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/ports"
 	"gorm.io/gorm"
 )
 

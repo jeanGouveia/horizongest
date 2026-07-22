@@ -234,13 +234,13 @@
 		{#if company}
 			<div class="header-actions">
 				<Button variant="secondary" onclick={loginAsCompany}>Login como Empresa</Button>
-				<Button variant="secondary" onclick={() => goto(`/platform/companies/${company.ID}/owner`)}>Gerenciar Owner</Button>
+				<Button variant="secondary" onclick={() => goto(`/platform/companies/${company!.ID}/owner`)}>Gerenciar Owner</Button>
 				<Button variant="secondary" onclick={openEditModal}>Editar</Button>
 				<Button
-					variant={company.Active ? 'secondary' : 'primary'}
+					variant={company!.Active ? 'secondary' : 'primary'}
 					onclick={toggleStatus}
 				>
-					{company.Active ? 'Desativar' : 'Ativar'}
+					{company!.Active ? 'Desativar' : 'Ativar'}
 				</Button>
 			</div>
 		{/if}

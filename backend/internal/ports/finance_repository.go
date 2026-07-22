@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
 // FinanceRepository define a interface para repositório financeiro

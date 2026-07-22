@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/middleware"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/ports"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/service"
-	"github.com/jeanGouveia/pratoOnline/backend/internal/util"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/ports"
+	"github.com/jeanGouveia/horizongest/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
 
 var validate = validator.New()

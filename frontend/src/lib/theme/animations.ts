@@ -1,5 +1,5 @@
 /**
- * Sistema de animações do PratoOnline - Sprint 9 PX
+ * Sistema de animações do horizongest - Sprint 9 PX
  * Keyframes e animações para microinterações
  * Animações sutis e profissionais
  */

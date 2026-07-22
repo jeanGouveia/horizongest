@@ -1,5 +1,5 @@
 /**
- * Paleta de cores do PratoOnline - Redesign Visual
+ * Paleta de cores do horizongest - Redesign Visual
  * Inspirada em produtos profissionais como Stripe, Linear e Vercel
  * Sistema de tokens de cores para consistência visual
  */

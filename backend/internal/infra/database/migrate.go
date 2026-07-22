@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/jeanGouveia/pratoOnline/backend/internal/infra/repository"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
 )
 
 // RunMigrations executa o AutoMigrate do GORM para todas as tabelas do sistema.

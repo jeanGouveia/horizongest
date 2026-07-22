@@ -30,7 +30,7 @@ linters-settings:
     check-type-assertions: true
     check-blank: false
   goimports:
-    local-prefixes: github.com/jeanGouveia/pratoOnline/backend
+    local-prefixes: github.com/jeanGouveia/horizongest/backend
   gocyclo:
     min-complexity: 15
   revive:

@@ -1,5 +1,5 @@
 /**
- * Layout Components - PratoOnline
+ * Layout Components - horizongest
  * Componentes de layout reutilizáveis
  */
 
