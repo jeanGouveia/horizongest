@@ -30,6 +30,7 @@
   // Preview state
   let previewPrimaryColor = $state('');
   let previewSecondaryColor = $state('');
+  let businessTypes = $state<Array<{ value: string; label: string }>>([]);
 
   function generateSlug(text: string): string {
     return text
@@ -47,15 +48,27 @@
     }
   });
 
-  const businessTypes = [
-    { value: 'restaurant', label: 'Restaurante' },
-    { value: 'bakery', label: 'Padaria' },
-    { value: 'cafe', label: 'Café' },
-    { value: 'bar', label: 'Bar' },
-    { value: 'food_truck', label: 'Food Truck' },
-    { value: 'catering', label: 'Catering' },
-    { value: 'other', label: 'Outro' }
-  ];
+  // Load business types from backend
+  async function loadBusinessTypes() {
+    try {
+      const response = await fetch('/api/public/business-types');
+      if (response.ok) {
+        businessTypes = await response.json();
+      }
+    } catch (e) {
+      console.error('Erro ao carregar tipos de negócio:', e);
+      // Fallback to hardcoded list
+      businessTypes = [
+        { value: 'restaurant', label: 'Restaurante' },
+        { value: 'bakery', label: 'Padaria' },
+        { value: 'cafe', label: 'Café' },
+        { value: 'bar', label: 'Bar' },
+        { value: 'food_truck', label: 'Food Truck' },
+        { value: 'catering', label: 'Catering' },
+        { value: 'other', label: 'Outro' }
+      ];
+    }
+  }
 
   const locales = [
     { value: 'pt-BR', label: 'Português (Brasil)' },
@@ -78,26 +91,38 @@
 
   onMount(async () => {
     loading = true;
+    await loadBusinessTypes();
     try {
-      const res = await api.companySettings.getSettings();
-      if (res.error) throw new Error(res.error);
-      if (res.data) {
-        name = res.data.name || '';
-        slug = res.data.slug || '';
-        description = res.data.description || '';
-        logoUrl = res.data.logo_url || '';
-        primaryColor = res.data.primary_color || '';
-        secondaryColor = res.data.secondary_color || '';
-        businessType = res.data.business_type || '';
-        locale = res.data.locale || '';
-        currency = res.data.currency || '';
-        timezone = res.data.timezone || '';
+      console.log('Fetching company settings...');
+      const response = await fetch('/api/company/settings', {
+        credentials: 'include'
+      });
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Company settings data:', data);
+        name = data.Name || '';
+        slug = data.Slug || '';
+        description = data.Description || '';
+        logoUrl = data.LogoURL || '';
+        primaryColor = data.PrimaryColor || '';
+        secondaryColor = data.SecondaryColor || '';
+        businessType = data.BusinessType || '';
+        locale = data.Locale || '';
+        currency = data.Currency || '';
+        timezone = data.Timezone || '';
         
         // Initialize preview
         previewPrimaryColor = primaryColor;
         previewSecondaryColor = secondaryColor;
+      } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        error = 'Erro ao carregar configurações da empresa.';
       }
     } catch (e: any) {
+      console.error('Fetch error:', e);
       error = e?.message ?? 'Erro ao carregar configurações da empresa.';
     } finally {
       loading = false;
@@ -114,24 +139,35 @@
     error = '';
     success = false;
     try {
-      const res = await api.companySettings.updateSettings({
-        name: name.trim(),
-        description: description.trim(),
-        logo_url: logoUrl.trim(),
-        primary_color: primaryColor.trim(),
-        secondary_color: secondaryColor.trim(),
-        business_type: businessType,
-        locale: locale,
-        currency: currency,
-        timezone: timezone
+      const response = await fetch('/api/company/settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slug.trim(),
+          description: description.trim(),
+          logo_url: logoUrl.trim(),
+          primary_color: primaryColor.trim(),
+          secondary_color: secondaryColor.trim(),
+          business_type: businessType,
+          locale: locale,
+          currency: currency,
+          timezone: timezone
+        })
       });
-      if (res.error) throw new Error(res.error);
-      success = true;
-      
-      // Reload theme to reflect changes
-      await themeStore.loadTheme();
-      
-      setTimeout(() => (success = false), 3000);
+      if (response.ok) {
+        success = true;
+        
+        // Reload theme to reflect changes
+        await themeStore.loadTheme();
+        
+        setTimeout(() => (success = false), 3000);
+      } else {
+        error = 'Erro ao atualizar configurações da empresa.';
+      }
     } catch (e: any) {
       error = e?.message ?? 'Erro ao atualizar configurações da empresa.';
     } finally {

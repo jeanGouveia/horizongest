@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -34,6 +35,41 @@ func main() {
 	// --- Migrações automáticas (estrutura das tabelas) ---
 	if err := database.RunMigrations(db); err != nil {
 		log.Fatalf("FATAL: falha ao executar migrações: %v", err)
+	}
+
+	// --- Seed (dados iniciais) ---
+	if os.Getenv("RUN_SEED") == "true" {
+		log.Println("Executando seed...")
+		ctx := context.Background()
+		platformUserRepo := repository.NewGormPlatformUserRepository(db)
+
+		// Verificar se já existe usuário admin
+		existing, err := platformUserRepo.FindByEmail(ctx, "admin@platform.com")
+		if err != nil {
+			log.Fatalf("Erro ao verificar usuário admin: %v", err)
+		}
+		if existing == nil {
+			// Criar usuário admin padrão
+			hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+			if err != nil {
+				log.Fatalf("Erro ao gerar hash da senha: %v", err)
+			}
+
+			adminUser := &domain.PlatformUser{
+				Name:         "Administrador",
+				Email:        "admin@platform.com",
+				PasswordHash: string(hash),
+				Role:         domain.PlatformRoleAdmin,
+				Active:       true,
+			}
+
+			if err := platformUserRepo.Create(ctx, adminUser); err != nil {
+				log.Fatalf("Erro ao criar usuário admin: %v", err)
+			}
+			log.Println("Usuário admin criado com sucesso: admin@platform.com / admin123")
+		} else {
+			log.Println("Usuário admin já existe, pulando seed")
+		}
 	}
 
 	// --- Injeção de Dependência (DI manual, sem framework) ---
@@ -149,6 +185,7 @@ func main() {
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
+	r.Use(middleware.CORS)            // CORS middleware
 	r.Use(middleware.SecurityHeaders) // Sprint 3.4 - Security headers
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.Timeout(30 * time.Second))
@@ -162,6 +199,24 @@ func main() {
 
 	// Public platform branding endpoint (Sprint 3.6 - White Label)
 	r.Get("/api/public/brand", platformBrandHandler.GetPublicPlatformBrand)
+
+	// Public business types endpoint
+	r.Get("/api/public/business-types", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		types := domain.AllBusinessTypes()
+		type BusinessTypeResponse struct {
+			Value string `json:"value"`
+			Label string `json:"label"`
+		}
+		response := make([]BusinessTypeResponse, len(types))
+		for i, bt := range types {
+			response[i] = BusinessTypeResponse{
+				Value: bt.String(),
+				Label: bt.DisplayName(),
+			}
+		}
+		json.NewEncoder(w).Encode(response)
+	})
 
 	r.Route("/api/system", func(r chi.Router) {
 		systemHandler.RegisterRoutes(r)

@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+
 -- Sprint 3.4 - Security Hardening: Add composite indexes for performance
 -- These indexes improve query performance for common tenant-scoped queries
 
@@ -21,3 +24,18 @@ CREATE INDEX IF NOT EXISTS idx_ingredients_company_active ON ingredients(company
 
 -- Index for companies: active + created_at (for listing active companies chronologically)
 CREATE INDEX IF NOT EXISTS idx_companies_active_created ON companies(active, created_at DESC) WHERE deleted_at IS NULL;
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+DROP INDEX IF EXISTS idx_companies_active_created;
+DROP INDEX IF EXISTS idx_ingredients_company_active;
+DROP INDEX IF EXISTS idx_users_company_active;
+DROP INDEX IF EXISTS idx_orders_company_created_at;
+DROP INDEX IF EXISTS idx_orders_company_status;
+DROP INDEX IF EXISTS idx_products_company_slug;
+DROP INDEX IF EXISTS idx_products_company_active;
+
+-- +goose StatementEnd

@@ -5,6 +5,8 @@
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { brandStore } from '$lib/stores/brandStore';
+	import { api } from '$lib/api/client';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 
@@ -32,11 +34,25 @@
 		return '';
 	});
 
-	onMount(() => {
+	onMount(async () => {
 		if (browser) {
 			showMenuButton = window.innerWidth < 768;
 			// Load theme on app initialization
 			themeStore.loadTheme();
+			// Buscar configurações da empresa usando o proxy (como no perfil)
+			try {
+				const response = await fetch('/api/company/settings', {
+					credentials: 'include'
+				});
+				if (response.ok) {
+					const data = await response.json();
+					if (data.name) {
+						brandStore.setCompanyName(data.name);
+					}
+				}
+			} catch (e) {
+				console.error('Erro ao carregar configurações da empresa:', e);
+			}
 		}
 	});
 

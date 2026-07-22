@@ -45,8 +45,8 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 		}
 
 		// Add platform user ID and role to context
-		ctx := context.WithValue(r.Context(), ContextKeyPlatformUserID, userID)
-		ctx = context.WithValue(ctx, ContextKeyPlatformRole, role)
+		ctx := context.WithValue(r.Context(), "platformUserID", userID)
+		ctx = context.WithValue(ctx, "platformRole", role)
 
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -56,7 +56,7 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 // RequireAdmin checks if the platform user has admin role
 func (m *PlatformAuthMiddleware) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		role, ok := r.Context().Value(ContextKeyPlatformRole).(domain.PlatformRole)
+		role, ok := r.Context().Value("platformRole").(domain.PlatformRole)
 		if !ok {
 			http.Error(w, "missing role in context", http.StatusInternalServerError)
 			return

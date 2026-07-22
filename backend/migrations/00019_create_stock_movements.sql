@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+
 -- Sprint 4 - Stock Movements: Create tables for stock movements and inventories
 
 -- Stock Movements Table
@@ -67,3 +70,25 @@ CREATE TABLE IF NOT EXISTS stock_inventory_items (
 CREATE INDEX IF NOT EXISTS idx_stock_inventory_items_inventory ON stock_inventory_items(inventory_id);
 CREATE INDEX IF NOT EXISTS idx_stock_inventory_items_ingredient ON stock_inventory_items(ingredient_id);
 CREATE INDEX IF NOT EXISTS idx_stock_inventory_items_deleted_at ON stock_inventory_items(deleted_at);
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+DROP INDEX IF EXISTS idx_stock_inventory_items_deleted_at;
+DROP INDEX IF EXISTS idx_stock_inventory_items_ingredient;
+DROP INDEX IF EXISTS idx_stock_inventory_items_inventory;
+DROP TABLE IF EXISTS stock_inventory_items;
+DROP INDEX IF EXISTS idx_stock_inventories_deleted_at;
+DROP INDEX IF EXISTS idx_stock_inventories_status;
+DROP INDEX IF EXISTS idx_stock_inventories_date;
+DROP INDEX IF EXISTS idx_stock_inventories_company;
+DROP TABLE IF EXISTS stock_inventories;
+DROP INDEX IF EXISTS idx_stock_movements_deleted_at;
+DROP INDEX IF EXISTS idx_stock_movements_reference;
+DROP INDEX IF EXISTS idx_stock_movements_ingredient;
+DROP INDEX IF EXISTS idx_stock_movements_company;
+DROP TABLE IF EXISTS stock_movements;
+
+-- +goose StatementEnd

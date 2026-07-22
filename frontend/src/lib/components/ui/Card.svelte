@@ -5,6 +5,7 @@
 		class?: string;
 		elevated?: boolean;
 		hoverable?: boolean;
+		onclick?: (e: MouseEvent) => void;
 	}
 
 	let {
@@ -13,10 +14,11 @@
 		class: className = '',
 		elevated = false,
 		hoverable = false,
+		onclick,
 	}: Props = $props();
 </script>
 
-<div class="card {className} {elevated ? 'card-elevated' : ''} {hoverable ? 'card-hoverable' : ''}">
+<div class="card {className} {elevated ? 'card-elevated' : ''} {hoverable ? 'card-hoverable' : ''}" on:click={onclick}>
 	{#if title || subtitle}
 		<div class="card-header">
 			{#if title}

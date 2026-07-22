@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+
 -- Sprint 3.4 - Security Hardening: Add ON DELETE clauses to foreign keys
 -- This prevents orphaned records when parent records are deleted
 
@@ -37,3 +40,13 @@
 
 -- For SQLite, these changes require recreating tables with the proper FK constraints
 -- This is documented for future migration to PostgreSQL/MySQL
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+-- No-op: this migration is documentation-only for SQLite
+-- When migrating to PostgreSQL/MySQL, the actual ALTER TABLE statements will be applied
+
+-- +goose StatementEnd

@@ -1,4 +1,5 @@
 import { writable, derived } from 'svelte/store';
+import { userStore } from './userStore.svelte';
 
 export interface BrandConfig {
 	platformName: string;
@@ -13,7 +14,7 @@ export interface BrandConfig {
 	loginIllustration: string;
 	copyright: string;
 	primaryColor: string;
-	secondaryColor: string;
+	secondaryColor: string
 }
 
 const defaultBrand: BrandConfig = {
@@ -51,6 +52,13 @@ function createBrandStore() {
 		},
 		reload: async () => {
 			await brandStore.load();
+		},
+		setCompanyName: (companyName: string) => {
+			update(brand => ({
+				...brand,
+				platformName: companyName,
+				platformShortName: companyName
+			}));
 		}
 	};
 }

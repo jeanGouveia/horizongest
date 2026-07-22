@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+
 -- Sprint 4 - Compras: Create tables for suppliers, purchase orders, and receivings
 
 -- Suppliers Table
@@ -122,3 +125,34 @@ CREATE INDEX IF NOT EXISTS idx_purchase_receiving_items_receiving ON purchase_re
 CREATE INDEX IF NOT EXISTS idx_purchase_receiving_items_order_item ON purchase_receiving_items(purchase_order_item_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_receiving_items_ingredient ON purchase_receiving_items(ingredient_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_receiving_items_deleted_at ON purchase_receiving_items(deleted_at);
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+DROP INDEX IF EXISTS idx_purchase_receiving_items_deleted_at;
+DROP INDEX IF EXISTS idx_purchase_receiving_items_ingredient;
+DROP INDEX IF EXISTS idx_purchase_receiving_items_order_item;
+DROP INDEX IF EXISTS idx_purchase_receiving_items_receiving;
+DROP TABLE IF EXISTS purchase_receiving_items;
+DROP INDEX IF EXISTS idx_purchase_receivings_deleted_at;
+DROP INDEX IF EXISTS idx_purchase_receivings_date;
+DROP INDEX IF EXISTS idx_purchase_receivings_order;
+DROP TABLE IF EXISTS purchase_receivings;
+DROP INDEX IF EXISTS idx_purchase_order_items_deleted_at;
+DROP INDEX IF EXISTS idx_purchase_order_items_ingredient;
+DROP INDEX IF EXISTS idx_purchase_order_items_order;
+DROP TABLE IF EXISTS purchase_order_items;
+DROP INDEX IF EXISTS idx_purchase_orders_deleted_at;
+DROP INDEX IF EXISTS idx_purchase_orders_date;
+DROP INDEX IF EXISTS idx_purchase_orders_status;
+DROP INDEX IF EXISTS idx_purchase_orders_supplier;
+DROP INDEX IF EXISTS idx_purchase_orders_company;
+DROP TABLE IF EXISTS purchase_orders;
+DROP INDEX IF EXISTS idx_suppliers_deleted_at;
+DROP INDEX IF EXISTS idx_suppliers_active;
+DROP INDEX IF EXISTS idx_suppliers_company;
+DROP TABLE IF EXISTS suppliers;
+
+-- +goose StatementEnd

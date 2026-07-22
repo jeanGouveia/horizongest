@@ -12,6 +12,7 @@
 		class?: string;
 		icon?: string;
 		iconPosition?: 'left' | 'right';
+		onclick?: (e: MouseEvent) => void;
 		[key: string]: any;
 	}
 
@@ -25,6 +26,7 @@
 		icon,
 		iconPosition = 'left',
 		class: className = '',
+		onclick,
 		...restProps
 	}: Props = $props();
 
@@ -35,6 +37,7 @@
 	<a
 		{...restProps}
 		{href}
+		onclick={onclick}
 		class:btn={true}
 		class:btn-primary={variant === 'primary'}
 		class:btn-secondary={variant === 'secondary'}
@@ -65,6 +68,7 @@
 {:else}
 	<button
 		{...restProps}
+		onclick={onclick}
 		class:btn={true}
 		class:btn-primary={variant === 'primary'}
 		class:btn-secondary={variant === 'secondary'}
