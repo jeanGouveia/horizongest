@@ -8,6 +8,8 @@
 	import { Select } from '$lib/components/ui';
 	import { Badge } from '$lib/components/ui';
 	import { showSuccess, showError } from '$lib/stores/toast';
+	import { tenantSessionManager } from '$lib/managers/tenantSessionManager';
+	import { CookieKeys } from '$lib/constants/storage-keys';
 
 	interface Company {
 		ID: number;
@@ -74,7 +76,7 @@
 				return;
 			}
 
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
@@ -83,12 +85,9 @@
 			}
 
 			const response = await fetch(`http://localhost:8080/api/platform/companies/${id}`, { headers });
-			console.log('Response status:', response.status);
 			if (response.ok) {
 				company = await response.json();
-				console.log('Company loaded:', company);
 			} else {
-				console.error('Error response:', response.status);
 				showError('Erro', 'Erro ao carregar empresa');
 				goto('/platform/companies');
 			}
@@ -101,7 +100,6 @@
 			}
 			goto('/platform/companies');
 		} finally {
-			console.log('Setting loading to false');
 			loading = false;
 		}
 	}
@@ -124,7 +122,7 @@
 		if (!company) return;
 
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
@@ -160,7 +158,7 @@
 
 		const action = company.Active ? 'deactivate' : 'activate';
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {};
 			if (token) {
 				headers['Authorization'] = `Bearer ${token}`;
@@ -190,33 +188,19 @@
 		if (!company) return;
 
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
-			const headers: Record<string, string> = {};
-			if (token) {
-				headers['Authorization'] = `Bearer ${token}`;
-			}
-
-			const response = await fetch(`http://localhost:8080/api/platform/companies/${company.ID}/login-as`, {
-				method: 'POST',
-				headers
-			});
-
-			if (response.ok) {
-				const data = await response.json();
-				console.log('Login como empresa:', data);
-				showSuccess('Sucesso', `Login como empresa iniciado. Owner: ${data.owner_email}`);
-				// In a real implementation, this would redirect to the company dashboard with a temporary token
+			const result = await tenantSessionManager.enterCompany(company.ID);
+			
+			if (result.success) {
+				showSuccess('Sucesso', `Entrando na empresa ${company.Name}`);
 			} else {
-				const errorData = await response.json();
-				console.error('Erro login como empresa:', errorData);
-				showError('Erro', errorData.message || 'Erro ao fazer login como empresa');
+				showError('Erro', result.error || 'Erro ao entrar na empresa');
 			}
 		} catch (error) {
-			console.error('Erro login como empresa:', error);
+			console.error('Erro ao entrar na empresa:', error);
 			if (error instanceof TypeError && error.message.includes('fetch')) {
 				showError('Erro de conexão', 'Não foi possível conectar ao servidor. Verifique se o backend está rodando em http://localhost:8080');
 			} else {
-				showError('Erro', 'Erro ao fazer login como empresa');
+				showError('Erro', 'Erro ao entrar na empresa');
 			}
 		}
 	}
@@ -233,7 +217,7 @@
 		</div>
 		{#if company}
 			<div class="header-actions">
-				<Button variant="secondary" onclick={loginAsCompany}>Login como Empresa</Button>
+				<Button variant="secondary" onclick={loginAsCompany}>Entrar na Empresa</Button>
 				<Button variant="secondary" onclick={() => goto(`/platform/companies/${company!.ID}/owner`)}>Gerenciar Owner</Button>
 				<Button variant="secondary" onclick={openEditModal}>Editar</Button>
 				<Button

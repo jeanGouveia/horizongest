@@ -8,6 +8,8 @@
 	import { Select } from '$lib/components/ui';
 	import { Badge } from '$lib/components/ui';
 	import { showSuccess, showError } from '$lib/stores/toast';
+	import { CookieKeys } from '$lib/constants/storage-keys';
+	import { forensicLogger } from '$lib/forensic/forensic-logger';
 
 	interface Company {
 		ID: number;
@@ -19,7 +21,7 @@
 		CreatedAt: string;
 	}
 
-	let companies: Company[] = [];
+	let companies: Company[] = $state([]);
 	let loading = $state(true);
 	let searchQuery = $state('');
 	let showCreateModal = $state(false);
@@ -65,7 +67,7 @@
 	async function loadCompanies() {
 		loading = true;
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
@@ -74,14 +76,10 @@
 			}
 
 			const response = await fetch('http://localhost:8080/api/platform/companies', { headers });
-			console.log('Response status:', response.status);
 			if (response.ok) {
 				const data = await response.json();
-				console.log('Companies data:', data);
 				companies = data.companies || [];
-				console.log('Companies loaded:', companies.length);
 			} else {
-				console.error('Error response:', response.status);
 				showError('Erro', 'Erro ao carregar empresas');
 			}
 		} catch (error) {
@@ -92,7 +90,6 @@
 				showError('Erro', 'Erro ao carregar empresas');
 			}
 		} finally {
-			console.log('Setting loading to false');
 			loading = false;
 		}
 	}
@@ -100,7 +97,7 @@
 	async function toggleCompanyStatus(company: Company) {
 		const action = company.Active ? 'deactivate' : 'activate';
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {};
 			if (token) {
 				headers['Authorization'] = `Bearer ${token}`;
@@ -130,6 +127,14 @@
 		goto(`/platform/companies/${company.ID}`);
 	}
 
+	async function generateForensicReport() {
+		try {
+			await forensicLogger.saveReport();
+		} catch (error) {
+			showError('Erro', 'Erro ao gerar relatório forense');
+		}
+	}
+
 	async function createCompany() {
 		if (!createForm.name || !createForm.slug || !createForm.owner_email || !createForm.owner_name || !createForm.password) {
 			showError('Erro', 'Preencha todos os campos obrigatórios');
@@ -137,7 +142,7 @@
 		}
 
 		try {
-			const tokenMatch = document.cookie.match(/platform_auth_token=([^;]+)/);
+			const tokenMatch = document.cookie.match(new RegExp(`${CookieKeys.PLATFORM_TOKEN}=([^;]+)`));
 			const token = tokenMatch ? tokenMatch[1] : null;
 			
 			if (!token) {
@@ -188,7 +193,6 @@
 				await loadCompanies();
 			} else {
 				const data = await response.json();
-				console.error('Erro ao criar empresa:', data);
 				showError('Erro', data.message || data.error || 'Erro ao criar empresa');
 			}
 		} catch (error) {
@@ -213,7 +217,10 @@
 			<h1>Empresas</h1>
 			<p>Gerencie todas as empresas da plataforma</p>
 		</div>
-		<Button variant="primary" onclick={() => (showCreateModal = true)}>Nova Empresa</Button>
+		<div class="header-actions">
+			<Button variant="secondary" onclick={generateForensicReport}>📋 Gerar Relatório Forense</Button>
+			<Button variant="primary" onclick={() => (showCreateModal = true)}>Nova Empresa</Button>
+		</div>
 	</header>
 
 	<div class="search-bar">
@@ -368,6 +375,11 @@
 		font-size: 0.875rem;
 		color: #94a3b8;
 		margin: 0;
+	}
+
+	.header-actions {
+		display: flex;
+		gap: 0.75rem;
 	}
 
 	.search-bar {

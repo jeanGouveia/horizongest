@@ -22,7 +22,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       } else {
         event.locals.user = null;
       }
-    } catch {
+    } catch (error) {
       event.locals.user = null;
     }
   } else {

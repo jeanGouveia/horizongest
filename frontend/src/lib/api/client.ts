@@ -34,12 +34,19 @@ async function request<T>(
 
     const json = await res.json().catch(() => ({}));
 
-    if (!res.ok) {
+    if(res.status===401){
+
+      console.error(
+          "401 recebido em:",
+          path
+      );
+
       return {
-        data: null,
-        error: json?.error ?? `Erro ${res.status}`,
-        status: res.status
+          data:null,
+          error:"401",
+          status:401
       };
+
     }
 
     return { data: json as T, error: null, status: res.status };
@@ -119,9 +126,6 @@ export const api = {
   // --- System endpoints ---
   dashboard: () =>
     request<any>('/dashboard'),
-
-  notifications: () =>
-    request<any>('/notifications'),
 
   health: () =>
     request<any>('/health'),
@@ -209,22 +213,22 @@ export const api = {
   companyUsers: {
     list: () =>
       request<Array<{
-        id: number;
-        name: string;
-        email: string;
-        role: string | null;
-        active: boolean;
-        company_id: number | null;
+        ID: number;
+        Name: string;
+        Email: string;
+        Role: string | null;
+        Active: boolean;
+        CompanyID: number | null;
       }>>('/company/users'),
 
     add: (body: { email: string }) =>
       request<{
-        id: number;
-        name: string;
-        email: string;
-        role: string | null;
-        active: boolean;
-        company_id: number | null;
+        ID: number;
+        Name: string;
+        Email: string;
+        Role: string | null;
+        Active: boolean;
+        CompanyID: number | null;
       }>('/company/users/add', {
         method: 'POST',
         body: JSON.stringify(body)

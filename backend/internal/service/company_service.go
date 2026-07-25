@@ -131,6 +131,24 @@ func (s *CompanyService) GetCompany(ctx context.Context, id uint) (*domain.Compa
 	return c, nil
 }
 
+// GetCurrentCompany retrieves the company by ID from the tenant context
+// This is the secure method that uses the CompanyID from the JWT/tenant context
+// The handler should extract the CompanyID from the tenant context and pass it here
+func (s *CompanyService) GetCurrentCompany(ctx context.Context, companyID uint) (*domain.Company, error) {
+	if companyID == 0 {
+		return nil, errors.New("company ID cannot be zero")
+	}
+
+	c, err := s.repo.FindByID(ctx, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("CompanyService.GetCurrentCompany: %w", err)
+	}
+	if c == nil {
+		return nil, ErrCompanyNotFound
+	}
+	return c, nil
+}
+
 func (s *CompanyService) GetCompanyBySlug(ctx context.Context, slug string) (*domain.Company, error) {
 	c, err := s.repo.FindBySlug(ctx, strings.ToLower(slug))
 	if err != nil {

@@ -6,6 +6,7 @@
 	import { Card } from '$lib/components/ui';
 	import { showSuccess, showError } from '$lib/stores/toast';
 	import { platformName } from '$lib/stores/brandStore';
+	import { CookieKeys } from '$lib/constants/storage-keys';
 
 	let email = '';
 	let password = '';
@@ -34,7 +35,7 @@
 			}
 
 			// Store token in cookie
-			document.cookie = `platform_auth_token=${data.token}; path=/; max-age=86400; samesite=lax`;
+			document.cookie = `${CookieKeys.PLATFORM_TOKEN}=${data.token}; path=/; max-age=86400; samesite=lax`;
 
 			showSuccess('Sucesso', 'Login realizado com sucesso');
 			goto('/platform/admin');

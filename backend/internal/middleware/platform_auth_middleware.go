@@ -3,9 +3,11 @@ package middleware
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
@@ -24,9 +26,58 @@ const ContextKeyPlatformRole contextKey = "platformRole"
 // Auth validates the JWT token and adds platform user ID and role to context
 func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("===================================================")
+		log.Println("TENANT AUTH MIDDLEWARE")
+		log.Println("REQUEST:", r.Method, r.URL.Path)
+		log.Println("RAW COOKIE HEADER:")
+		log.Println(r.Header.Get("Cookie"))
+		log.Println("===================================================")
+
+		// Check auth_token
+		authTokenCookie, err := r.Cookie("auth_token")
+		if err != nil {
+			log.Println("auth_token: NÃO ENCONTRADO")
+		} else {
+			log.Println("auth_token ENCONTRADO")
+			log.Println("tamanho:", len(authTokenCookie.Value))
+
+			// Parse JWT without validation
+			if token, _, e := jwt.NewParser().ParseUnverified(authTokenCookie.Value, jwt.MapClaims{}); e == nil {
+				if claims, ok := token.Claims.(jwt.MapClaims); ok {
+					log.Println("JWT RECEBIDO (auth_token)")
+					logJWTClaims(claims)
+				}
+			}
+		}
+
+		// Check platform_auth_token
+		platformTokenCookie, err := r.Cookie("platform_auth_token")
+		if err != nil {
+			log.Println("platform_auth_token: NÃO ENCONTRADO")
+		} else {
+			log.Println("platform_auth_token ENCONTRADO")
+			log.Println("tamanho:", len(platformTokenCookie.Value))
+
+			// Parse JWT without validation
+			if token, _, e := jwt.NewParser().ParseUnverified(platformTokenCookie.Value, jwt.MapClaims{}); e == nil {
+				if claims, ok := token.Claims.(jwt.MapClaims); ok {
+					log.Println("JWT RECEBIDO (platform_auth_token)")
+					logJWTClaims(claims)
+				}
+			}
+		}
+
+		// FORENSIC: Log authentication attempt
+		log.Printf("[FORENSIC MIDDLEWARE] AUTH_ATTEMPT - URL: %s %s", r.Method, r.URL.Path)
+		log.Printf("[FORENSIC MIDDLEWARE] AUTHORIZATION - Header: %s", r.Header.Get("Authorization"))
+		log.Printf("[FORENSIC MIDDLEWARE] COOKIE - Cookies: %v", r.Cookies())
+
 		// Get token from Authorization header
 		authHeader := r.Header.Get("Authorization")
+
 		if authHeader == "" {
+			log.Println("MOTIVO DO 401: missing authorization header")
+			log.Printf("[FORENSIC MIDDLEWARE] JWT_FOUND - NÃO")
 			http.Error(w, "missing authorization header", http.StatusUnauthorized)
 			return
 		}
@@ -37,12 +88,21 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 			token = authHeader[7:]
 		}
 
+		log.Printf("[FORENSIC MIDDLEWARE] JWT_FOUND - SIM")
+
 		// Validate token
 		userID, role, err := m.platformAuthService.ValidateToken(token)
 		if err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			log.Println("MOTIVO DO 401: invalid token -", err.Error())
+			log.Printf("[FORENSIC MIDDLEWARE] JWT_VALID - NÃO - Error: %v", err)
+			http.Error(w, "invalid token: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
+
+		log.Printf("[FORENSIC MIDDLEWARE] JWT_VALID - SIM")
+		log.Printf("[FORENSIC MIDDLEWARE] CLAIMS - UserID: %d, Role: %s", userID, role)
+		log.Printf("[FORENSIC MIDDLEWARE] TOKEN_TYPE - Platform")
+		log.Printf("[FORENSIC MIDDLEWARE] AUTH_RESULT - SUCESSO")
 
 		// Add platform user ID and role to context
 		ctx := context.WithValue(r.Context(), "platformUserID", userID)
@@ -51,6 +111,30 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func logJWTClaims(claims jwt.MapClaims) {
+	if uid, ok := claims["uid"].(float64); ok {
+		log.Printf("uid = %d", int(uid))
+	}
+	if cid, ok := claims["cid"].(float64); ok {
+		log.Printf("cid = %d", int(cid))
+	}
+	if imp, ok := claims["imp"].(bool); ok {
+		log.Printf("imp = %v", imp)
+	}
+	if opuid, ok := claims["opuid"].(float64); ok {
+		log.Printf("opuid = %d", int(opuid))
+	}
+	if iss, ok := claims["iss"].(string); ok {
+		log.Printf("iss = %s", iss)
+	}
+	if sub, ok := claims["sub"].(string); ok {
+		log.Printf("sub = %s", sub)
+	}
+	if exp, ok := claims["exp"].(float64); ok {
+		log.Printf("exp = %d", int(exp))
+	}
 }
 
 // RequireAdmin checks if the platform user has admin role

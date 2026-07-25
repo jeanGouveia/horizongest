@@ -25,9 +25,13 @@ var (
 
 // JWTClaims é exportado para que o middleware possa usar o tipo.
 type JWTClaims struct {
-	UserID uint   `json:"uid"`
-	Email  string `json:"email"`
-	Name   string `json:"name"`
+	UserID    uint   `json:"uid"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	CompanyID uint   `json:"cid"`
+	// Impersonation claims
+	IsImpersonating        bool `json:"imp"`
+	OriginalPlatformUserID uint `json:"opuid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -176,6 +180,9 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input Cha
 // Retorna *JWTClaims (exportado) para o middleware extrair UserID, Email e Name.
 
 func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTClaims, error) {
+	// FORENSIC: Log JWT bruto recebido
+	log.Printf("[FORENSIC] ValidateToken - JWT bruto recebido: %s", tokenStr)
+
 	// Check if token is blacklisted no banco
 	blacklisted, err := s.tokenBlacklist.IsBlacklisted(ctx, tokenStr)
 	if err != nil {
@@ -205,6 +212,11 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("ValidateToken: claims inválidos")
 	}
+
+	// FORENSIC: Log claims após validação
+	log.Printf("[FORENSIC] ValidateToken - Claims validados - UserID: %d, CompanyID: %d, Email: %s, Name: %s, Issuer: %s, Subject: %s, IsImpersonating: %v",
+		claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.Issuer, claims.Subject, claims.IsImpersonating)
+
 	return claims, nil
 }
 
@@ -258,6 +270,11 @@ func (s *AuthService) parseTokenClaims(tokenStr string) (*JWTClaims, error) {
 // --- helper privado ---
 
 func (s *AuthService) generateJWT(user *domain.User) (string, error) {
+	return s.generateJWTWithImpersonation(user, false, 0)
+}
+
+// generateJWTWithImpersonation generates a JWT token with optional impersonation claims
+func (s *AuthService) generateJWTWithImpersonation(user *domain.User, isImpersonating bool, originalPlatformUserID uint) (string, error) {
 	now := time.Now()
 	// Use dynamic issuer from platform brand (Sprint 3.6)
 	issuer := s.issuer
@@ -265,9 +282,12 @@ func (s *AuthService) generateJWT(user *domain.User) (string, error) {
 		issuer = "platform" // Fallback if issuer is empty
 	}
 	claims := JWTClaims{
-		UserID: user.ID,
-		Email:  user.Email,
-		Name:   user.Name,
+		UserID:                 user.ID,
+		Email:                  user.Email,
+		Name:                   user.Name,
+		CompanyID:              user.CompanyID,
+		IsImpersonating:        isImpersonating,
+		OriginalPlatformUserID: originalPlatformUserID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   fmt.Sprintf("%d", user.ID),
@@ -276,10 +296,15 @@ func (s *AuthService) generateJWT(user *domain.User) (string, error) {
 			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
+
+	// DEBUG: Log JWT claims before generating
+	log.Printf("[DEBUG] generateJWTWithImpersonation - Claims: UserID=%d, CompanyID=%d, Email=%s, Name=%s, IsImpersonating=%v, OriginalPlatformUserID=%d",
+		claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating, claims.OriginalPlatformUserID)
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(s.secret)
 	if err != nil {
-		return "", fmt.Errorf("generateJWT: %w", err)
+		return "", fmt.Errorf("generateJWTWithImpersonation: %w", err)
 	}
 	return signed, nil
 }

@@ -6,6 +6,7 @@
 	import { Input } from '$lib/components/ui';
 	import { Badge } from '$lib/components/ui';
 	import { showSuccess, showError } from '$lib/stores/toast';
+	import { CookieKeys } from '$lib/constants/storage-keys';
 
 	interface Owner {
 		ID: number;
@@ -37,7 +38,7 @@
 	async function loadOwner() {
 		loading = true;
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
@@ -71,7 +72,7 @@
 		}
 
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json'
 			};
@@ -107,7 +108,7 @@
 
 		const action = owner.Active ? 'block' : 'unblock';
 		try {
-			const token = document.cookie.split('; ').find(row => row.startsWith('platform_auth_token='))?.split('=')[1];
+			const token = document.cookie.split('; ').find(row => row.startsWith(`${CookieKeys.PLATFORM_TOKEN}=`))?.split('=')[1];
 			const headers: Record<string, string> = {};
 			if (token) {
 				headers['Authorization'] = `Bearer ${token}`;

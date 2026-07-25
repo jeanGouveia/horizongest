@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -50,16 +51,66 @@ func (h *CompanyHandler) ListCompanies(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/companies/{id}
+// DEPRECATED: Use GET /api/me/company instead
+// This endpoint now validates that the requested ID matches the tenant's CompanyID
+// to prevent IDOR (Insecure Direct Object Reference) attacks
 func (h *CompanyHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r, "id")
 	if err != nil {
 		jsonError(w, "ID da empresa inválido. Verifique o valor informado.", http.StatusBadRequest)
 		return
 	}
+
+	// Security check: Validate that requested ID matches tenant's CompanyID
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+
+	if tenantCtx.CompanyID == 0 {
+		jsonError(w, "company ID não encontrado no contexto tenant", http.StatusUnauthorized)
+		return
+	}
+
+	// Prevent IDOR: User can only access their own company
+	if id != tenantCtx.CompanyID {
+		jsonError(w, "acesso negado: empresa não pertence ao usuário", http.StatusForbidden)
+		return
+	}
+
 	c, err := h.svc.GetCompany(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrCompanyNotFound) {
 			jsonError(w, "empresa não encontrada. Verifique o ID informado.", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "não foi possível carregar a empresa. Tente novamente.", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, http.StatusOK, c)
+}
+
+// GET /api/me/company
+// Secure endpoint that returns the current user's company from tenant context
+// Does not accept CompanyID from URL - uses only the CompanyID from JWT/tenant context
+func (h *CompanyHandler) GetCurrentCompany(w http.ResponseWriter, r *http.Request) {
+	// Get tenant context from middleware
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+
+	if tenantCtx.CompanyID == 0 {
+		jsonError(w, "company ID não encontrado no contexto tenant", http.StatusUnauthorized)
+		return
+	}
+
+	c, err := h.svc.GetCurrentCompany(r.Context(), tenantCtx.CompanyID)
+	if err != nil {
+		if errors.Is(err, service.ErrCompanyNotFound) {
+			jsonError(w, "empresa não encontrada", http.StatusNotFound)
 			return
 		}
 		jsonError(w, "não foi possível carregar a empresa. Tente novamente.", http.StatusInternalServerError)

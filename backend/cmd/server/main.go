@@ -91,6 +91,7 @@ func main() {
 	platformAuditRepo := repository.NewGormPlatformAuditRepository(db)
 	planRepo := repository.NewGormPlanRepository(db)
 	platformBrandRepo := repository.NewGormPlatformBrandRepository(db) // Sprint 3.5
+	impersonationAuditRepo := repository.NewGormImpersonationAuditRepository(db)
 
 	// JWT secrets (Sprint 3.4 - Security Hardening)
 	jwtPlatformSecret := getEnv("JWT_PLATFORM_SECRET", "your-platform-secret-key-change-in-production")
@@ -134,6 +135,9 @@ func main() {
 	// Initialize auth service with platform brand as JWT issuer (Sprint 3.6)
 	authSvc := service.NewAuthService(userRepo, companyRepo, tokenBlacklistRepo, passwordResetRepo, jwtTenantSecret, platformBrand.PlatformName)
 
+	// Impersonation service
+	impersonationSvc := service.NewImpersonationService(authSvc, companyRepo, userRepo, impersonationAuditRepo)
+
 	emailSvc := service.NewEmailService(false, platformBrand.SupportEmail, platformBrand.PlatformName) // Email disabled by default
 	platformSvc := service.NewPlatformService(companyRepo, userRepo, platformUserRepo, platformAuditRepo, emailSvc)
 	planSvc := service.NewPlanService(planRepo)
@@ -171,6 +175,8 @@ func main() {
 	backupHandler := handler.NewBackupHandler(backupSvc)
 	exportHandler := handler.NewExportHandler(exportSvc)
 	platformBrandHandler := handler.NewPlatformBrandHandler(platformBrandSvc) // Sprint 3.5
+	impersonationHandler := handler.NewImpersonationHandler(impersonationSvc)
+	forensicHandler := handler.NewForensicHandler() // Forensic investigation
 
 	authMw := middleware.NewAuthMiddleware(authSvc)
 	tenantMw := middleware.NewTenantMiddleware(userRepo)
@@ -294,6 +300,19 @@ func main() {
 		r.Put("/", platformBrandHandler.UpdatePlatformBrand)
 	}) // Sprint 3.5
 
+	r.Route("/api/platform/impersonation", func(r chi.Router) {
+		r.Use(platformAuthMw.Auth)
+		r.Post("/start", impersonationHandler.StartImpersonation)
+		r.Post("/end", impersonationHandler.EndImpersonation)
+		r.Get("/active", impersonationHandler.GetActiveImpersonation)
+		r.Get("/history", impersonationHandler.GetImpersonationHistory)
+	})
+
+	// Forensic investigation endpoints (no auth required for debugging)
+	r.Route("/api/forensic", func(r chi.Router) {
+		forensicHandler.RegisterRoutes(r)
+	})
+
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Use(rateLimiter.RateLimitByIP) // Sprint 3.4 - Rate limiting
 		r.Post("/login", authHandler.Login)
@@ -312,6 +331,7 @@ func main() {
 		r.Get("/api/me", authHandler.Me)
 		r.Put("/api/me", authHandler.UpdateProfile)
 		r.Post("/api/me/change-password", authHandler.ChangePassword)
+		r.Get("/api/me/company", companyHandler.GetCurrentCompany)
 
 		// Empresas (Tenant Engine - Platform 2.0)
 		// REMOVED: POST /api/companies - Company creation is platform-only (Sprint 3.2)
