@@ -777,6 +777,215 @@ Establish naming conventions: Go (PascalCase/camelCase), Database (snake_case), 
 
 ---
 
+## Decision 26: Secure Impersonation for Platform Admins
+
+**Date:** July 2026  
+**Status:** Active
+
+### Problem
+
+Platform administrators need to temporarily access company dashboards to troubleshoot issues and provide support without:
+- Requiring company owner credentials
+- Creating permanent user accounts
+- Bypassing security and audit trails
+- Breaking existing authentication and authorization systems
+
+### Decision
+
+Implement secure impersonation using JWT claims with temporary sessions and comprehensive audit logging.
+
+### Justification
+
+- **Security:** No password sharing or credential exposure
+- **Auditability:** All actions during impersonation are logged with platform admin identity
+- **Temporary:** Sessions are time-limited (24 hours) and can be ended immediately
+- **Non-invasive:** Doesn't alter existing authentication/authorization architecture
+- **Clear Indication:** Frontend banner shows impersonation status to users
+- **RBAC Integration:** Platform admins get Owner permissions only during impersonation
+
+### Consequences
+
+- JWT claims include impersonation flags (IsImpersonating, OriginalPlatformUserID)
+- New impersonation_audit table for comprehensive logging
+- Middleware updated to recognize and handle impersonation context
+- RBAC middleware grants Owner permissions during impersonation
+- Frontend banner component shows impersonation status
+- Platform-only feature (tenants cannot impersonate)
+- All impersonation operations are auditable
+
+---
+
+## Decision 27: Professional Session Management Architecture
+
+**Date:** July 2026  
+**Status:** Active
+
+### Problem
+
+The HorizonGest lacked a formal session management policy, causing:
+- Dashboard opening without session validation
+- Old JWTs surviving after backend restart
+- Stores persisting across company switches
+- Active impersonation sessions remaining after logout
+- 409 errors for "already existing impersonation session"
+- Inconsistent company switching
+- User insecurity due to unpredictable session behavior
+
+### Decision
+
+Implement a professional session management architecture with centralized managers and strict lifecycle policies.
+
+### Justification
+
+- **Centralization:** Single point of truth for session operations
+- **Consistency:** Context always validated before navigation
+- **Security:** Automatic 401 handling and session destruction
+- **Prevention:** Flags prevent race conditions
+- **Professional:** Equivalent to Stripe, Notion, GitHub, Slack, Linear
+- **Maintainability:** Easy to test and evolve
+- **User Trust:** Predictable and secure session behavior
+
+### Consequences
+
+- **SessionManager:** Centralized Platform and Tenant session management
+- **TenantSessionManager:** Centralized company switching lifecycle
+- **Validation:** Backend validation on app initialization
+- **401 Handling:** Automatic session destruction on 401
+- **Stale Sessions:** Auto-cleanup of impersonations older than 24 hours
+- **Cache Invalidation:** Complete cache clearing on company switch
+- **Store Reset:** All stores have clear/reset methods
+- **No Hacks:** No setTimeout, no reload, no scattered clearing
+- **Single Point:** All session operations go through managers
+
+---
+
+## Decision 28: Storage Keys Centralization and Browser Compatibility
+
+**Date:** July 24, 2026  
+**Status:** Active
+
+### Problem
+
+The codebase had scattered storage key strings throughout, causing:
+- Typos in cookie and localStorage keys
+- Difficulty refactoring when keys needed to change
+- No documentation of storage key purposes
+- Use of experimental Navigation API not supported by all browsers
+- Broad cache clearing (`sessionStorage.clear()`) affecting platform data
+
+### Decision
+
+Centralize all storage keys in a constants file and implement granular cache clearing with browser-compatible APIs.
+
+### Justification
+
+- **Type Safety:** Constants prevent typos and provide TypeScript type safety
+- **Maintainability:** Single source of truth for all storage keys
+- **Documentation:** Each key's purpose is documented
+- **Refactoring:** Easy to change keys in one place
+- **Browser Compatibility:** Removed experimental Navigation API
+- **Granular Clearing:** Only tenant-specific data is cleared, preserving platform session
+- **Cross-browser:** Uses only APIs supported by Chrome, Firefox, Safari, Edge
+
+### Consequences
+
+- **New File:** `frontend/src/lib/constants/storage-keys.ts` with all cookie/localStorage/sessionStorage keys
+- **Rule:** Never use string literals for storage keys
+- **Rule:** Never use `sessionStorage.clear()` or `localStorage.clear()` globally
+- **Rule:** Only use APIs supported by all target browsers
+- **Rule:** Never use `@ts-ignore` to silence TypeScript errors
+- **Implementation:** Granular methods like `clearTenantSessionStorage()` remove only specific keys
+- **Error Handling:** Typed error classes (InfrastructureError, SessionValidationError, BackendError, UIError)
+- **Documentation:** Comprehensive JSDoc comments on cache lifecycle methods
+
+### Files Changed
+
+- `frontend/src/lib/constants/storage-keys.ts` (new)
+- `frontend/src/lib/managers/sessionManager.ts`
+- `frontend/src/lib/managers/tenantSessionManager.ts`
+- `frontend/src/routes/platform/signin/+page.svelte`
+- `frontend/src/routes/platform/admin/+page.svelte`
+- `frontend/src/routes/platform/companies/+page.svelte`
+- `frontend/src/routes/platform/companies/[id]/+page.svelte`
+- `frontend/src/routes/platform/companies/[id]/owner/+page.svelte`
+- `docs/05-development/SESSION_MANAGEMENT.md`
+- `docs/05-development/SESSION_TESTING.md`
+- `docs/AI_CONTEXT.md`
+
+---
+
+## Decision 29: Backend-Driven Impersonation Management
+
+**Date:** July 24, 2026  
+**Status:** Active
+
+### Problem
+
+The previous implementation returned HTTP 409 "já existe uma sessão de impersonation ativa" when a platform admin tried to switch companies with an active impersonation less than 24 hours old. This contradicted the HorizonGest architecture, which was designed to allow platform admins to freely switch between companies without logout or manual impersonation termination.
+
+**Previous Behavior:**
+- If impersonation active AND > 24h: Auto-end and create new ✅
+- If impersonation active AND < 24h: Return HTTP 409 ❌
+
+**Expected Flow:**
+Platform → Company A → Platform → Company B → Platform → Company C (without any 409 errors)
+
+### Decision
+
+Make the backend fully responsible for impersonation management. The endpoint `POST /api/platform/impersonation/start` is now idempotent and automatically ends any active impersonation before creating a new one, regardless of age.
+
+**New Behavior:**
+- If impersonation active (any age): Auto-end and create new ✅
+- No HTTP 409 for normal company switching
+
+### Justification
+
+- **User Experience:** Platform admins can freely switch companies without manual intervention
+- **Simplicity:** Frontend no longer needs to call `endPreviousImpersonation()` before `enterCompany()`
+- **Idempotency:** Endpoint is now idempotent for the same platform admin
+- **Architectural Consistency:** Aligns with HorizonGest's design goal of seamless company switching
+- **Audit Integrity:** Previous impersonation receives EndedAt correctly, new one is created
+- **No Race Conditions:** Backend ensures atomic operation (end previous + create new)
+
+### Consequences
+
+- **Backend Changes:**
+  - `impersonation_service.go`: Removed age check, auto-end any active impersonation
+  - `impersonation_handler.go`: Removed `ErrAlreadyImpersonating` error handling
+  - Endpoint no longer returns HTTP 409 for active impersonations
+
+- **Frontend Changes:**
+  - `tenantSessionManager.ts`: Removed `endPreviousImpersonation()` call from `enterCompany()`
+  - Simplified flow: just call `requestTenantJWT()`, backend handles the rest
+
+- **HTTP 409 Usage:**
+  - Only for truly invalid scenarios (non-existent user, company, permissions, deactivated company, business rule violations)
+  - Never for "already has active impersonation"
+
+- **Audit Guarantees:**
+  - Previous impersonation always receives EndedAt
+  - New impersonation is always created
+  - Never two active impersonations for same PlatformUser
+  - History remains intact
+
+### Files Changed
+
+- `backend/internal/service/impersonation_service.go`
+- `backend/internal/handler/impersonation_handler.go`
+- `frontend/src/lib/managers/tenantSessionManager.ts`
+- `docs/05-development/SESSION_MANAGEMENT.md`
+
+### Testing Validation
+
+Required flow validation:
+- Company A → Company B → Company C → Company D → Company A → Company B
+- No HTTP 409 errors
+- No logout required
+- No browser restart required
+- No cookie clearing required
+
+---
+
 ## Summary
 
 | Decision | Status | Impact |
@@ -806,7 +1015,11 @@ Establish naming conventions: Go (PascalCase/camelCase), Database (snake_case), 
 | Dynamic PlatformName | Active | White-label services |
 | Goose | Active | Migrations |
 | Naming Conventions | Active | Code consistency |
+| Secure Impersonation | Active | Platform admin access to companies |
+| Professional Session Management | Active | Centralized session lifecycle |
+| Storage Keys Centralization | Active | Type-safe storage management |
+| Backend-Driven Impersonation | Active | Idempotent company switching |
 
 ---
 
-**Last Updated:** Fase 2 - Documentation & Knowledge Base
+**Last Updated:** July 24, 2026 - Backend-Driven Impersonation Management
