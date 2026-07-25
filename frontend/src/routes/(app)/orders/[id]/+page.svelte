@@ -177,7 +177,7 @@
   {:else if order}
     <header class="order-header">
       <div class="order-meta">
-        <h1 class="order-title">Pedido <span class="order-id-num">#{order.ID}</span></h1>
+        <h1 class="order-title">Pedido <span class="order-id-num">#{order.OrderNumber}</span></h1>
         <span class="status-badge {ORDER_STATUS_COLOR[order.Status]}">
           {ORDER_STATUS_LABEL[order.Status]}
         </span>

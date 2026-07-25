@@ -16,14 +16,15 @@ import (
 // ─── GORM models ────────────────────────────────────────────────────────────
 
 type GormOrder struct {
-	ID         uint   `gorm:"primaryKey;autoIncrement"`
-	Status     string `gorm:"not null;default:'pending'"`
-	TotalPrice float64
-	Notes      string
-	CompanyID  uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
-	DeletedAt  *int64 `gorm:"index"`
-	CreatedAt  int64  `gorm:"autoCreateTime"`
-	UpdatedAt  int64  `gorm:"autoUpdateTime"`
+	ID          uint   `gorm:"primaryKey;autoIncrement"`
+	OrderNumber int    `gorm:"not null;default:0;index:idx_orders_company_order_number,priority:1"`
+	Status      string `gorm:"not null;default:'pending'"`
+	TotalPrice  float64
+	Notes       string
+	CompanyID   uint   `gorm:"index;not null;index:idx_orders_company_order_number,priority:2"` // Sprint 3: NOT NULL
+	DeletedAt   *int64 `gorm:"index"`
+	CreatedAt   int64  `gorm:"autoCreateTime"`
+	UpdatedAt   int64  `gorm:"autoUpdateTime"`
 }
 
 func (GormOrder) TableName() string { return "orders" }
@@ -73,17 +74,29 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
-		// 1. Persiste o pedido
+		// 1. Gerar o próximo número de pedido para esta empresa (isolamento de tenant)
+		// SELECT MAX(order_number) + 1 FROM orders WHERE company_id = ?
+		var nextOrderNumber int
+		if err := tx.Model(&GormOrder{}).
+			Where("company_id = ?", companyID).
+			Select("COALESCE(MAX(order_number), 0) + 1").
+			Scan(&nextOrderNumber).Error; err != nil {
+			return fmt.Errorf("CreateOrder: gerar order_number: %w", err)
+		}
+
+		// 2. Persiste o pedido
 		gOrder := GormOrder{
-			Status:     string(order.Status),
-			TotalPrice: order.TotalPrice,
-			Notes:      order.Notes,
-			CompanyID:  companyID, // Auto-filled from context
+			OrderNumber: nextOrderNumber,
+			Status:      string(order.Status),
+			TotalPrice:  order.TotalPrice,
+			Notes:       order.Notes,
+			CompanyID:   companyID, // Auto-filled from context
 		}
 		if err := tx.Create(&gOrder).Error; err != nil {
 			return fmt.Errorf("CreateOrder: criar pedido: %w", err)
 		}
 		order.ID = gOrder.ID
+		order.OrderNumber = gOrder.OrderNumber
 		order.CompanyID = gOrder.CompanyID
 		order.CreatedAt = time.Unix(gOrder.CreatedAt, 0)
 
@@ -509,13 +522,14 @@ func orderToDomain(g *GormOrder) *domain.Order {
 		deletedAt = &dt
 	}
 	return &domain.Order{
-		ID:         g.ID,
-		Status:     domain.OrderStatus(g.Status),
-		TotalPrice: g.TotalPrice,
-		Notes:      g.Notes,
-		CompanyID:  g.CompanyID,
-		DeletedAt:  deletedAt,
-		CreatedAt:  time.Unix(g.CreatedAt, 0),
-		UpdatedAt:  time.Unix(g.UpdatedAt, 0),
+		ID:          g.ID,
+		OrderNumber: g.OrderNumber,
+		Status:      domain.OrderStatus(g.Status),
+		TotalPrice:  g.TotalPrice,
+		Notes:       g.Notes,
+		CompanyID:   g.CompanyID,
+		DeletedAt:   deletedAt,
+		CreatedAt:   time.Unix(g.CreatedAt, 0),
+		UpdatedAt:   time.Unix(g.UpdatedAt, 0),
 	}
 }

@@ -11,6 +11,7 @@ export interface OrderItem {
 
 export interface Order {
   ID: number;
+  OrderNumber: number; // Número comercial do pedido (sequencial por empresa)
   Status: OrderStatus;
   TotalPrice: number;
   Notes?: string;

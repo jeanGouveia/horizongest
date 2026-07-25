@@ -39,7 +39,7 @@
 
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const idMatch = order.ID.toString().includes(query);
+        const idMatch = order.OrderNumber.toString().includes(query);
         const productsMatch = order.Items.some(item =>
           item.Product?.Name?.toLowerCase().includes(query)
         );
@@ -65,7 +65,7 @@
       } else if (sortBy === 'total') {
         comparison = a.TotalPrice - b.TotalPrice;
       } else if (sortBy === 'id') {
-        comparison = a.ID - b.ID;
+        comparison = a.OrderNumber - b.OrderNumber;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     })
@@ -260,7 +260,7 @@
         {#each paginated as order}
           <Card class="order-card">
             <div class="order-header">
-              <div class="order-id">#{order.ID}</div>
+              <div class="order-id">#{order.OrderNumber}</div>
               <Badge variant={getStatusVariant(order.Status)} size="sm">
                 {ORDER_STATUS_LABEL[order.Status]}
               </Badge>
