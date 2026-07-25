@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -67,14 +68,27 @@ func (r *GormCompanyRepository) Create(ctx context.Context, company *domain.Comp
 }
 
 func (r *GormCompanyRepository) FindByID(ctx context.Context, id uint) (*domain.Company, error) {
+	// FORENSIC: Log CompanyID received
+	log.Printf("[FORENSIC] CompanyRepository.FindByID - CompanyID recebido: %d", id)
+
 	var model GormCompanyModel
+
+	// FORENSIC: Log SQL that will be executed
+	log.Printf("[FORENSIC] CompanyRepository.FindByID - SQL a ser executado: SELECT * FROM companies WHERE id = %d AND deleted_at IS NULL", id)
+
 	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&model, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Printf("[FORENSIC] CompanyRepository.FindByID - Registro não encontrado para CompanyID: %d", id)
 		return nil, nil
 	}
 	if err != nil {
+		log.Printf("[FORENSIC] CompanyRepository.FindByID - Erro ao executar SQL: %v", err)
 		return nil, fmt.Errorf("CompanyRepository.FindByID: %w", err)
 	}
+
+	// FORENSIC: Log company returned
+	log.Printf("[FORENSIC] CompanyRepository.FindByID - Empresa retornada: ID=%d, Name=%s", model.ID, model.Name)
+
 	return toDomainCompany(&model), nil
 }
 

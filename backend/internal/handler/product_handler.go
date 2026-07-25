@@ -326,7 +326,30 @@ func (h *ProductHandler) GetProductIngredients(w http.ResponseWriter, r *http.Re
 		jsonError(w, "não foi possível carregar a ficha técnica. Tente novamente.", http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, http.StatusOK, p.Ingredients)
+
+	// Flatten the response to include ingredient fields directly
+	type flattenedIngredient struct {
+		ID           uint    `json:"ID"`
+		ProductID    uint    `json:"ProductID"`
+		IngredientID uint    `json:"IngredientID"`
+		Quantity     float64 `json:"Quantity"`
+		Name         string  `json:"Name"`
+		Unit         string  `json:"Unit"`
+	}
+
+	flattened := make([]flattenedIngredient, len(p.Ingredients))
+	for i, ing := range p.Ingredients {
+		flattened[i] = flattenedIngredient{
+			ID:           ing.ID,
+			ProductID:    ing.ProductID,
+			IngredientID: ing.IngredientID,
+			Quantity:     ing.Quantity,
+			Name:         ing.Ingredient.Name,
+			Unit:         ing.Ingredient.Unit,
+		}
+	}
+
+	jsonResponse(w, http.StatusOK, flattened)
 }
 
 // POST /api/products/{id}/duplicate
