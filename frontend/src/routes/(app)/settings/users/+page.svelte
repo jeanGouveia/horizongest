@@ -8,12 +8,12 @@
 
   let loading = $state(true);
   let users = $state<Array<{
-    id: number;
-    name: string;
-    email: string;
-    role: string | null;
-    active: boolean;
-    company_id: number | null;
+    ID: number;
+    Name: string;
+    Email: string;
+    Role: string | null;
+    Active: boolean;
+    CompanyID: number | null;
   }>>([]);
   let error = $state('');
   let success = $state(false);
@@ -251,16 +251,16 @@
             <tbody>
               {#each users as user}
                 <tr>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
+                  <td>{user.Name}</td>
+                  <td>{user.Email}</td>
                   <td>
-                    <span class="badge {getRoleBadgeColor(user.role)}">
-                      {getRoleBadge(user.role)}
+                    <span class="badge {getRoleBadgeColor(user.Role)}">
+                      {getRoleBadge(user.Role)}
                     </span>
                   </td>
                   <td>
-                    <span class="status-badge {user.active ? 'active' : 'inactive'}">
-                      {user.active ? 'Ativo' : 'Inativo'}
+                    <span class="status-badge {user.Active ? 'active' : 'inactive'}">
+                      {user.Active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td>
@@ -268,10 +268,10 @@
                       <Button onclick={() => openRoleModal(user)} variant="ghost" size="sm" title="Alterar cargo">
                         <Shield size={16} />
                       </Button>
-                      <Button onclick={() => toggleUserActive(user.id, user.active)} variant="ghost" size="sm" title={user.active ? 'Desativar usuário' : 'Ativar usuário'}>
-                        {user.active ? '🔴' : '🟢'}
+                      <Button onclick={() => toggleUserActive(user.ID, user.Active)} variant="ghost" size="sm" title={user.Active ? 'Desativar usuário' : 'Ativar usuário'}>
+                        {user.Active ? '🔴' : '🟢'}
                       </Button>
-                      <Button onclick={() => removeUser(user.id)} variant="ghost" size="sm" title="Remover usuário">
+                      <Button onclick={() => removeUser(user.ID)} variant="ghost" size="sm" title="Remover usuário">
                         <Trash2 size={16} />
                       </Button>
                     </div>

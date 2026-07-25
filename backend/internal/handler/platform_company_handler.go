@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -39,7 +40,7 @@ func (h *PlatformCompanyHandler) CreateCompany(w http.ResponseWriter, r *http.Re
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -87,12 +88,21 @@ func (h *PlatformCompanyHandler) ListCompanies(w http.ResponseWriter, r *http.Re
 
 // GET /api/platform/companies/:id
 func (h *PlatformCompanyHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
+	// FORENSIC: Log request complete
+	log.Printf("[FORENSIC companies/{id}] REQUEST_COMPLETE - Method: %s, URL: %s", r.Method, r.URL.Path)
+	log.Printf("[FORENSIC companies/{id}] REQUEST_COMPLETE - Headers: %v", r.Header)
+	log.Printf("[FORENSIC companies/{id}] REQUEST_COMPLETE - Cookies: %v", r.Cookies())
+
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		log.Printf("[FORENSIC companies/{id}] AUTH_RESULT - FALHA (platformUserID not found in context)")
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
+
+	log.Printf("[FORENSIC companies/{id}] AUTHORIZATION - Header: %s", r.Header.Get("Authorization"))
+	log.Printf("[FORENSIC companies/{id}] USER_AUTHENTICATED - PlatformUserID: %d", platformUserID)
 
 	// Get company ID from URL parameter
 	companyIDStr := chi.URLParam(r, "id")
@@ -102,19 +112,27 @@ func (h *PlatformCompanyHandler) GetCompany(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	log.Printf("[FORENSIC companies/{id}] COMPANY_REQUESTED - CompanyID: %d", companyID)
+
 	company, err := h.platformService.GetCompany(r.Context(), platformUserID, uint(companyID))
 	if err != nil {
 		if errors.Is(err, service.ErrPermissionDenied) {
+			log.Printf("[FORENSIC companies/{id}] AUTH_RESULT - FALHA (Permission denied)")
 			jsonError(w, "permissão negada", http.StatusForbidden)
 			return
 		}
 		if errors.Is(err, service.ErrCompanyNotFound) {
+			log.Printf("[FORENSIC companies/{id}] COMPANY_FOUND - NÃO (Company not found)")
 			jsonError(w, "empresa não encontrada", http.StatusNotFound)
 			return
 		}
+		log.Printf("[FORENSIC companies/{id}] AUTH_RESULT - FALHA (Internal error: %v)", err)
 		jsonError(w, "não foi possível obter empresa", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[FORENSIC companies/{id}] COMPANY_FOUND - SIM (CompanyID: %d, Name: %s)", company.ID, company.Name)
+	log.Printf("[FORENSIC companies/{id}] RESPONSE_ENVIADA - %+v", company)
 
 	jsonResponse(w, http.StatusOK, company)
 }
@@ -134,7 +152,7 @@ func (h *PlatformCompanyHandler) UpdateCompany(w http.ResponseWriter, r *http.Re
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -173,7 +191,7 @@ func (h *PlatformCompanyHandler) DeactivateCompany(w http.ResponseWriter, r *htt
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -208,7 +226,7 @@ func (h *PlatformCompanyHandler) ActivateCompany(w http.ResponseWriter, r *http.
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -243,7 +261,7 @@ func (h *PlatformCompanyHandler) GetCompanyOwner(w http.ResponseWriter, r *http.
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -289,7 +307,7 @@ func (h *PlatformCompanyHandler) ResetOwnerPassword(w http.ResponseWriter, r *ht
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -324,7 +342,7 @@ func (h *PlatformCompanyHandler) BlockUser(w http.ResponseWriter, r *http.Reques
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -355,7 +373,7 @@ func (h *PlatformCompanyHandler) UnblockUser(w http.ResponseWriter, r *http.Requ
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -386,7 +404,7 @@ func (h *PlatformCompanyHandler) LoginAsCompany(w http.ResponseWriter, r *http.R
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -435,7 +453,7 @@ func (h *PlatformCompanyHandler) SetCompanyTrial(w http.ResponseWriter, r *http.
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -477,7 +495,7 @@ func (h *PlatformCompanyHandler) SuspendCompany(w http.ResponseWriter, r *http.R
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -512,7 +530,7 @@ func (h *PlatformCompanyHandler) CancelCompany(w http.ResponseWriter, r *http.Re
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 
@@ -547,7 +565,7 @@ func (h *PlatformCompanyHandler) ReactivateCompany(w http.ResponseWriter, r *htt
 	// Get platform user ID from context (set by middleware)
 	platformUserID, ok := r.Context().Value("platformUserID").(uint)
 	if !ok {
-		jsonError(w, "não autenticado", http.StatusUnauthorized)
+		jsonError(w, "não autenticado: platformUserID not found in context", http.StatusUnauthorized)
 		return
 	}
 

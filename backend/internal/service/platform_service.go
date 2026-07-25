@@ -48,7 +48,7 @@ type PlatformCreateCompanyInput struct {
 	Name         string `json:"name" validate:"required,min=2,max=100"`
 	Slug         string `json:"slug" validate:"required,min=2,max=50"`
 	Description  string `json:"description"`
-	BusinessType string `json:"business_type" validate:"omitempty,oneof=restaurant cafe bakery other"`
+	BusinessType string `json:"business_type" validate:"omitempty,oneof=restaurant bakery confectionery coffee_shop pizzeria burger ice_cream acai food_truck dark_kitchen generic"`
 	Locale       string `json:"locale" validate:"omitempty"`
 	Currency     string `json:"currency" validate:"omitempty"`
 	Timezone     string `json:"timezone" validate:"omitempty"`

@@ -4,6 +4,7 @@
 	import { Card } from '$lib/components/ui';
 	import { Button } from '$lib/components/ui';
 	import { showSuccess, showError } from '$lib/stores/toast';
+	import { CookieKeys } from '$lib/constants/storage-keys';
 
 	let stats = {
 		totalCompanies: 0,
@@ -40,7 +41,7 @@
 	}
 
 	function logout() {
-		document.cookie = 'platform_auth_token=; path=/; max-age=0';
+		document.cookie = `${CookieKeys.PLATFORM_TOKEN}=; path=/; max-age=0`;
 		goto('/platform/signin');
 	}
 </script>
