@@ -203,7 +203,7 @@
           {#each dashboard.recentOrders as order}
             <div class="order-item">
               <div class="order-info">
-                <div class="order-id">#{order.id}</div>
+                <div class="order-id">#{order.orderNumber}</div>
                 <div class="order-table">{order.itemsCount} itens</div>
               </div>
               <div class="order-status">
@@ -242,7 +242,11 @@
                 </div>
               </div>
               <div class="ingredient-status">
-                <Badge variant="danger" size="sm">Crítico</Badge>
+                {#if ingredient.stockQuantity === 0}
+                  <Badge variant="danger" size="sm">Zerado</Badge>
+                {:else}
+                  <Badge variant="danger" size="sm">Crítico</Badge>
+                {/if}
               </div>
             </div>
           {/each}
