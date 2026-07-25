@@ -18,7 +18,6 @@
 	function handleSearch(e: KeyboardEvent) {
 		if (e.key === 'Enter' && searchQuery.trim()) {
 			// Implementar busca
-			console.log('Searching for:', searchQuery);
 		}
 	}
 </script>

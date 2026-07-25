@@ -72,11 +72,12 @@ type TopItem struct {
 
 // RecentOrder representa um pedido recente para o dashboard
 type RecentOrder struct {
-	ID         uint        `json:"id"`
-	Status     OrderStatus `json:"status"`
-	TotalPrice float64     `json:"totalPrice"`
-	CreatedAt  string      `json:"createdAt"`
-	ItemsCount int         `json:"itemsCount"`
+	ID          uint        `json:"id"`
+	OrderNumber int         `json:"orderNumber"` // Número comercial (sequencial por empresa)
+	Status      OrderStatus `json:"status"`
+	TotalPrice  float64     `json:"totalPrice"`
+	CreatedAt   string      `json:"createdAt"`
+	ItemsCount  int         `json:"itemsCount"`
 }
 
 // LowStockItem representa um ingrediente com estoque baixo

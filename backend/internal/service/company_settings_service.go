@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
@@ -59,6 +60,11 @@ type UpdateSettingsInput struct {
 
 // GetSettings retrieves the settings for the user's company
 func (s *CompanySettingsService) GetSettings(ctx context.Context, userID uint) (*GetSettingsOutput, error) {
+	log.Printf("[FORENSIC] CompanySettingsService - GetSettings - UserID recebido: %d", userID)
+
+	// FORENSIC: ANTES do FindByID user
+	log.Printf("[FORENSIC] CompanySettingsService - ANTES FindByID user - UserID: %d", userID)
+
 	// Get user to find their company
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
@@ -73,6 +79,12 @@ func (s *CompanySettingsService) GetSettings(ctx context.Context, userID uint) (
 		return nil, ErrUserNoCompany
 	}
 
+	// FORENSIC: APÓS do FindByID user
+	log.Printf("[FORENSIC] CompanySettingsService - APÓS FindByID user - user.ID=%d, user.CompanyID=%d, user.Name=%s", user.ID, user.CompanyID, user.Name)
+
+	// FORENSIC: ANTES do CompanyRepo
+	log.Printf("[FORENSIC] CompanySettingsService - ANTES CompanyRepo.FindByID - CompanyID usado: %d", user.CompanyID)
+
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
@@ -82,6 +94,9 @@ func (s *CompanySettingsService) GetSettings(ctx context.Context, userID uint) (
 	if company == nil {
 		return nil, errors.New("company not found")
 	}
+
+	// FORENSIC: APÓS do CompanyRepo
+	log.Printf("[FORENSIC] CompanySettingsService - APÓS CompanyRepo.FindByID - empresa carregada: ID=%d, Name=%s", company.ID, company.Name)
 
 	return &GetSettingsOutput{
 		Name:           company.Name,

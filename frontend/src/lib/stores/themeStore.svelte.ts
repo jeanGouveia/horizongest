@@ -86,12 +86,15 @@ class ThemeStore {
 		const root = document.documentElement;
 
 		// Apply primary color to CSS variables
-		root.style.setProperty('--color-primary-500', this.theme.primary_color);
-		root.style.setProperty('--color-primary-600', this.theme.secondary_color);
+		const primaryColor = this.theme.primary_color || DEFAULT_THEME.primary_color;
+		const secondaryColor = this.theme.secondary_color || DEFAULT_THEME.secondary_color;
+		
+		root.style.setProperty('--color-primary-500', primaryColor);
+		root.style.setProperty('--color-primary-600', secondaryColor);
 		
 		// Generate color palette from primary color (simplified)
-		root.style.setProperty('--color-primary-400', this.lightenColor(this.theme.primary_color, 10));
-		root.style.setProperty('--color-primary-700', this.darkenColor(this.theme.secondary_color, 10));
+		root.style.setProperty('--color-primary-400', this.lightenColor(primaryColor, 10));
+		root.style.setProperty('--color-primary-700', this.darkenColor(secondaryColor, 10));
 		
 		// Apply logo URL if available
 		if (this.theme.logo_url) {
@@ -150,6 +153,14 @@ class ThemeStore {
 
 	get isDefault(): boolean {
 		return this.theme.is_default;
+	}
+
+	// Clear store (for tenant session lifecycle)
+	clear(): void {
+		this.theme = DEFAULT_THEME;
+		this.loading = false;
+		this.error = null;
+		this.applyThemeToDOM();
 	}
 }
 

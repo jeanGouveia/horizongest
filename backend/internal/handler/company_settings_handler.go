@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
@@ -19,10 +20,30 @@ func NewCompanySettingsHandler(companySettingsService *service.CompanySettingsSe
 
 // GetSettings handles GET /api/company/settings
 func (h *CompanySettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[FORENSIC] CompanySettingsHandler - GetSettings - Request recebida")
+
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
+		log.Printf("[FORENSIC] CompanySettingsHandler - UserID não encontrado no contexto")
 		jsonError(w, "não autorizado. Faça login novamente.", http.StatusUnauthorized)
 		return
+	}
+
+	// FORENSIC: Log UserID received
+	log.Printf("[FORENSIC] CompanySettingsHandler - UserID recebido: %d", userID)
+
+	// FORENSIC: Log TenantContext
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if ok {
+		log.Printf("[FORENSIC] CompanySettingsHandler - TenantContext - UserID: %d, CompanyID: %d", tenantCtx.UserID, tenantCtx.CompanyID)
+	} else {
+		log.Printf("[FORENSIC] CompanySettingsHandler - TenantContext NÃO encontrado no contexto")
+	}
+
+	// FORENSIC: Log Claims
+	claims, ok := middleware.GetClaimsFromContext(r.Context())
+	if ok {
+		log.Printf("[FORENSIC] CompanySettingsHandler - Claims - UserID: %d, CompanyID: %d, Email: %s, Name: %s", claims.UserID, claims.CompanyID, claims.Email, claims.Name)
 	}
 
 	settings, err := h.companySettingsService.GetSettings(r.Context(), userID)
@@ -34,6 +55,9 @@ func (h *CompanySettingsHandler) GetSettings(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "não foi possível carregar as configurações da empresa", http.StatusInternalServerError)
 		return
 	}
+
+	// FORENSIC: Log company settings loaded
+	log.Printf("[FORENSIC] CompanySettingsHandler - Empresa carregada: Name=%s, Slug=%s", settings.Name, settings.Slug)
 
 	jsonResponse(w, http.StatusOK, settings)
 }

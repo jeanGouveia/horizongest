@@ -59,6 +59,9 @@ function createBrandStore() {
 				platformName: companyName,
 				platformShortName: companyName
 			}));
+		},
+		clear: () => {
+			set(defaultBrand);
 		}
 	};
 }

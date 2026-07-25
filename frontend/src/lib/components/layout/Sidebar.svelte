@@ -3,7 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import { userStore } from '$lib/stores/userStore.svelte';
-	import { platformName } from '$lib/stores/brandStore';
+	import { companyStore } from '$lib/stores/companyStore.svelte';
+	import { sessionManager } from '$lib/managers/sessionManager';
 	import type { Notifications } from '$lib/types/notifications';
 	import { LayoutDashboard, Plus, ShoppingCart, Utensils, Leaf, Scale, Users, User, LogOut, ChevronLeft, ChevronRight, Bell, Building2 } from '@lucide/svelte';
 
@@ -86,26 +87,14 @@
 	}
 
 	onMount(async () => {
-		try {
-			const res = await api.notifications();
-			if (!res.error && res.data) {
-				notifications = res.data;
-			}
-		} catch (e) {
-			console.error('Failed to load notifications:', e);
-		}
+		// Notifications endpoint not implemented yet
+		// TODO: Implement notifications backend endpoint
 	});
 
 	async function handleLogout() {
-		try {
-			await api.auth.logout();
-			userStore.logout();
-			goto('/login');
-		} catch (e) {
-			console.error('Logout error:', e);
-			// Even if API call fails, clear local state and redirect
-			userStore.logout();
-			goto('/login');
+		const result = await sessionManager.logout();
+		if (!result.success) {
+			console.error('Logout error:', result.error);
 		}
 	}
 </script>
@@ -121,7 +110,7 @@
 		</button>
 		{#if !collapsed}
 			<div class="sidebar-brand">
-				<span class="brand-text">{$platformName}</span>
+				<span class="brand-text">{companyStore.company?.name || 'Carregando...'}</span>
 			</div>
 		{/if}
 	</div>

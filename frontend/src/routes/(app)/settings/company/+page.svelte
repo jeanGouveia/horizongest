@@ -93,15 +93,11 @@
     loading = true;
     await loadBusinessTypes();
     try {
-      console.log('Fetching company settings...');
       const response = await fetch('/api/company/settings', {
         credentials: 'include'
       });
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
       if (response.ok) {
         const data = await response.json();
-        console.log('Company settings data:', data);
         name = data.Name || '';
         slug = data.Slug || '';
         description = data.Description || '';
@@ -117,12 +113,9 @@
         previewPrimaryColor = primaryColor;
         previewSecondaryColor = secondaryColor;
       } else {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
         error = 'Erro ao carregar configurações da empresa.';
       }
     } catch (e: any) {
-      console.error('Fetch error:', e);
       error = e?.message ?? 'Erro ao carregar configurações da empresa.';
     } finally {
       loading = false;
