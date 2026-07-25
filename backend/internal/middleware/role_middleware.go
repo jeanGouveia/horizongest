@@ -21,12 +21,21 @@ func NewRoleMiddleware(rbacService *service.RBACService) *RoleMiddleware {
 }
 
 // Require creates middleware that requires a specific role
+// During impersonation, platform admins are granted Owner permissions automatically
 func (m *RoleMiddleware) Require(role domain.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := GetUserIDFromContext(r.Context())
 			if !ok {
 				jsonError(w, "não autorizado", http.StatusUnauthorized)
+				return
+			}
+
+			// Check if user is impersonating - if so, grant Owner permissions
+			isImpersonating, _ := GetIsImpersonating(r.Context())
+			if isImpersonating {
+				// During impersonation, platform admin has Owner permissions
+				next.ServeHTTP(w, r)
 				return
 			}
 
@@ -47,12 +56,21 @@ func (m *RoleMiddleware) Require(role domain.Role) func(http.Handler) http.Handl
 }
 
 // RequireAny creates middleware that requires any of the specified roles
+// During impersonation, platform admins are granted Owner permissions automatically
 func (m *RoleMiddleware) RequireAny(roles ...domain.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := GetUserIDFromContext(r.Context())
 			if !ok {
 				jsonError(w, "não autorizado", http.StatusUnauthorized)
+				return
+			}
+
+			// Check if user is impersonating - if so, grant Owner permissions
+			isImpersonating, _ := GetIsImpersonating(r.Context())
+			if isImpersonating {
+				// During impersonation, platform admin has Owner permissions
+				next.ServeHTTP(w, r)
 				return
 			}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -119,12 +120,24 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// DEBUG: Log JWT claims from context
+	claims, _ := middleware.GetClaimsFromContext(r.Context())
+	if claims != nil {
+		log.Printf("[DEBUG] /api/me - JWT recebido: UserID=%d, CompanyID=%d, Email=%s, Name=%s, IsImpersonating=%v",
+			claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating)
+	}
+	log.Printf("[DEBUG] /api/me - UserID do contexto: %d", userID)
+
 	// Get full user data to include CompanyID
 	user, err := h.userRepo.FindByID(r.Context(), userID)
 	if err != nil || user == nil {
 		jsonError(w, "não foi possível carregar dados do usuário", http.StatusInternalServerError)
 		return
 	}
+
+	// DEBUG: Log user loaded from database
+	log.Printf("[DEBUG] /api/me - Usuário carregado do banco: ID=%d, Nome=%s, CompanyID=%d, Email=%s",
+		user.ID, user.Name, user.CompanyID, user.Email)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"id":         user.ID,
