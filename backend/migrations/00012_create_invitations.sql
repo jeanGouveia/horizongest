@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+
 -- Create invitations table for Sprint 8: Invites & Onboarding
 CREATE TABLE IF NOT EXISTS invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,3 +24,17 @@ CREATE INDEX IF NOT EXISTS idx_invitations_email ON invitations(email);
 CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token);
 CREATE INDEX IF NOT EXISTS idx_invitations_status ON invitations(status);
 CREATE INDEX IF NOT EXISTS idx_invitations_expires_at ON invitations(expires_at);
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+DROP INDEX IF EXISTS idx_invitations_expires_at;
+DROP INDEX IF EXISTS idx_invitations_status;
+DROP INDEX IF EXISTS idx_invitations_token;
+DROP INDEX IF EXISTS idx_invitations_email;
+DROP INDEX IF EXISTS idx_invitations_company_id;
+DROP TABLE IF EXISTS invitations;
+
+-- +goose StatementEnd

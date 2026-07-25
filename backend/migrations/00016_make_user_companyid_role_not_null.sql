@@ -4,11 +4,18 @@
 -- Sprint 3: Make CompanyID and Role NOT NULL in users table
 -- This migration enforces that all users must belong to a company
 
--- Step 1: Add default values for existing NULL records (if any)
+-- Step 1: Add active column if it doesn't exist (ignore error if already exists)
+-- SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we try and ignore
+ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1));
+
+-- Step 2: Add deleted_at column if it doesn't exist
+ALTER TABLE users ADD COLUMN deleted_at INTEGER;
+
+-- Step 3: Add default values for existing NULL records (if any)
 UPDATE users SET company_id = 0 WHERE company_id IS NULL;
 UPDATE users SET role = 'owner' WHERE role IS NULL;
 
--- Step 2: Create new columns with NOT NULL constraint
+-- Step 4: Create new table with NOT NULL constraints
 -- SQLite doesn't support ALTER COLUMN directly, so we need to recreate the table
 
 -- Create new users table with NOT NULL constraints
@@ -27,7 +34,13 @@ CREATE TABLE IF NOT EXISTS users_new (
 
 -- Copy data from old table to new table
 INSERT INTO users_new (id, name, email, password_hash, active, company_id, role, deleted_at, created_at, updated_at)
-SELECT id, name, email, password_hash, active, company_id, role, deleted_at, created_at, updated_at
+SELECT id, name, email, password_hash,
+       COALESCE(active, 1) as active,
+       COALESCE(company_id, 0) as company_id,
+       COALESCE(role, 'owner') as role,
+       deleted_at,
+       created_at,
+       updated_at
 FROM users;
 
 -- Drop old table

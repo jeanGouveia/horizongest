@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+
 -- Migration: Add Business Engine fields to companies table
 -- Version: 2.0.3
 -- Description: Adds business_type, locale, currency, and timezone fields to support Business Engine
@@ -15,10 +18,22 @@ ALTER TABLE companies ADD COLUMN currency TEXT DEFAULT 'BRL';
 ALTER TABLE companies ADD COLUMN timezone TEXT DEFAULT 'America/Sao_Paulo';
 
 -- Update existing companies with default values
-UPDATE companies 
-SET 
+UPDATE companies
+SET
     business_type = 'generic',
     locale = 'pt-BR',
     currency = 'BRL',
     timezone = 'America/Sao_Paulo'
 WHERE business_type IS NULL OR locale IS NULL OR currency IS NULL OR timezone IS NULL;
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+ALTER TABLE companies DROP COLUMN timezone;
+ALTER TABLE companies DROP COLUMN currency;
+ALTER TABLE companies DROP COLUMN locale;
+ALTER TABLE companies DROP COLUMN business_type;
+
+-- +goose StatementEnd
