@@ -2,10 +2,11 @@
 	import { Header } from '$lib/components/layout';
 	import { Sidebar } from '$lib/components/layout';
 	import { Footer } from '$lib/components/layout';
+	import ImpersonationBanner from '$lib/components/ImpersonationBanner.svelte';
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/userStore.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
-	import { brandStore } from '$lib/stores/brandStore';
+	import { companyStore } from '$lib/stores/companyStore.svelte';
 	import { api } from '$lib/api/client';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
@@ -39,19 +40,22 @@
 			showMenuButton = window.innerWidth < 768;
 			// Load theme on app initialization
 			themeStore.loadTheme();
+
 			// Buscar configurações da empresa usando o proxy (como no perfil)
 			try {
 				const response = await fetch('/api/company/settings', {
 					credentials: 'include'
 				});
+
 				if (response.ok) {
 					const data = await response.json();
-					if (data.name) {
-						brandStore.setCompanyName(data.name);
+					const companyName = data.Name || data.name;
+					if (companyName) {
+						companyStore.setCompany({ name: companyName });
 					}
 				}
 			} catch (e) {
-				console.error('Erro ao carregar configurações da empresa:', e);
+				// Error silently ignored - company will use default name
 			}
 		}
 	});
@@ -62,6 +66,7 @@
 </script>
 
 <div class="app-layout">
+	<ImpersonationBanner />
 	<Header
 		breadcrumb={breadcrumb()}
 		showMenuButton={showMenuButton}
