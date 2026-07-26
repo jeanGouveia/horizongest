@@ -126,3 +126,9 @@ func (s *RBACService) GetUserRole(ctx context.Context, userID uint) (domain.Role
 	}
 	return user.Role, nil
 }
+
+// CanApproveStockAdjustments checks if user can approve stock adjustments
+// Owner and Admin can approve stock adjustments
+func (s *RBACService) CanApproveStockAdjustments(ctx context.Context, userID uint) (bool, error) {
+	return s.HasAnyRole(ctx, userID, domain.RoleOwner, domain.RoleAdmin)
+}

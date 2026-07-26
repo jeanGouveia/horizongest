@@ -16,11 +16,11 @@ import (
 )
 
 type UserManagementHandler struct {
-	userManagementService *service.UserManagementService
+	userManagementService service.UserManagementServiceInterface
 	userRepo              ports.UserRepository
 }
 
-func NewUserManagementHandler(userManagementService *service.UserManagementService, userRepo ports.UserRepository) *UserManagementHandler {
+func NewUserManagementHandler(userManagementService service.UserManagementServiceInterface, userRepo ports.UserRepository) *UserManagementHandler {
 	return &UserManagementHandler{
 		userManagementService: userManagementService,
 		userRepo:              userRepo,

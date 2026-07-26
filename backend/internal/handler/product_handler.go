@@ -13,11 +13,11 @@ import (
 )
 
 type ProductHandler struct {
-	svc       *service.ProductService
+	svc       service.ProductServiceInterface
 	sanitizer *util.Sanitizer
 }
 
-func NewProductHandler(svc *service.ProductService) *ProductHandler {
+func NewProductHandler(svc service.ProductServiceInterface) *ProductHandler {
 	return &ProductHandler{
 		svc:       svc,
 		sanitizer: util.NewSanitizer(),

@@ -10,10 +10,10 @@ import (
 )
 
 type OrderHandler struct {
-	svc *service.OrderService
+	svc service.OrderServiceInterface
 }
 
-func NewOrderHandler(svc *service.OrderService) *OrderHandler {
+func NewOrderHandler(svc service.OrderServiceInterface) *OrderHandler {
 	return &OrderHandler{svc: svc}
 }
 

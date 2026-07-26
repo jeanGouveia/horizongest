@@ -20,12 +20,12 @@ import (
 var validate = validator.New()
 
 type AuthHandler struct {
-	authService *service.AuthService
+	authService service.AuthServiceInterface
 	userRepo    ports.UserRepository
 	sanitizer   *util.Sanitizer
 }
 
-func NewAuthHandler(authService *service.AuthService, userRepo ports.UserRepository) *AuthHandler {
+func NewAuthHandler(authService service.AuthServiceInterface, userRepo ports.UserRepository) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		userRepo:    userRepo,

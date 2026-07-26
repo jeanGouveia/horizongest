@@ -23,10 +23,10 @@ var (
 type UserManagementService struct {
 	userRepo    ports.UserRepository
 	companyRepo ports.CompanyRepository
-	rbacService *RBACService
+	rbacService RBACServiceInterface
 }
 
-func NewUserManagementService(userRepo ports.UserRepository, companyRepo ports.CompanyRepository, rbacService *RBACService) *UserManagementService {
+func NewUserManagementService(userRepo ports.UserRepository, companyRepo ports.CompanyRepository, rbacService RBACServiceInterface) *UserManagementService {
 	return &UserManagementService{
 		userRepo:    userRepo,
 		companyRepo: companyRepo,
