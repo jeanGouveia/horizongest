@@ -17,10 +17,10 @@ const ContextKeyIsImpersonating contextKey = "is_impersonating"
 const ContextKeyOriginalPlatformUserID contextKey = "original_platform_user_id"
 
 type AuthMiddleware struct {
-	authService *service.AuthService
+	authService service.AuthServiceInterface
 }
 
-func NewAuthMiddleware(authService *service.AuthService) *AuthMiddleware {
+func NewAuthMiddleware(authService service.AuthServiceInterface) *AuthMiddleware {
 	return &AuthMiddleware{authService: authService}
 }
 
