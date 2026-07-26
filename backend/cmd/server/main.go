@@ -308,10 +308,13 @@ func main() {
 		r.Get("/history", impersonationHandler.GetImpersonationHistory)
 	})
 
-	// Forensic investigation endpoints (no auth required for debugging)
-	r.Route("/api/forensic", func(r chi.Router) {
-		forensicHandler.RegisterRoutes(r)
-	})
+	// Forensic investigation endpoints (only enabled in development/debug mode)
+	if os.Getenv("ENABLE_FORENSIC") == "true" {
+		log.Println("WARNING: Forensic endpoints enabled - DO NOT use in production")
+		r.Route("/api/forensic", func(r chi.Router) {
+			forensicHandler.RegisterRoutes(r)
+		})
+	}
 
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Use(rateLimiter.RateLimitByIP) // Sprint 3.4 - Rate limiting
