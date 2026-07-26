@@ -7,12 +7,67 @@ import (
 	"testing"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"github.com/jeanGouveia/horizongest/backend/internal/mocks"
 )
+
+// MockUserRepository is a mock implementation of ports.UserRepository
+type MockUserRepository struct {
+	Users             map[uint]*domain.User
+	FindByEmailResult *domain.User
+	FindByEmailError  error
+	UpdateError       error
+}
+
+func NewMockUserRepository() *MockUserRepository {
+	return &MockUserRepository{
+		Users: make(map[uint]*domain.User),
+	}
+}
+
+func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) error {
+	m.Users[user.ID] = user
+	return nil
+}
+
+func (m *MockUserRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
+	return m.Users[id], nil
+}
+
+func (m *MockUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+	if m.FindByEmailResult != nil {
+		return m.FindByEmailResult, m.FindByEmailError
+	}
+	for _, user := range m.Users {
+		if user.Email == email {
+			return user, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *MockUserRepository) List(ctx context.Context) ([]*domain.User, error) {
+	var users []*domain.User
+	for _, user := range m.Users {
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+func (m *MockUserRepository) Update(ctx context.Context, user *domain.User) error {
+	if m.UpdateError != nil {
+		return m.UpdateError
+	}
+	m.Users[user.ID] = user
+	return nil
+}
+
+func (m *MockUserRepository) Delete(ctx context.Context, id uint) error {
+	delete(m.Users, id)
+	return nil
+}
 
 // TestTenantMiddleware_TenantContext tests that tenant context is properly set
 func TestTenantMiddleware_TenantContext(t *testing.T) {
-	mockUserRepo := mocks.NewMockUserRepository()
+	mockUserRepo := NewMockUserRepository()
 	mockUserRepo.Users[1] = &domain.User{
 		ID:        1,
 		Name:      "Test User",
@@ -52,7 +107,7 @@ func TestTenantMiddleware_TenantContext(t *testing.T) {
 
 // TestTenantMiddleware_CompanyIDIsolation tests that users cannot access other companies' data
 func TestTenantMiddleware_CompanyIDIsolation(t *testing.T) {
-	mockUserRepo := mocks.NewMockUserRepository()
+	mockUserRepo := NewMockUserRepository()
 	mockUserRepo.Users[1] = &domain.User{
 		ID:        1,
 		Name:      "Test User",
@@ -85,7 +140,7 @@ func TestTenantMiddleware_CompanyIDIsolation(t *testing.T) {
 
 // TestTenantMiddleware_MissingCompanyID tests that requests without CompanyID are rejected
 func TestTenantMiddleware_MissingCompanyID(t *testing.T) {
-	mockUserRepo := mocks.NewMockUserRepository()
+	mockUserRepo := NewMockUserRepository()
 	mockUserRepo.Users[1] = &domain.User{
 		ID:        1,
 		Name:      "Test User",
@@ -119,7 +174,7 @@ func TestTenantMiddleware_MissingCompanyID(t *testing.T) {
 
 // TestTenantMiddleware_Impersonation tests that impersonation preserves original tenant context
 func TestTenantMiddleware_Impersonation(t *testing.T) {
-	mockUserRepo := mocks.NewMockUserRepository()
+	mockUserRepo := NewMockUserRepository()
 	mockUserRepo.Users[1] = &domain.User{
 		ID:        1,
 		Name:      "Test User",

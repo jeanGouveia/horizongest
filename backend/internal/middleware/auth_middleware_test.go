@@ -6,13 +6,52 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/jeanGouveia/horizongest/backend/internal/mocks"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
+// MockAuthService is a mock implementation of service.AuthServiceInterface
+type MockAuthService struct {
+	ValidateTokenResult *service.JWTClaims
+	ValidateTokenError  error
+	LogoutError         error
+}
+
+func NewMockAuthService() *MockAuthService {
+	return &MockAuthService{}
+}
+
+func (m *MockAuthService) Login(ctx context.Context, input service.LoginInput) (*service.LoginResult, error) {
+	return &service.LoginResult{}, nil
+}
+
+func (m *MockAuthService) Logout(ctx context.Context, token string) error {
+	return m.LogoutError
+}
+
+func (m *MockAuthService) ValidateToken(ctx context.Context, token string) (*service.JWTClaims, error) {
+	return m.ValidateTokenResult, m.ValidateTokenError
+}
+
+func (m *MockAuthService) UpdateProfile(ctx context.Context, userID uint, input service.UpdateProfileInput) (*domain.User, error) {
+	return &domain.User{}, nil
+}
+
+func (m *MockAuthService) ChangePassword(ctx context.Context, userID uint, input service.ChangePasswordInput) error {
+	return nil
+}
+
+func (m *MockAuthService) RequestPasswordReset(ctx context.Context, input service.RequestPasswordResetInput) error {
+	return nil
+}
+
+func (m *MockAuthService) ResetPassword(ctx context.Context, input service.ResetPasswordInput) error {
+	return nil
+}
+
 // TestAuthMiddleware_MissingToken tests that requests without token are rejected
 func TestAuthMiddleware_MissingToken(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenError = service.ErrInvalidCredentials
 	authMw := NewAuthMiddleware(mockAuth)
 
@@ -31,7 +70,7 @@ func TestAuthMiddleware_MissingToken(t *testing.T) {
 
 // TestAuthMiddleware_InvalidToken tests that requests with invalid token are rejected
 func TestAuthMiddleware_InvalidToken(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenError = service.ErrInvalidCredentials
 	authMw := NewAuthMiddleware(mockAuth)
 
@@ -51,7 +90,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 
 // TestAuthMiddleware_ValidToken tests that requests with valid token are accepted
 func TestAuthMiddleware_ValidToken(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenResult = &service.JWTClaims{
 		UserID:    1,
 		CompanyID: 1,
@@ -83,7 +122,7 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 
 // TestAuthMiddleware_ClaimsExtraction tests that JWT claims are properly extracted
 func TestAuthMiddleware_ClaimsExtraction(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenResult = &service.JWTClaims{
 		UserID:    1,
 		CompanyID: 1,
@@ -117,7 +156,7 @@ func TestAuthMiddleware_ClaimsExtraction(t *testing.T) {
 
 // TestAuthMiddleware_ImpersonationClaims tests that impersonation claims are handled correctly
 func TestAuthMiddleware_ImpersonationClaims(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenResult = &service.JWTClaims{
 		UserID:                 1,
 		CompanyID:              1,
@@ -182,7 +221,7 @@ func TestGetClaimsFromContext(t *testing.T) {
 
 // TestAuthMiddleware_CookieBasedAuth tests that cookie-based authentication works
 func TestAuthMiddleware_CookieBasedAuth(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenResult = &service.JWTClaims{
 		UserID:    1,
 		CompanyID: 1,
@@ -207,7 +246,7 @@ func TestAuthMiddleware_CookieBasedAuth(t *testing.T) {
 
 // TestAuthMiddleware_HeaderBasedAuth tests that header-based authentication works
 func TestAuthMiddleware_HeaderBasedAuth(t *testing.T) {
-	mockAuth := mocks.NewMockAuthService()
+	mockAuth := NewMockAuthService()
 	mockAuth.ValidateTokenResult = &service.JWTClaims{
 		UserID:    1,
 		CompanyID: 1,
