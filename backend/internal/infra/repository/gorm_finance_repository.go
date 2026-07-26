@@ -74,7 +74,8 @@ func (r *GormFinanceRepository) ListTransactionCategories(ctx context.Context, c
 
 func (r *GormFinanceRepository) GetTransactionCategoryByID(ctx context.Context, id uint) (*domain.TransactionCategory, error) {
 	var category domain.TransactionCategory
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&category).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&category).Error
 	return &category, err
 }
 
@@ -83,7 +84,8 @@ func (r *GormFinanceRepository) UpdateTransactionCategory(ctx context.Context, c
 }
 
 func (r *GormFinanceRepository) DeleteTransactionCategory(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.TransactionCategory{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.TransactionCategory{}).Error
 }
 
 // --- Transações ---
@@ -116,7 +118,8 @@ func (r *GormFinanceRepository) ListTransactions(ctx context.Context, companyID 
 
 func (r *GormFinanceRepository) GetTransactionByID(ctx context.Context, id uint) (*domain.Transaction, error) {
 	var transaction domain.Transaction
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").
 		Preload("Category").
 		First(&transaction).Error
 	return &transaction, err
@@ -127,7 +130,8 @@ func (r *GormFinanceRepository) UpdateTransaction(ctx context.Context, transacti
 }
 
 func (r *GormFinanceRepository) DeleteTransaction(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.Transaction{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.Transaction{}).Error
 }
 
 // --- Resumos ---

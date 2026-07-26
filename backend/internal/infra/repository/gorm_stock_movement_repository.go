@@ -28,27 +28,29 @@ func (r *GormStockMovementRepository) Create(ctx context.Context, movement *doma
 func (r *GormStockMovementRepository) List(ctx context.Context, companyID uint, ingredientID *uint, limit, offset int) ([]domain.StockMovement, error) {
 	var movements []domain.StockMovement
 	query := r.db.WithContext(ctx).Where("company_id = ? AND deleted_at IS NULL", companyID)
-	
+
 	if ingredientID != nil {
 		query = query.Where("ingredient_id = ?", *ingredientID)
 	}
-	
+
 	query = query.Order("created_at DESC").Limit(limit).Offset(offset)
-	
+
 	err := query.Preload("Ingredient").Preload("Performer").Find(&movements).Error
 	return movements, err
 }
 
 func (r *GormStockMovementRepository) GetByID(ctx context.Context, id uint) (*domain.StockMovement, error) {
 	var movement domain.StockMovement
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").
 		Preload("Ingredient").Preload("Performer").
 		First(&movement).Error
 	return &movement, err
 }
 
 func (r *GormStockMovementRepository) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.StockMovement{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.StockMovement{}).Error
 }
 
 // --- Inventários ---
@@ -59,7 +61,8 @@ func (r *GormStockMovementRepository) CreateInventory(ctx context.Context, inven
 
 func (r *GormStockMovementRepository) GetInventoryByID(ctx context.Context, id uint) (*domain.StockInventory, error) {
 	var inventory domain.StockInventory
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").
 		Preload("Items.Ingredient").
 		First(&inventory).Error
 	return &inventory, err
@@ -68,13 +71,13 @@ func (r *GormStockMovementRepository) GetInventoryByID(ctx context.Context, id u
 func (r *GormStockMovementRepository) ListInventories(ctx context.Context, companyID uint, status string, limit, offset int) ([]domain.StockInventory, error) {
 	var inventories []domain.StockInventory
 	query := r.db.WithContext(ctx).Where("company_id = ? AND deleted_at IS NULL", companyID)
-	
+
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-	
+
 	query = query.Order("created_at DESC").Limit(limit).Offset(offset)
-	
+
 	err := query.Find(&inventories).Error
 	return inventories, err
 }
@@ -86,7 +89,8 @@ func (r *GormStockMovementRepository) UpdateInventoryStatus(ctx context.Context,
 }
 
 func (r *GormStockMovementRepository) DeleteInventory(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.StockInventory{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.StockInventory{}).Error
 }
 
 // --- Itens de Inventário ---

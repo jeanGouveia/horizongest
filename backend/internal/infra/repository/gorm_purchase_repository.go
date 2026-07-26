@@ -28,20 +28,21 @@ func (r *GormPurchaseRepository) CreateSupplier(ctx context.Context, supplier *d
 func (r *GormPurchaseRepository) ListSuppliers(ctx context.Context, companyID uint, activeOnly bool, limit, offset int) ([]domain.Supplier, error) {
 	var suppliers []domain.Supplier
 	query := r.db.WithContext(ctx).Where("company_id = ? AND deleted_at IS NULL", companyID)
-	
+
 	if activeOnly {
 		query = query.Where("active = ?", true)
 	}
-	
+
 	query = query.Order("name ASC").Limit(limit).Offset(offset)
-	
+
 	err := query.Find(&suppliers).Error
 	return suppliers, err
 }
 
 func (r *GormPurchaseRepository) GetSupplierByID(ctx context.Context, id uint) (*domain.Supplier, error) {
 	var supplier domain.Supplier
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&supplier).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&supplier).Error
 	return &supplier, err
 }
 
@@ -50,7 +51,8 @@ func (r *GormPurchaseRepository) UpdateSupplier(ctx context.Context, supplier *d
 }
 
 func (r *GormPurchaseRepository) DeleteSupplier(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.Supplier{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.Supplier{}).Error
 }
 
 // --- Pedidos de Compra ---
@@ -62,20 +64,21 @@ func (r *GormPurchaseRepository) CreatePurchaseOrder(ctx context.Context, order 
 func (r *GormPurchaseRepository) ListPurchaseOrders(ctx context.Context, companyID uint, status string, limit, offset int) ([]domain.PurchaseOrder, error) {
 	var orders []domain.PurchaseOrder
 	query := r.db.WithContext(ctx).Where("company_id = ? AND deleted_at IS NULL", companyID)
-	
+
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-	
+
 	query = query.Order("created_at DESC").Limit(limit).Offset(offset)
-	
+
 	err := query.Preload("Supplier").Preload("Items.Ingredient").Find(&orders).Error
 	return orders, err
 }
 
 func (r *GormPurchaseRepository) GetPurchaseOrderByID(ctx context.Context, id uint) (*domain.PurchaseOrder, error) {
 	var order domain.PurchaseOrder
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").
 		Preload("Supplier").
 		Preload("Items.Ingredient").
 		First(&order).Error
@@ -93,7 +96,8 @@ func (r *GormPurchaseRepository) UpdatePurchaseOrderStatus(ctx context.Context, 
 }
 
 func (r *GormPurchaseRepository) DeletePurchaseOrder(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.PurchaseOrder{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.PurchaseOrder{}).Error
 }
 
 // --- Itens de Pedido de Compra ---
@@ -126,7 +130,8 @@ func (r *GormPurchaseRepository) CreatePurchaseReceiving(ctx context.Context, re
 
 func (r *GormPurchaseRepository) GetPurchaseReceivingByID(ctx context.Context, id uint) (*domain.PurchaseReceiving, error) {
 	var receiving domain.PurchaseReceiving
-	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").
 		Preload("Items.Ingredient").
 		First(&receiving).Error
 	return &receiving, err
@@ -141,7 +146,8 @@ func (r *GormPurchaseRepository) ListPurchaseReceivings(ctx context.Context, pur
 }
 
 func (r *GormPurchaseRepository) DeletePurchaseReceiving(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.PurchaseReceiving{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.Delete(&domain.PurchaseReceiving{}).Error
 }
 
 // --- Itens de Recebimento ---
