@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -53,8 +54,12 @@ func (h *PurchaseHandler) CreateSupplier(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	supplier, err := h.purchaseService.CreateSupplier(r.Context(), companyID, input)
 	if err != nil {
@@ -70,8 +75,12 @@ func (h *PurchaseHandler) ListSuppliers(w http.ResponseWriter, r *http.Request) 
 	limit := 50
 	offset := 0
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	suppliers, err := h.purchaseService.ListSuppliers(r.Context(), companyID, activeOnly, limit, offset)
 	if err != nil {
@@ -140,9 +149,18 @@ func (h *PurchaseHandler) CreatePurchaseOrder(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// TODO: Get companyID and userID from context
-	companyID := uint(1) // Placeholder
-	userID := uint(1)    // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
+
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
 
 	order, err := h.purchaseService.CreatePurchaseOrder(r.Context(), companyID, userID, input)
 	if err != nil {
@@ -158,8 +176,12 @@ func (h *PurchaseHandler) ListPurchaseOrders(w http.ResponseWriter, r *http.Requ
 	limit := 50
 	offset := 0
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	orders, err := h.purchaseService.ListPurchaseOrders(r.Context(), companyID, status, limit, offset)
 	if err != nil {
@@ -259,7 +281,11 @@ func (h *PurchaseHandler) CreatePurchaseReceiving(w http.ResponseWriter, r *http
 	}
 
 	// TODO: Get userID from context
-	userID := uint(1) // Placeholder
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
 
 	receiving, err := h.purchaseService.CreatePurchaseReceiving(r.Context(), id, userID, input)
 	if err != nil {

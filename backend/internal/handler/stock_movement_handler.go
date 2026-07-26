@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -45,9 +46,18 @@ func (h *StockMovementHandler) CreateStockMovement(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// TODO: Get companyID and userID from context
-	companyID := uint(1) // Placeholder
-	userID := uint(1)    // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
+
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
 
 	movement, err := h.stockMovementService.CreateStockMovement(r.Context(), companyID, userID, input)
 	if err != nil {
@@ -74,8 +84,12 @@ func (h *StockMovementHandler) ListStockMovements(w http.ResponseWriter, r *http
 	limit := 50
 	offset := 0
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	movements, err := h.stockMovementService.ListStockMovements(r.Context(), companyID, ingredientID, limit, offset)
 	if err != nil {
@@ -126,9 +140,18 @@ func (h *StockMovementHandler) CreateInventory(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// TODO: Get companyID and userID from context
-	companyID := uint(1) // Placeholder
-	userID := uint(1)    // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
+
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
 
 	inventory, err := h.stockMovementService.CreateInventory(r.Context(), companyID, userID, input)
 	if err != nil {
@@ -144,8 +167,12 @@ func (h *StockMovementHandler) ListInventories(w http.ResponseWriter, r *http.Re
 	limit := 50
 	offset := 0
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	inventories, err := h.stockMovementService.ListInventories(r.Context(), companyID, status, limit, offset)
 	if err != nil {
@@ -195,7 +222,7 @@ func (h *StockMovementHandler) AddInventoryItem(w http.ResponseWriter, r *http.R
 	}
 
 	var input struct {
-		IngredientID uint    `json:"ingredientId"`
+		IngredientID  uint    `json:"ingredientId"`
 		ExpectedStock float64 `json:"expectedStock"`
 		ActualStock   float64 `json:"actualStock"`
 		Reason        string  `json:"reason"`
@@ -221,8 +248,11 @@ func (h *StockMovementHandler) CompleteInventory(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// TODO: Get userID from context
-	userID := uint(1) // Placeholder
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
 
 	if err := h.stockMovementService.CompleteInventory(r.Context(), id, userID); err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)

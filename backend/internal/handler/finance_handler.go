@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -48,8 +49,12 @@ func (h *FinanceHandler) CreateTransactionCategory(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	category, err := h.financeService.CreateTransactionCategory(r.Context(), companyID, input)
 	if err != nil {
@@ -71,8 +76,12 @@ func (h *FinanceHandler) ListTransactionCategories(w http.ResponseWriter, r *htt
 	limit := 50
 	offset := 0
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	categories, err := h.financeService.ListTransactionCategories(r.Context(), companyID, transactionType, limit, offset)
 	if err != nil {
@@ -141,9 +150,18 @@ func (h *FinanceHandler) CreateTransaction(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO: Get companyID and userID from context
-	companyID := uint(1) // Placeholder
-	userID := uint(1)    // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
+
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		jsonError(w, "usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
 
 	transaction, err := h.financeService.CreateTransaction(r.Context(), companyID, userID, input)
 	if err != nil {
@@ -183,8 +201,12 @@ func (h *FinanceHandler) ListTransactions(w http.ResponseWriter, r *http.Request
 	limit := 50
 	offset := 0
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	transactions, err := h.financeService.ListTransactions(r.Context(), companyID, transactionType, startDate, endDate, limit, offset)
 	if err != nil {
@@ -261,8 +283,12 @@ func (h *FinanceHandler) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	cashFlow, err := h.financeService.GetCashFlow(r.Context(), companyID, startDate, endDate)
 	if err != nil {
@@ -288,8 +314,12 @@ func (h *FinanceHandler) GetFinancialSummary(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// TODO: Get companyID from context
-	companyID := uint(1) // Placeholder
+	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	if !ok {
+		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
+		return
+	}
+	companyID := tenantCtx.CompanyID
 
 	summary, err := h.financeService.GetFinancialSummary(r.Context(), companyID, startDate, endDate)
 	if err != nil {
