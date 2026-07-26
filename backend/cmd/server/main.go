@@ -152,12 +152,19 @@ func main() {
 	)
 	exportSvc := service.NewExportService(companyRepo, userRepo, getEnv("EXPORT_DIR", "./exports"))
 
+	// Middlewares
+	authMw := middleware.NewAuthMiddleware(authSvc)
+	tenantMw := middleware.NewTenantMiddleware(userRepo)
+	roleMw := middleware.NewRoleMiddleware(rbacSvc)                         // Infrastructure for Sprint 7
+	platformAuthMw := middleware.NewPlatformAuthMiddleware(platformAuthSvc) // Sprint 3.2
+	rateLimiter := middleware.NewRateLimiter(5, 30)                         // 5 req/min per IP, 30 req/hour per user (Sprint 3.4)
+
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	productHandler := handler.NewProductHandler(productSvc)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	stockAdjustmentHandler := handler.NewStockAdjustmentHandler(stockAdjustmentSvc)
-	stockMovementHandler := handler.NewStockMovementHandler(stockMovementSvc)
+	stockMovementHandler := handler.NewStockMovementHandler(stockMovementSvc, roleMw)
 	mediaHandler := handler.NewMediaHandler(mediaSvc)
 	dashboardHandler := handler.NewDashboardHandler(dashboardRepo)
 	companyHandler := handler.NewCompanyHandler(companySvc)
@@ -177,12 +184,6 @@ func main() {
 	platformBrandHandler := handler.NewPlatformBrandHandler(platformBrandSvc) // Sprint 3.5
 	impersonationHandler := handler.NewImpersonationHandler(impersonationSvc)
 	forensicHandler := handler.NewForensicHandler() // Forensic investigation
-
-	authMw := middleware.NewAuthMiddleware(authSvc)
-	tenantMw := middleware.NewTenantMiddleware(userRepo)
-	roleMw := middleware.NewRoleMiddleware(rbacSvc)                         // Infrastructure for Sprint 7
-	platformAuthMw := middleware.NewPlatformAuthMiddleware(platformAuthSvc) // Sprint 3.2
-	rateLimiter := middleware.NewRateLimiter(5, 30)                         // 5 req/min per IP, 30 req/hour per user (Sprint 3.4)
 
 	// --- Router ---
 	r := chi.NewRouter()
@@ -329,92 +330,149 @@ func main() {
 		r.Use(authMw.Auth)
 		r.Use(tenantMw.Tenant)
 
-		r.Get("/api/dashboard", dashboardHandler.GetDashboard)
-
-		r.Get("/api/me", authHandler.Me)
-		r.Put("/api/me", authHandler.UpdateProfile)
-		r.Post("/api/me/change-password", authHandler.ChangePassword)
-		r.Get("/api/me/company", companyHandler.GetCurrentCompany)
+		// Dashboard e perfil (todos autenticados)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/dashboard", dashboardHandler.GetDashboard)
+			r.Get("/api/me", authHandler.Me)
+			r.Put("/api/me", authHandler.UpdateProfile)
+			r.Post("/api/me/change-password", authHandler.ChangePassword)
+			r.Get("/api/me/company", companyHandler.GetCurrentCompany)
+		})
 
 		// Empresas (Tenant Engine - Platform 2.0)
-		// REMOVED: POST /api/companies - Company creation is platform-only (Sprint 3.2)
-		r.Get("/api/companies", companyHandler.ListCompanies)
-		r.Get("/api/companies/{id}", companyHandler.GetCompany)
-		r.Put("/api/companies/{id}", companyHandler.UpdateCompany)
-		r.Delete("/api/companies/{id}", companyHandler.DeleteCompany)
-
-		// Company Settings (Platform 2.0 - Sprint 5)
-		r.Get("/api/company/settings", companySettingsHandler.GetSettings)
-		r.Put("/api/company/settings", companySettingsHandler.UpdateSettings)
-
-		// User Management (Platform 2.0 - Sprint 7)
-		// Apply RBAC: Only Owner and Admin can manage users
 		r.Group(func(r chi.Router) {
 			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin))
+			r.Get("/api/companies", companyHandler.ListCompanies)
+			r.Get("/api/companies/{id}", companyHandler.GetCompany)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.Require(domain.RoleOwner))
+			r.Put("/api/companies/{id}", companyHandler.UpdateCompany)
+			r.Delete("/api/companies/{id}", companyHandler.DeleteCompany)
+		})
 
+		// Company Settings (Platform 2.0 - Sprint 5)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin))
+			r.Get("/api/company/settings", companySettingsHandler.GetSettings)
+			r.Put("/api/company/settings", companySettingsHandler.UpdateSettings)
+		})
+
+		// User Management (Platform 2.0 - Sprint 7)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin))
 			r.Get("/api/company/users", userManagementHandler.ListUsers)
 			r.Get("/api/company/users/{id}", userManagementHandler.GetUser)
 			r.Post("/api/company/users/add", userManagementHandler.AddUser)
-			r.Put("/api/company/users/{id}/role", userManagementHandler.ChangeRole)
 			r.Put("/api/company/users/{id}/active", userManagementHandler.SetUserActive)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.Require(domain.RoleOwner))
+			r.Put("/api/company/users/{id}/role", userManagementHandler.ChangeRole)
 			r.Delete("/api/company/users/{id}", userManagementHandler.RemoveUser)
 		})
 
 		// Tema (White Label - Platform 2.0)
-		r.Get("/api/theme", themeHandler.GetTheme)
-		r.Get("/api/theme/default", themeHandler.GetDefaultTheme)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/theme", themeHandler.GetTheme)
+			r.Get("/api/theme/default", themeHandler.GetDefaultTheme)
+		})
 
 		// Business Profile (Business Engine - Platform 2.0)
-		r.Get("/api/business/profile", businessHandler.GetBusinessProfile)
-		r.Get("/api/business/profile/default", businessHandler.GetDefaultBusinessProfile)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin))
+			r.Get("/api/business/profile", businessHandler.GetBusinessProfile)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/business/profile/default", businessHandler.GetDefaultBusinessProfile)
+		})
 
 		// Produtos
-		r.Post("/api/products", productHandler.CreateProduct)
-		r.Get("/api/products", productHandler.ListProducts)
-		r.Get("/api/products/active", productHandler.ListActiveProducts)
-		r.Get("/api/products/{id}", productHandler.GetProduct)
-		r.Put("/api/products/{id}", productHandler.UpdateProduct)
-		r.Delete("/api/products/{id}", productHandler.DeleteProduct)
-		r.Post("/api/products/{id}/duplicate", productHandler.DuplicateProduct)
-		r.Post("/api/products/{id}/archive", productHandler.ArchiveProduct)
-		r.Put("/api/products/{id}/ingredients", productHandler.SetProductIngredients)
-		r.Get("/api/products/{id}/ingredients", productHandler.GetProductIngredients)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/products", productHandler.ListProducts)
+			r.Get("/api/products/active", productHandler.ListActiveProducts)
+			r.Get("/api/products/{id}", productHandler.GetProduct)
+			r.Get("/api/products/{id}/ingredients", productHandler.GetProductIngredients)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Post("/api/products", productHandler.CreateProduct)
+			r.Put("/api/products/{id}", productHandler.UpdateProduct)
+			r.Delete("/api/products/{id}", productHandler.DeleteProduct)
+			r.Post("/api/products/{id}/duplicate", productHandler.DuplicateProduct)
+			r.Post("/api/products/{id}/archive", productHandler.ArchiveProduct)
+			r.Put("/api/products/{id}/ingredients", productHandler.SetProductIngredients)
+		})
 
 		// Ingredientes
-		r.Post("/api/ingredients", productHandler.CreateIngredient)
-		r.Get("/api/ingredients", productHandler.ListIngredients)
-		r.Get("/api/ingredients/{id}", productHandler.GetIngredient)
-		r.Put("/api/ingredients/{id}", productHandler.UpdateIngredient)
-		r.Delete("/api/ingredients/{id}", productHandler.DeleteIngredient)
-		r.Patch("/api/ingredients/{id}/stock", productHandler.UpdateIngredientStock)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/ingredients", productHandler.ListIngredients)
+			r.Get("/api/ingredients/{id}", productHandler.GetIngredient)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Post("/api/ingredients", productHandler.CreateIngredient)
+			r.Put("/api/ingredients/{id}", productHandler.UpdateIngredient)
+			r.Delete("/api/ingredients/{id}", productHandler.DeleteIngredient)
+			r.Patch("/api/ingredients/{id}/stock", productHandler.UpdateIngredientStock)
+		})
 
 		// Categorias
-		r.Post("/api/categories", categoryHandler.CreateCategory)
-		r.Get("/api/categories", categoryHandler.ListCategories)
-		r.Get("/api/categories/{id}", categoryHandler.GetCategory)
-		r.Put("/api/categories/{id}", categoryHandler.UpdateCategory)
-		r.Delete("/api/categories/{id}", categoryHandler.DeleteCategory)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/categories", categoryHandler.ListCategories)
+			r.Get("/api/categories/{id}", categoryHandler.GetCategory)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Post("/api/categories", categoryHandler.CreateCategory)
+			r.Put("/api/categories/{id}", categoryHandler.UpdateCategory)
+			r.Delete("/api/categories/{id}", categoryHandler.DeleteCategory)
+		})
 
 		// Pedidos
-		r.Post("/api/orders", orderHandler.CreateOrder)
-		r.Get("/api/orders", orderHandler.ListOrders)
-		r.Get("/api/orders/{id}", orderHandler.GetOrder)
-		r.Put("/api/orders/{id}", orderHandler.UpdateOrder)
-		r.Patch("/api/orders/{id}/status", orderHandler.UpdateOrderStatus)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/orders", orderHandler.ListOrders)
+			r.Get("/api/orders/{id}", orderHandler.GetOrder)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Post("/api/orders", orderHandler.CreateOrder)
+			r.Patch("/api/orders/{id}/status", orderHandler.UpdateOrderStatus)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Put("/api/orders/{id}", orderHandler.UpdateOrder)
+		})
 
 		// Ajustes de Estoque
-		r.Get("/api/stock-adjustments/pending", stockAdjustmentHandler.ListPendingAdjustments)
-		r.Post("/api/stock-adjustments/{id}/approve", stockAdjustmentHandler.ApproveAdjustment)
-		r.Post("/api/stock-adjustments/{id}/reject", stockAdjustmentHandler.RejectAdjustment)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Get("/api/stock-adjustments/pending", stockAdjustmentHandler.ListPendingAdjustments)
+			r.Post("/api/stock-adjustments/{id}/approve", stockAdjustmentHandler.ApproveAdjustment)
+			r.Post("/api/stock-adjustments/{id}/reject", stockAdjustmentHandler.RejectAdjustment)
+		})
 
 		// Stock Movements (Sprint 4)
 		stockMovementHandler.RegisterRoutes(r)
 
 		// Mídia
-		r.Post("/api/media/upload", mediaHandler.UploadMedia)
-		r.Get("/api/media/{id}", mediaHandler.GetMedia)
-		r.Delete("/api/media/{id}", mediaHandler.DeleteMedia)
-		r.Get("/api/media/entity/{entity_type}/{entity_id}", mediaHandler.GetMediaByEntity)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/api/media/{id}", mediaHandler.GetMedia)
+			r.Get("/api/media/entity/{entity_type}/{entity_id}", mediaHandler.GetMediaByEntity)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Post("/api/media/upload", mediaHandler.UploadMedia)
+			r.Delete("/api/media/{id}", mediaHandler.DeleteMedia)
+		})
 	})
 
 	// --- Rotas públicas para servir arquivos estáticos ---
