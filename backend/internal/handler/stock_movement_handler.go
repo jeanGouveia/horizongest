@@ -7,33 +7,53 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
 type StockMovementHandler struct {
 	stockMovementService *service.StockMovementService
+	roleMw               *middleware.RoleMiddleware
 }
 
-func NewStockMovementHandler(stockMovementService *service.StockMovementService) *StockMovementHandler {
-	return &StockMovementHandler{stockMovementService: stockMovementService}
+func NewStockMovementHandler(stockMovementService *service.StockMovementService, roleMw *middleware.RoleMiddleware) *StockMovementHandler {
+	return &StockMovementHandler{stockMovementService: stockMovementService, roleMw: roleMw}
 }
 
 func (h *StockMovementHandler) RegisterRoutes(r chi.Router) {
 	r.Route("/stock-movements", func(r chi.Router) {
-		r.Post("/", h.CreateStockMovement)
-		r.Get("/", h.ListStockMovements)
-		r.Get("/{id}", h.GetStockMovementByID)
-		r.Delete("/{id}", h.DeleteStockMovement)
+		r.Group(func(r chi.Router) {
+			r.Use(h.roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/", h.ListStockMovements)
+			r.Get("/{id}", h.GetStockMovementByID)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(h.roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Post("/", h.CreateStockMovement)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(h.roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Delete("/{id}", h.DeleteStockMovement)
+		})
 	})
 
 	r.Route("/stock-inventories", func(r chi.Router) {
-		r.Post("/", h.CreateInventory)
-		r.Get("/", h.ListInventories)
-		r.Get("/{id}", h.GetInventoryByID)
-		r.Delete("/{id}", h.DeleteInventory)
-		r.Post("/{id}/items", h.AddInventoryItem)
-		r.Post("/{id}/complete", h.CompleteInventory)
+		r.Group(func(r chi.Router) {
+			r.Use(h.roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Get("/", h.ListInventories)
+			r.Get("/{id}", h.GetInventoryByID)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(h.roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			r.Post("/", h.CreateInventory)
+			r.Delete("/{id}", h.DeleteInventory)
+			r.Post("/{id}/complete", h.CompleteInventory)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(h.roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager, domain.RoleEmployee))
+			r.Post("/{id}/items", h.AddInventoryItem)
+		})
 	})
 }
 
