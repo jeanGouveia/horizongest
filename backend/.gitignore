@@ -49,3 +49,5 @@ coverage.out
 
 # Uploads
 uploads/
+
+backend/coverage.html
