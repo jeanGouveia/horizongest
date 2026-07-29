@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
@@ -33,7 +34,7 @@ func (h *CompanySettingsHandler) GetSettings(w http.ResponseWriter, r *http.Requ
 	log.Printf("[FORENSIC] CompanySettingsHandler - UserID recebido: %d", userID)
 
 	// FORENSIC: Log TenantContext
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if ok {
 		log.Printf("[FORENSIC] CompanySettingsHandler - TenantContext - UserID: %d, CompanyID: %d", tenantCtx.UserID, tenantCtx.CompanyID)
 	} else {

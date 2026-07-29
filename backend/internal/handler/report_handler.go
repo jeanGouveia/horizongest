@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -46,7 +46,7 @@ func (h *ReportHandler) GetSalesReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -64,7 +64,7 @@ func (h *ReportHandler) GetSalesReport(w http.ResponseWriter, r *http.Request) {
 
 // GetProductsReport retorna relatório de produtos
 func (h *ReportHandler) GetProductsReport(w http.ResponseWriter, r *http.Request) {
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -96,7 +96,7 @@ func (h *ReportHandler) GetCMVReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -128,7 +128,7 @@ func (h *ReportHandler) GetProfitReport(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -146,7 +146,7 @@ func (h *ReportHandler) GetProfitReport(w http.ResponseWriter, r *http.Request) 
 
 // GetStockReport retorna relatório de estoque
 func (h *ReportHandler) GetStockReport(w http.ResponseWriter, r *http.Request) {
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -178,7 +178,7 @@ func (h *ReportHandler) GetPurchasesReport(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -210,7 +210,7 @@ func (h *ReportHandler) GetFinancialReport(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return

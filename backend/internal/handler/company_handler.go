@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -62,7 +62,7 @@ func (h *CompanyHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Security check: Validate that requested ID matches tenant's CompanyID
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -96,7 +96,7 @@ func (h *CompanyHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 // Does not accept CompanyID from URL - uses only the CompanyID from JWT/tenant context
 func (h *CompanyHandler) GetCurrentCompany(w http.ResponseWriter, r *http.Request) {
 	// Get tenant context from middleware
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return

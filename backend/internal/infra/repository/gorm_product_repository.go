@@ -7,10 +7,29 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
 )
+
+// ─── Helper functions for Money conversion ───────────────────────────────────
+
+func convertMoneyPtrToInt64Ptr(m *domain.Money) *int64 {
+	if m == nil {
+		return nil
+	}
+	v := int64(*m)
+	return &v
+}
+
+func convertInt64PtrToMoneyPtr(i *int64) *domain.Money {
+	if i == nil {
+		return nil
+	}
+	v := domain.Money(*i)
+	return &v
+}
 
 // ─── GORM models ────────────────────────────────────────────────────────────
 
@@ -18,9 +37,9 @@ type GormProduct struct {
 	ID                     uint   `gorm:"primaryKey;autoIncrement"`
 	Name                   string `gorm:"not null"`
 	Description            string
-	Price                  float64 `gorm:"not null;default:0"`
-	IsComposto             bool    `gorm:"not null;default:false"`
-	Active                 bool    `gorm:"not null;default:true"`
+	Price                  int64 `gorm:"not null;default:0"`
+	IsComposto             bool  `gorm:"not null;default:false"`
+	Active                 bool  `gorm:"not null;default:true"`
 	PhotoURL               string
 	CategoryID             *uint `gorm:"index"`
 	CompanyID              uint  `gorm:"index;not null"` // Sprint 3: NOT NULL
@@ -28,23 +47,23 @@ type GormProduct struct {
 	PreparationTimeMinutes int   `gorm:"not null;default:0"`
 	Featured               bool  `gorm:"not null;default:false"`
 	IsNew                  bool  `gorm:"not null;default:false"`
-	PromotionPrice         *float64
+	PromotionPrice         *int64
 	PromotionStart         *int64
 	PromotionEnd           *int64
 	AvailableFrom          string
 	AvailableUntil         string
 	SKU                    string
 	InternalNotes          string
-	DeletedAt              *int64 `gorm:"index"`
-	CreatedAt              int64  `gorm:"autoCreateTime"`
-	UpdatedAt              int64  `gorm:"autoUpdateTime"`
+	DeletedAt              *time.Time `gorm:"index"`
+	CreatedAt              time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt              time.Time  `gorm:"autoUpdateTime"`
 
 	// Sprint 4 - Ficha Técnica Avançada
-	Cost           float64 `gorm:"default:0.0"`
-	CMV            float64 `gorm:"default:0.0"`
+	Cost           int64   `gorm:"default:0"`
+	CMV            int64   `gorm:"default:0"`
 	Margin         float64 `gorm:"default:0.0"`
-	Profit         float64 `gorm:"default:0.0"`
-	SuggestedPrice float64 `gorm:"default:0.0"`
+	Profit         int64   `gorm:"default:0"`
+	SuggestedPrice int64   `gorm:"default:0"`
 
 	// SEO fields para Cardápio Digital
 	Slug            string `gorm:"uniqueIndex"`
@@ -63,16 +82,16 @@ type GormProduct struct {
 func (GormProduct) TableName() string { return "products" }
 
 type GormIngredient struct {
-	ID            uint    `gorm:"primaryKey;autoIncrement"`
-	Name          string  `gorm:"not null"`
-	Unit          string  `gorm:"not null;default:'un'"`
-	StockQuantity float64 `gorm:"not null;default:0"`
-	MinStock      float64 `gorm:"not null;default:0"`
-	Active        bool    `gorm:"not null;default:true"`
-	CompanyID     uint    `gorm:"index;not null"` // Sprint 3: NOT NULL
-	DeletedAt     *int64  `gorm:"index"`
-	CreatedAt     int64   `gorm:"autoCreateTime"`
-	UpdatedAt     int64   `gorm:"autoUpdateTime"`
+	ID            uint       `gorm:"primaryKey;autoIncrement"`
+	Name          string     `gorm:"not null"`
+	Unit          string     `gorm:"not null;default:'un'"`
+	StockQuantity float64    `gorm:"not null;default:0"`
+	MinStock      float64    `gorm:"not null;default:0"`
+	Active        bool       `gorm:"not null;default:true"`
+	CompanyID     uint       `gorm:"index;not null"` // Sprint 3: NOT NULL
+	DeletedAt     *time.Time `gorm:"index"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (GormIngredient) TableName() string { return "ingredients" }
@@ -85,9 +104,9 @@ type GormProductIngredient struct {
 	// Sprint 4 - Ficha Técnica Avançada
 	Loss       float64        `gorm:"default:0.0"`
 	Yield      float64        `gorm:"default:1.0"`
-	UnitCost   float64        `gorm:"default:0.0"`
-	TotalCost  float64        `gorm:"default:0.0"`
-	DeletedAt  *int64         `gorm:"index"`
+	UnitCost   int64          `gorm:"default:0"`
+	TotalCost  int64          `gorm:"default:0"`
+	DeletedAt  *time.Time     `gorm:"index"`
 	Ingredient GormIngredient `gorm:"foreignKey:IngredientID"`
 }
 
@@ -101,6 +120,15 @@ type GormProductRepository struct{ db *gorm.DB }
 
 func NewGormProductRepository(db *gorm.DB) *GormProductRepository {
 	return &GormProductRepository{db: db}
+}
+
+// getDB retorna a transação se fornecida, senão retorna o DB padrão
+// Sprint 4B.1 v2: Transaction propagation
+func (r *GormProductRepository) getDB(ctx context.Context, tx *gorm.DB) *gorm.DB {
+	if tx != nil {
+		return tx.WithContext(ctx)
+	}
+	return r.db.WithContext(ctx)
 }
 
 // ── Produto ──────────────────────────────────────────────────────────────────
@@ -126,7 +154,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 
 	m := GormProduct{
 		Name: p.Name, Description: p.Description,
-		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
+		Price: int64(p.Price), IsComposto: p.IsComposto, Active: p.Active,
 		PhotoURL:               p.PhotoURL,
 		CategoryID:             p.CategoryID,
 		CompanyID:              companyID, // Auto-filled from context
@@ -134,7 +162,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 		PreparationTimeMinutes: p.PreparationTimeMinutes,
 		Featured:               p.Featured,
 		IsNew:                  p.IsNew,
-		PromotionPrice:         p.PromotionPrice,
+		PromotionPrice:         convertMoneyPtrToInt64Ptr(p.PromotionPrice),
 		AvailableFrom:          p.AvailableFrom,
 		AvailableUntil:         p.AvailableUntil,
 		SKU:                    p.SKU,
@@ -161,8 +189,8 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 	}
 	p.ID = m.ID
 	p.CompanyID = m.CompanyID
-	p.CreatedAt = time.Unix(m.CreatedAt, 0)
-	p.UpdatedAt = time.Unix(m.UpdatedAt, 0)
+	p.CreatedAt = m.CreatedAt
+	p.UpdatedAt = m.UpdatedAt
 	return nil
 }
 
@@ -231,7 +259,7 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 	// Update without changing CompanyID (immutable)
 	m := GormProduct{
 		ID: p.ID, Name: p.Name, Description: p.Description,
-		Price: p.Price, IsComposto: p.IsComposto, Active: p.Active,
+		Price: int64(p.Price), IsComposto: p.IsComposto, Active: p.Active,
 		PhotoURL:               p.PhotoURL,
 		CategoryID:             p.CategoryID,
 		CompanyID:              existing.CompanyID, // Preserve original CompanyID
@@ -239,7 +267,7 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 		PreparationTimeMinutes: p.PreparationTimeMinutes,
 		Featured:               p.Featured,
 		IsNew:                  p.IsNew,
-		PromotionPrice:         p.PromotionPrice,
+		PromotionPrice:         convertMoneyPtrToInt64Ptr(p.PromotionPrice),
 		AvailableFrom:          p.AvailableFrom,
 		AvailableUntil:         p.AvailableUntil,
 		SKU:                    p.SKU,
@@ -269,7 +297,7 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 
 func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) error {
 	// Soft delete: marca DeletedAt (princípio #8)
-	now := time.Now().Unix()
+	now := time.Now()
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	if err := query.WithContext(ctx).Model(&GormProduct{}).
 		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
@@ -348,20 +376,37 @@ func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.
 	i.ID = m.ID
 	i.CompanyID = m.CompanyID
 	i.Active = m.Active
-	i.CreatedAt = time.Unix(m.CreatedAt, 0)
-	i.UpdatedAt = time.Unix(m.UpdatedAt, 0)
+	i.CreatedAt = m.CreatedAt
+	i.UpdatedAt = m.UpdatedAt
 	return nil
 }
 
-func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint) (*domain.Ingredient, error) {
+func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint, tx *gorm.DB) (*domain.Ingredient, error) {
 	var m GormIngredient
-	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), id)
 	err := query.Where("deleted_at IS NULL").First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("ingredient not found or access denied")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("FindIngredientByID: %w", err)
+	}
+	return ingredientToDomain(&m), nil
+}
+
+// FindIngredientByIDForUpdate busca ingrediente com SELECT FOR UPDATE
+// Sprint 4B.1 v2: Lock pessimista real
+func (r *GormProductRepository) FindIngredientByIDForUpdate(ctx context.Context, id uint, tx *gorm.DB) (*domain.Ingredient, error) {
+	var m GormIngredient
+	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), id)
+	err := query.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("deleted_at IS NULL").
+		First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("FindIngredientByID: %w", err)
+		return nil, fmt.Errorf("FindIngredientByIDForUpdate: %w", err)
 	}
 	return ingredientToDomain(&m), nil
 }
@@ -379,25 +424,32 @@ func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.I
 	return out, nil
 }
 
-func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.Ingredient) error {
-	// First, verify the ingredient belongs to the tenant
+// Sprint 4B.4: Adicionado SELECT FOR UPDATE para prevenir lost update
+func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.Ingredient, tx *gorm.DB) error {
+	// Sprint 4B.4: SELECT FOR UPDATE antes de qualquer leitura de campos
+	// Isso previne lost update bloqueando o registro durante a transação
 	var existing GormIngredient
-	query := ApplyTenantFilterWithID(ctx, r.db, i.ID)
-	if err := query.Where("deleted_at IS NULL").First(&existing).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), i.ID)
+	if err := query.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("deleted_at IS NULL").
+		First(&existing).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("UpdateIngredient: ingredient not found or access denied")
 		}
 		return fmt.Errorf("UpdateIngredient: %w", err)
 	}
 
-	// Update without changing CompanyID (immutable)
-	m := GormIngredient{
-		ID: i.ID, Name: i.Name, Unit: i.Unit,
-		StockQuantity: i.StockQuantity, MinStock: i.MinStock,
-		Active:    i.Active,
-		CompanyID: existing.CompanyID, // Preserve original CompanyID
-	}
-	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
+	// Sprint 4B.4: Usar Updates() em vez de Save() para evitar atualizar timestamps desnecessários
+	// Update sem changing CompanyID (immutable)
+	if err := r.getDB(ctx, tx).Model(&GormIngredient{}).
+		Where("id = ? AND deleted_at IS NULL", i.ID).
+		Updates(map[string]interface{}{
+			"name":           i.Name,
+			"unit":           i.Unit,
+			"stock_quantity": i.StockQuantity,
+			"min_stock":      i.MinStock,
+			"active":         i.Active,
+		}).Error; err != nil {
 		return fmt.Errorf("UpdateIngredient: %w", err)
 	}
 	return nil
@@ -405,7 +457,7 @@ func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.
 
 func (r *GormProductRepository) DeleteIngredient(ctx context.Context, id uint) error {
 	// Soft delete: marca DeletedAt (princípio #8)
-	now := time.Now().Unix()
+	now := time.Now()
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
@@ -462,8 +514,8 @@ func (r *GormProductRepository) SetProductIngredients(
 				Quantity:     item.Quantity,
 				Loss:         item.Loss,
 				Yield:        item.Yield,
-				UnitCost:     item.UnitCost,
-				TotalCost:    item.TotalCost,
+				UnitCost:     int64(item.UnitCost),
+				TotalCost:    int64(item.TotalCost),
 			}
 			if err := tx.Create(&m).Error; err != nil {
 				return fmt.Errorf("SetProductIngredients insert: %w", err)
@@ -492,8 +544,8 @@ func (r *GormProductRepository) GetProductIngredients(
 			Quantity:     m.Quantity,
 			Loss:         m.Loss,
 			Yield:        m.Yield,
-			UnitCost:     m.UnitCost,
-			TotalCost:    m.TotalCost,
+			UnitCost:     domain.Money(m.UnitCost),
+			TotalCost:    domain.Money(m.TotalCost),
 			Ingredient:   ing,
 		}
 	}
@@ -507,30 +559,50 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 	ingredientName string, currentStock float64,
 ) error {
 	// Usa o DB da transação se fornecido, senão usa o DB padrão
-	db := r.db
-	if txDB != nil {
-		db = txDB.WithContext(ctx)
-	} else {
-		db = db.WithContext(ctx)
+	db := r.getDB(ctx, txDB)
+
+	// Build WHERE clause manually
+	whereClause := "id = ? AND deleted_at IS NULL"
+	whereArgs := []interface{}{ingredientID}
+
+	// Apply tenant filter if context has tenant
+	if tenantCtx, ok := domain.GetTenantContextFromContext(ctx); ok {
+		whereClause += " AND company_id = ?"
+		whereArgs = append(whereArgs, tenantCtx.GetCompanyID())
 	}
 
-	// Apply tenant filter to stock operations
-	query := ApplyTenantFilterWithID(ctx, db, ingredientID)
+	// Sprint 4B.1 v2: SELECT FOR UPDATE real com Clauses(clause.Locking{Strength: "UPDATE"})
+	// Isso impede que outras transações leiam/modifiquem o ingrediente durante esta operação
+	var ingredient GormIngredient
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where(whereClause, whereArgs...).
+		First(&ingredient).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("ingrediente não encontrado")
+		}
+		return fmt.Errorf("DecreaseIngredientStock: lock ingrediente: %w", err)
+	}
 
-	// Usa UPDATE com CHECK inline para garantir que não vai negativo
-	result := query.
-		Model(&GormIngredient{}).
-		Where("stock_quantity >= ?", qty).
+	// Verificar estoque suficiente antes do UPDATE (validação adicional)
+	if ingredient.StockQuantity < qty {
+		return fmt.Errorf(
+			"estoque insuficiente para '%s': disponível=%.4f necessário=%.4f",
+			ingredientName, ingredient.StockQuantity, qty,
+		)
+	}
+
+	// Usa UPDATE com CHECK inline como garantia adicional (defesa em profundidade)
+	updateWhere := whereClause + " AND stock_quantity >= ?"
+	updateArgs := append(whereArgs, qty)
+	result := db.Model(&GormIngredient{}).
+		Where(updateWhere, updateArgs...).
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity - ?", qty))
 
 	if result.Error != nil {
 		return fmt.Errorf("DecreaseIngredientStock id=%d: %w", ingredientID, result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf(
-			"estoque insuficiente para '%s': disponível=%.4f necessário=%.4f",
-			ingredientName, currentStock, qty,
-		)
+		return fmt.Errorf("estoque insuficiente (concorrência)")
 	}
 	return nil
 }
@@ -538,18 +610,32 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 func (r *GormProductRepository) IncreaseIngredientStock(
 	ctx context.Context, ingredientID uint, qty float64, txDB *gorm.DB,
 ) error {
-	db := r.db
-	if txDB != nil {
-		db = txDB.WithContext(ctx)
-	} else {
-		db = db.WithContext(ctx)
+	db := r.getDB(ctx, txDB)
+
+	// Build WHERE clause manually
+	whereClause := "id = ? AND deleted_at IS NULL"
+	whereArgs := []interface{}{ingredientID}
+
+	// Apply tenant filter if context has tenant
+	if tenantCtx, ok := domain.GetTenantContextFromContext(ctx); ok {
+		whereClause += " AND company_id = ?"
+		whereArgs = append(whereArgs, tenantCtx.GetCompanyID())
 	}
 
-	// Apply tenant filter to stock operations
-	query := ApplyTenantFilterWithID(ctx, db, ingredientID)
+	// Sprint 4B.1 v2: SELECT FOR UPDATE real com Clauses(clause.Locking{Strength: "UPDATE"})
+	// Consistente com DecreaseIngredientStock para evitar race condition
+	var ingredient GormIngredient
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where(whereClause, whereArgs...).
+		First(&ingredient).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("ingrediente não encontrado")
+		}
+		return fmt.Errorf("IncreaseIngredientStock: lock ingrediente: %w", err)
+	}
 
-	result := query.
-		Model(&GormIngredient{}).
+	result := db.Model(&GormIngredient{}).
+		Where(whereClause, whereArgs...).
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity + ?", qty))
 
 	if result.Error != nil {
@@ -566,7 +652,7 @@ func (r *GormProductRepository) IncreaseIngredientStock(
 func productToDomain(m *GormProduct) *domain.Product {
 	var deletedAt *time.Time
 	if m.DeletedAt != nil {
-		dt := time.Unix(*m.DeletedAt, 0)
+		dt := *m.DeletedAt
 		deletedAt = &dt
 	}
 	var promotionStart, promotionEnd, lastSync *time.Time
@@ -584,7 +670,7 @@ func productToDomain(m *GormProduct) *domain.Product {
 	}
 	return &domain.Product{
 		ID: m.ID, Name: m.Name, Description: m.Description,
-		Price: m.Price, IsComposto: m.IsComposto, Active: m.Active,
+		Price: domain.Money(m.Price), IsComposto: m.IsComposto, Active: m.Active,
 		PhotoURL:               m.PhotoURL,
 		CategoryID:             m.CategoryID,
 		CompanyID:              m.CompanyID,
@@ -592,7 +678,7 @@ func productToDomain(m *GormProduct) *domain.Product {
 		PreparationTimeMinutes: m.PreparationTimeMinutes,
 		Featured:               m.Featured,
 		IsNew:                  m.IsNew,
-		PromotionPrice:         m.PromotionPrice,
+		PromotionPrice:         convertInt64PtrToMoneyPtr(m.PromotionPrice),
 		PromotionStart:         promotionStart,
 		PromotionEnd:           promotionEnd,
 		AvailableFrom:          m.AvailableFrom,
@@ -600,7 +686,7 @@ func productToDomain(m *GormProduct) *domain.Product {
 		SKU:                    m.SKU,
 		InternalNotes:          m.InternalNotes,
 		DeletedAt:              deletedAt,
-		CreatedAt:              time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
+		CreatedAt:              m.CreatedAt, UpdatedAt: m.UpdatedAt,
 		Slug:            m.Slug,
 		MetaTitle:       m.MetaTitle,
 		MetaDescription: m.MetaDescription,
@@ -614,17 +700,12 @@ func productToDomain(m *GormProduct) *domain.Product {
 }
 
 func ingredientToDomain(m *GormIngredient) *domain.Ingredient {
-	var deletedAt *time.Time
-	if m.DeletedAt != nil {
-		dt := time.Unix(*m.DeletedAt, 0)
-		deletedAt = &dt
-	}
 	return &domain.Ingredient{
 		ID: m.ID, Name: m.Name, Unit: m.Unit,
 		StockQuantity: m.StockQuantity, MinStock: m.MinStock,
 		Active:    m.Active,
 		CompanyID: m.CompanyID,
-		DeletedAt: deletedAt,
-		CreatedAt: time.Unix(m.CreatedAt, 0), UpdatedAt: time.Unix(m.UpdatedAt, 0),
+		DeletedAt: m.DeletedAt,
+		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}
 }
