@@ -73,7 +73,8 @@ func (s *StockAdjustmentService) RegisterStockAdjustmentForOrder(
 			consumedQuantity := pi.Quantity * item.Quantity
 
 			// Buscar ingrediente para capturar snapshot (princípio #4: Histórico é imutável)
-			ingredient, err := s.productRepo.FindIngredientByID(ctx, pi.IngredientID)
+			// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+			ingredient, err := s.productRepo.FindIngredientByID(ctx, pi.IngredientID, nil)
 			if err != nil {
 				return fmt.Errorf("RegisterStockAdjustmentForOrder: buscar ingrediente_id=%d: %w", pi.IngredientID, err)
 			}

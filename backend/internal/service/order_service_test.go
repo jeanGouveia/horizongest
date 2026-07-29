@@ -22,13 +22,22 @@ func NewMockOrderRepository() *MockOrderRepository {
 	}
 }
 
-func (m *MockOrderRepository) CreateOrder(ctx context.Context, order *domain.Order, productIngredients map[uint][]domain.ProductIngredient) error {
+func (m *MockOrderRepository) CreateOrder(ctx context.Context, order *domain.Order, productIngredients map[uint][]domain.ProductIngredient) (*domain.Order, error) {
 	if m.createError != nil {
-		return m.createError
+		return nil, m.createError
 	}
 	order.ID = uint(len(m.orders) + 1)
 	m.orders[order.ID] = order
-	return nil
+	return order, nil
+}
+
+func (m *MockOrderRepository) FindByIdempotencyKey(ctx context.Context, companyID uint, idempotencyKey string) (*domain.Order, error) {
+	for _, order := range m.orders {
+		if order.CompanyID == companyID && order.IdempotencyKey != nil && *order.IdempotencyKey == idempotencyKey {
+			return order, nil
+		}
+	}
+	return nil, nil
 }
 
 func (m *MockOrderRepository) FindOrderByID(ctx context.Context, id uint) (*domain.Order, error) {
@@ -71,6 +80,163 @@ func (m *MockOrderRepository) UpdateOrder(ctx context.Context, id uint, items []
 
 func (m *MockOrderRepository) ValidateStock(ctx context.Context, items []domain.OrderItem, productIngredients map[uint][]domain.ProductIngredient) (*domain.StockValidationResponse, error) {
 	return &domain.StockValidationResponse{Valid: true}, nil
+}
+
+// Sprint 4C: Teste de idempotência
+func TestOrderService_CreateOrder_Idempotency(t *testing.T) {
+	mockOrderRepo := NewMockOrderRepository()
+	mockProductRepo := NewMockProductRepositoryForOrder()
+	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+
+	// Setup product
+	mockProductRepo.products[1] = &domain.Product{
+		ID:     1,
+		Name:   "Cake",
+		Price:  10.0,
+		Active: true,
+	}
+
+	idempotencyKey := "test-idempotency-key-123"
+
+	// Criar contexto com tenant
+	tenantCtx := &domain.TenantContext{
+		UserID:    1,
+		CompanyID: 123,
+	}
+	ctx := context.WithValue(context.Background(), "tenant", tenantCtx)
+
+	input := CreateOrderInput{
+		Items: []OrderItemInput{
+			{ProductID: 1, Quantity: 2},
+		},
+		Notes:          "Test order",
+		IdempotencyKey: &idempotencyKey,
+	}
+
+	// Primeira chamada - deve criar pedido
+	order1, err := svc.CreateOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("First CreateOrder failed: %v", err)
+	}
+	if order1 == nil {
+		t.Fatal("First CreateOrder returned nil order")
+	}
+
+	// Segunda chamada com mesma chave - deve retornar pedido existente
+	order2, err := svc.CreateOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("Second CreateOrder failed: %v", err)
+	}
+	if order2 == nil {
+		t.Fatal("Second CreateOrder returned nil order")
+	}
+
+	// Verificar que é o mesmo pedido
+	if order1.ID != order2.ID {
+		t.Errorf("Expected same order ID, got %d and %d", order1.ID, order2.ID)
+	}
+
+	// Verificar que não criou um novo pedido
+	if len(mockOrderRepo.orders) != 1 {
+		t.Errorf("Expected 1 order, got %d", len(mockOrderRepo.orders))
+	}
+}
+
+func TestOrderService_CreateOrder_IdempotencyDifferentKeys(t *testing.T) {
+	mockOrderRepo := NewMockOrderRepository()
+	mockProductRepo := NewMockProductRepositoryForOrder()
+	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+
+	// Setup product
+	mockProductRepo.products[1] = &domain.Product{
+		ID:     1,
+		Name:   "Cake",
+		Price:  10.0,
+		Active: true,
+	}
+
+	// Criar contexto com tenant
+	tenantCtx := &domain.TenantContext{
+		UserID:    1,
+		CompanyID: 123,
+	}
+	ctx := context.WithValue(context.Background(), "tenant", tenantCtx)
+
+	key1 := "test-idempotency-key-1"
+	key2 := "test-idempotency-key-2"
+
+	input1 := CreateOrderInput{
+		Items: []OrderItemInput{
+			{ProductID: 1, Quantity: 2},
+		},
+		Notes:          "Test order 1",
+		IdempotencyKey: &key1,
+	}
+
+	input2 := CreateOrderInput{
+		Items: []OrderItemInput{
+			{ProductID: 1, Quantity: 2},
+		},
+		Notes:          "Test order 2",
+		IdempotencyKey: &key2,
+	}
+
+	// Duas chamadas com chaves diferentes - devem criar pedidos diferentes
+	order1, err := svc.CreateOrder(ctx, input1)
+	if err != nil {
+		t.Fatalf("First CreateOrder failed: %v", err)
+	}
+
+	order2, err := svc.CreateOrder(ctx, input2)
+	if err != nil {
+		t.Fatalf("Second CreateOrder failed: %v", err)
+	}
+
+	// Verificar que são pedidos diferentes
+	if order1.ID == order2.ID {
+		t.Errorf("Expected different order IDs, got same ID %d", order1.ID)
+	}
+
+	// Verificar que criou dois pedidos
+	if len(mockOrderRepo.orders) != 2 {
+		t.Errorf("Expected 2 orders, got %d", len(mockOrderRepo.orders))
+	}
+}
+
+func TestOrderService_CreateOrder_NoIdempotencyKey(t *testing.T) {
+	mockOrderRepo := NewMockOrderRepository()
+	mockProductRepo := NewMockProductRepositoryForOrder()
+	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+
+	// Setup product
+	mockProductRepo.products[1] = &domain.Product{
+		ID:     1,
+		Name:   "Cake",
+		Price:  10.0,
+		Active: true,
+	}
+
+	input := CreateOrderInput{
+		Items: []OrderItemInput{
+			{ProductID: 1, Quantity: 2},
+		},
+		Notes: "Test order",
+		// IdempotencyKey é nil
+	}
+
+	// Chamada sem chave - deve criar pedido normalmente
+	order, err := svc.CreateOrder(context.Background(), input)
+	if err != nil {
+		t.Fatalf("CreateOrder failed: %v", err)
+	}
+	if order == nil {
+		t.Fatal("CreateOrder returned nil order")
+	}
+
+	// Verificar que criou pedido
+	if len(mockOrderRepo.orders) != 1 {
+		t.Errorf("Expected 1 order, got %d", len(mockOrderRepo.orders))
+	}
 }
 
 func NewMockProductRepositoryForOrder() *MockProductRepository {

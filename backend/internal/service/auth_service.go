@@ -180,8 +180,8 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input Cha
 // Retorna *JWTClaims (exportado) para o middleware extrair UserID, Email e Name.
 
 func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTClaims, error) {
-	// FORENSIC: Log JWT bruto recebido
-	log.Printf("[FORENSIC] ValidateToken - JWT bruto recebido: %s", tokenStr)
+	// Sprint 4A: Remover log de JWT bruto por segurança
+	// log.Printf("[FORENSIC] ValidateToken - JWT bruto recebido: %s", tokenStr)
 
 	// Check if token is blacklisted no banco
 	blacklisted, err := s.tokenBlacklist.IsBlacklisted(ctx, tokenStr)
@@ -213,9 +213,9 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 		return nil, fmt.Errorf("ValidateToken: claims inválidos")
 	}
 
-	// FORENSIC: Log claims após validação
-	log.Printf("[FORENSIC] ValidateToken - Claims validados - UserID: %d, CompanyID: %d, Email: %s, Name: %s, Issuer: %s, Subject: %s, IsImpersonating: %v",
-		claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.Issuer, claims.Subject, claims.IsImpersonating)
+	// Sprint 4A: Remover log de claims sensíveis por segurança
+	// log.Printf("[FORENSIC] ValidateToken - Claims validados - UserID: %d, CompanyID: %d, Email: %s, Name: %s, Issuer: %s, Subject: %s, IsImpersonating: %v",
+	//	claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.Issuer, claims.Subject, claims.IsImpersonating)
 
 	return claims, nil
 }

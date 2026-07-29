@@ -86,7 +86,15 @@ func (m *MockProductRepository) CreateIngredient(ctx context.Context, ingredient
 	return nil
 }
 
-func (m *MockProductRepository) FindIngredientByID(ctx context.Context, id uint) (*domain.Ingredient, error) {
+func (m *MockProductRepository) FindIngredientByID(ctx context.Context, id uint, tx *gorm.DB) (*domain.Ingredient, error) {
+	if m.ingredientsError != nil {
+		return nil, m.ingredientsError
+	}
+	return m.ingredients[id], nil
+}
+
+// FindIngredientByIDForUpdate mock implementation
+func (m *MockProductRepository) FindIngredientByIDForUpdate(ctx context.Context, id uint, tx *gorm.DB) (*domain.Ingredient, error) {
 	if m.ingredientsError != nil {
 		return nil, m.ingredientsError
 	}
@@ -101,7 +109,7 @@ func (m *MockProductRepository) ListIngredients(ctx context.Context) ([]domain.I
 	return ingredients, nil
 }
 
-func (m *MockProductRepository) UpdateIngredient(ctx context.Context, ingredient *domain.Ingredient) error {
+func (m *MockProductRepository) UpdateIngredient(ctx context.Context, ingredient *domain.Ingredient, tx *gorm.DB) error {
 	m.ingredients[ingredient.ID] = ingredient
 	return nil
 }
