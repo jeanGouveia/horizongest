@@ -29,25 +29,23 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 		log.Printf("[FORENSIC] AuthMiddleware - Request recebida: %s %s", r.Method, r.URL.Path)
 		log.Printf("[FORENSIC] AuthMiddleware - Request ID: %s", r.Header.Get("X-Request-ID"))
 
-		// FORENSIC: Log ALL cookies received
-		log.Printf("[FORENSIC] AuthMiddleware - TODOS os cookies recebidos:")
-		for _, c := range r.Cookies() {
-			log.Printf("[FORENSIC] AuthMiddleware - [COOKIE] %s=%s", c.Name, c.Value)
-		}
+		// Sprint 4A: Remover logs de cookies sensíveis
+		// log.Printf("[FORENSIC] AuthMiddleware - TODOS os cookies recebidos:")
+		// for _, c := range r.Cookies() {
+		//	log.Printf("[FORENSIC] AuthMiddleware - [COOKIE] %s=%s", c.Name, c.Value)
+		// }
 
-		// FORENSIC: Log Authorization header
-		authHeader := r.Header.Get("Authorization")
-		log.Printf("[FORENSIC] AuthMiddleware - Authorization Header: %s", authHeader)
+		// Sprint 4A: Remover log de Authorization header sensível
+		// authHeader := r.Header.Get("Authorization")
+		// log.Printf("[FORENSIC] AuthMiddleware - Authorization Header: %s", authHeader)
 
 		var token string
-		var tokenSource string
 
 		// Estratégia 1: Cookie HttpOnly (produção)
 		if cookie, err := r.Cookie("auth_token"); err == nil {
 			token = cookie.Value
-			tokenSource = "cookie auth_token"
-			// FORENSIC: Log token bruto
-			log.Printf("[FORENSIC] AuthMiddleware - Token encontrado no cookie auth_token: %s", token)
+			// Sprint 4A: Remover log de token bruto
+			// log.Printf("[FORENSIC] AuthMiddleware - Token encontrado no cookie auth_token: %s", token)
 		} else {
 			log.Printf("[FORENSIC] AuthMiddleware - Cookie auth_token não encontrado: %v", err)
 		}
@@ -56,8 +54,8 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 		if token == "" {
 			if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 				token = strings.TrimPrefix(h, "Bearer ")
-				tokenSource = "Authorization header"
-				log.Printf("[FORENSIC] AuthMiddleware - Token encontrado no header Authorization: %s", token)
+				// Sprint 4A: Remover log de token bruto
+				// log.Printf("[FORENSIC] AuthMiddleware - Token encontrado no header Authorization: %s", token)
 			}
 		}
 
@@ -67,8 +65,8 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 			return
 		}
 
-		// FORENSIC: Log which token was chosen
-		log.Printf("[FORENSIC] AuthMiddleware - Token escolhido - Origem: %s, Token: %s", tokenSource, token)
+		// Sprint 4A: Remover log de token escolhido
+		// log.Printf("[FORENSIC] AuthMiddleware - Token escolhido - Origem: %s, Token: %s", tokenSource, token)
 
 		claims, err := m.authService.ValidateToken(r.Context(), token)
 		if err != nil {
@@ -77,9 +75,9 @@ func (m *AuthMiddleware) Auth(next http.Handler) http.Handler {
 			return
 		}
 
-		// FORENSIC: Log claims
-		log.Printf("[FORENSIC] AuthMiddleware - Claims - UserID: %d, CompanyID: %d, Email: %s, Name: %s, IsImpersonating: %v, OriginalPlatformUserID: %d",
-			claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating, claims.OriginalPlatformUserID)
+		// Sprint 4A: Remover log de claims sensíveis
+		// log.Printf("[FORENSIC] AuthMiddleware - Claims - UserID: %d, CompanyID: %d, Email: %s, Name: %s, IsImpersonating: %v, OriginalPlatformUserID: %d",
+		//	claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating, claims.OriginalPlatformUserID)
 
 		// Injeta UserID e claims completos no context
 		ctx := context.WithValue(r.Context(), ContextKeyUserID, claims.UserID)

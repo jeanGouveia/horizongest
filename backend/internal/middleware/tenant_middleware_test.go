@@ -9,6 +9,15 @@ import (
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
 
+// Helper function to create context with tenant
+func createTenantContext(ctx context.Context, userID, companyID uint) context.Context {
+	tenantCtx := &domain.TenantContext{
+		UserID:    userID,
+		CompanyID: companyID,
+	}
+	return context.WithValue(ctx, domain.ContextKeyTenant, tenantCtx)
+}
+
 // MockUserRepository is a mock implementation of ports.UserRepository
 type MockUserRepository struct {
 	Users             map[uint]*domain.User
@@ -93,7 +102,7 @@ func TestTenantMiddleware_TenantContext(t *testing.T) {
 		t.Errorf("Expected 200, got %d", w.Code)
 	}
 
-	tenant, ok := GetTenantContextFromContext(capturedContext)
+	tenant, ok := domain.GetTenantContextFromContext(capturedContext)
 	if !ok {
 		t.Fatal("Expected TenantContext in context")
 	}
@@ -129,7 +138,7 @@ func TestTenantMiddleware_CompanyIDIsolation(t *testing.T) {
 	}))
 	handler.ServeHTTP(w, req)
 
-	tenant, ok := GetTenantContextFromContext(capturedContext)
+	tenant, ok := domain.GetTenantContextFromContext(capturedContext)
 	if !ok {
 		t.Fatal("Expected TenantContext in context")
 	}
@@ -162,7 +171,7 @@ func TestTenantMiddleware_MissingCompanyID(t *testing.T) {
 	}))
 	handler.ServeHTTP(w, req)
 
-	tenant, ok := GetTenantContextFromContext(capturedContext)
+	tenant, ok := domain.GetTenantContextFromContext(capturedContext)
 	if !ok {
 		t.Fatal("Expected TenantContext in context")
 	}
@@ -202,7 +211,7 @@ func TestTenantMiddleware_Impersonation(t *testing.T) {
 		t.Errorf("Expected 200, got %d", w.Code)
 	}
 
-	tenant, ok := GetTenantContextFromContext(capturedContext)
+	tenant, ok := domain.GetTenantContextFromContext(capturedContext)
 	if !ok {
 		t.Fatal("Expected TenantContext in context")
 	}
@@ -216,7 +225,7 @@ func TestTenantContext_GetCompanyID(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with no tenant context
-	_, ok := GetTenantContextFromContext(ctx)
+	_, ok := domain.GetTenantContextFromContext(ctx)
 	if ok {
 		t.Error("expected false when no tenant context")
 	}
@@ -226,9 +235,9 @@ func TestTenantContext_GetCompanyID(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx = context.WithValue(ctx, ContextKeyTenant, tenantCtx)
+	ctx = context.WithValue(ctx, domain.ContextKeyTenant, tenantCtx)
 
-	retrieved, ok := GetTenantContextFromContext(ctx)
+	retrieved, ok := domain.GetTenantContextFromContext(ctx)
 	if !ok {
 		t.Error("expected true when tenant context exists")
 	}
