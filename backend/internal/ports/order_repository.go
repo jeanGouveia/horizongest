@@ -11,7 +11,12 @@ type OrderRepository interface {
 	// de todos os ingredientes em uma única transação atômica.
 	// Se qualquer ingrediente ficar com estoque negativo → rollback total.
 	// productIngredients é um mapa de product_id -> ingredientes pré-carregados
-	CreateOrder(ctx context.Context, order *domain.Order, productIngredients map[uint][]domain.ProductIngredient) error
+	// Sprint 4C: Retorna o pedido criado ou o pedido existente em caso de colisão de idempotency_key
+	CreateOrder(ctx context.Context, order *domain.Order, productIngredients map[uint][]domain.ProductIngredient) (*domain.Order, error)
+
+	// FindByIdempotencyKey busca um pedido pela chave de idempotência
+	// Retorna nil se não encontrado (não é erro)
+	FindByIdempotencyKey(ctx context.Context, companyID uint, idempotencyKey string) (*domain.Order, error)
 
 	FindOrderByID(ctx context.Context, id uint) (*domain.Order, error)
 	ListOrders(ctx context.Context) ([]domain.Order, error)
@@ -38,7 +43,7 @@ type OrderRepository interface {
 		ctx context.Context,
 		id uint,
 		items []domain.OrderItem,
-		total float64,
+		total domain.Money,
 		notes string,
 		productIngredients map[uint][]domain.ProductIngredient,
 	) error

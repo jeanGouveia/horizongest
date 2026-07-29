@@ -20,9 +20,10 @@ type ProductRepository interface {
 
 	// Ingrediente
 	CreateIngredient(ctx context.Context, i *domain.Ingredient) error
-	FindIngredientByID(ctx context.Context, id uint) (*domain.Ingredient, error)
+	FindIngredientByID(ctx context.Context, id uint, tx *gorm.DB) (*domain.Ingredient, error)
+	FindIngredientByIDForUpdate(ctx context.Context, id uint, tx *gorm.DB) (*domain.Ingredient, error)
 	ListIngredients(ctx context.Context) ([]domain.Ingredient, error)
-	UpdateIngredient(ctx context.Context, i *domain.Ingredient) error
+	UpdateIngredient(ctx context.Context, i *domain.Ingredient, tx *gorm.DB) error
 	DeleteIngredient(ctx context.Context, id uint) error
 	CanDeleteIngredient(ctx context.Context, id uint) (*domain.DependencyCheck, error)
 
