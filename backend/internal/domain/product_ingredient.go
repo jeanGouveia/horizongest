@@ -13,8 +13,8 @@ type ProductIngredient struct {
 	// Sprint 4 - Ficha Técnica Avançada
 	Loss      float64    // perda em % (ex: 10% = 0.10)
 	Yield     float64    // rendimento em % (ex: 90% = 0.90)
-	UnitCost  float64    // custo unitário do ingrediente (calculado)
-	TotalCost float64    // custo total = quantity * unitCost / yield
+	UnitCost  Money      // custo unitário do ingrediente (calculado)
+	TotalCost Money      // custo total = quantity * unitCost / yield
 	DeletedAt *time.Time // "O registro foi removido logicamente"
 
 	// Preenchido em joins (leitura)
@@ -23,11 +23,11 @@ type ProductIngredient struct {
 
 // CalculateCost calcula o custo total do ingrediente no produto
 // Custo = (Quantidade * CustoUnitário) / Rendimento
-func (pi *ProductIngredient) CalculateCost() float64 {
+func (pi *ProductIngredient) CalculateCost() Money {
 	if pi.Yield == 0 {
 		pi.Yield = 1.0 // Se não definido, assume 100%
 	}
-	cost := (pi.Quantity * pi.UnitCost) / pi.Yield
+	cost := pi.UnitCost.MulFloat(pi.Quantity / pi.Yield)
 	pi.TotalCost = cost
 	return cost
 }

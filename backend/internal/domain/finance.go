@@ -34,7 +34,7 @@ type Transaction struct {
 	CompanyID   uint            `json:"companyId" gorm:"not null;index"`
 	CategoryID  uint            `json:"categoryId" gorm:"not null;index"`
 	Type        TransactionType `json:"type" gorm:"not null"`
-	Amount      float64         `json:"amount" gorm:"not null"`
+	Amount      Money           `json:"amount" gorm:"not null"`
 	Description string          `json:"description"`
 	Date        time.Time       `json:"date" gorm:"not null"`
 	Reference   string          `json:"reference"` // Referência externa (ex: pedido #123)
@@ -56,17 +56,17 @@ func (Transaction) TableName() string {
 type CashFlow struct {
 	StartDate      time.Time `json:"startDate"`
 	EndDate        time.Time `json:"endDate"`
-	Income         float64   `json:"income"`
-	Expense        float64   `json:"expense"`
-	Balance        float64   `json:"balance"`
-	OpeningBalance float64   `json:"openingBalance"`
-	ClosingBalance float64   `json:"closingBalance"`
+	Income         Money     `json:"income"`
+	Expense        Money     `json:"expense"`
+	Balance        Money     `json:"balance"`
+	OpeningBalance Money     `json:"openingBalance"`
+	ClosingBalance Money     `json:"closingBalance"`
 }
 
 // FinancialSummary representa um resumo financeiro
 type FinancialSummary struct {
-	TotalIncome      float64 `json:"totalIncome"`
-	TotalExpense     float64 `json:"totalExpense"`
-	NetBalance       float64 `json:"netBalance"`
-	TransactionCount int64   `json:"transactionCount"`
+	TotalIncome      Money `json:"totalIncome"`
+	TotalExpense     Money `json:"totalExpense"`
+	NetBalance       Money `json:"netBalance"`
+	TransactionCount int64 `json:"transactionCount"`
 }

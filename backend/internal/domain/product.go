@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"math"
 	"time"
 )
 
@@ -9,7 +10,7 @@ type Product struct {
 	ID                     uint
 	Name                   string
 	Description            string
-	Price                  float64
+	Price                  Money
 	IsComposto             bool
 	Active                 bool // "Pode ser utilizado pelo negócio?"
 	PhotoURL               string
@@ -19,7 +20,7 @@ type Product struct {
 	PreparationTimeMinutes int
 	Featured               bool
 	IsNew                  bool
-	PromotionPrice         *float64
+	PromotionPrice         *Money
 	PromotionStart         *time.Time
 	PromotionEnd           *time.Time
 	AvailableFrom          string
@@ -31,11 +32,11 @@ type Product struct {
 	UpdatedAt              time.Time
 
 	// Sprint 4 - Ficha Técnica Avançada
-	Cost           float64 // custo total do produto (soma dos ingredientes)
-	CMV            float64 // custo merca da venda (CMV = Cost / Price)
+	Cost           Money   // custo total do produto (soma dos ingredientes)
+	CMV            Money   // custo merca da venda (CMV = Cost / Price)
 	Margin         float64 // margem em % (Margin = (Price - Cost) / Price)
-	Profit         float64 // lucro por unidade (Profit = Price - Cost)
-	SuggestedPrice float64 // preço sugerido baseado no custo e margem desejada
+	Profit         Money   // lucro por unidade (Profit = Price - Cost)
+	SuggestedPrice Money   // preço sugerido baseado no custo e margem desejada
 
 	// SEO fields para Cardápio Digital
 	Slug            string
@@ -55,56 +56,60 @@ type Product struct {
 }
 
 // CalculateCost calcula o custo total do produto baseado nos ingredientes
-func (p *Product) CalculateCost() float64 {
-	totalCost := 0.0
+func (p *Product) CalculateCost() Money {
+	totalCost := Money(0)
 	for _, ingredient := range p.Ingredients {
-		totalCost += ingredient.CalculateCost()
+		totalCost = totalCost.Add(ingredient.CalculateCost())
 	}
 	p.Cost = totalCost
 	return totalCost
 }
 
 // CalculateCMV calcula o custo merca da venda
-// CMV = Custo / Preço
+// CMV = Custo / Preço (retorna como float64 percentual)
 func (p *Product) CalculateCMV() float64 {
-	if p.Price == 0 {
-		p.CMV = 0
+	if p.Price.IsZero() {
+		p.CMV = Money(0)
 		return 0
 	}
-	p.CMV = p.Cost / p.Price
-	return p.CMV
+	cmv := float64(p.Cost) / float64(p.Price)
+	p.CMV = Money(math.Round(cmv * 100)) // Armazena como centavos de percentual
+	return cmv
 }
 
 // CalculateMargin calcula a margem de lucro
-// Margem = (Preço - Custo) / Preço
+// Margem = (Preço - Custo) / Preço (retorna como float64 percentual)
 func (p *Product) CalculateMargin() float64 {
-	if p.Price == 0 {
+	if p.Price.IsZero() {
 		p.Margin = 0
 		return 0
 	}
-	p.Margin = (p.Price - p.Cost) / p.Price
+	profit := float64(p.Price.Sub(p.Cost)) / 100.0
+	price := p.Price.ToFloat64()
+	p.Margin = profit / price
 	return p.Margin
 }
 
 // CalculateProfit calcula o lucro por unidade
 // Lucro = Preço - Custo
-func (p *Product) CalculateProfit() float64 {
-	p.Profit = p.Price - p.Cost
+func (p *Product) CalculateProfit() Money {
+	p.Profit = p.Price.Sub(p.Cost)
 	return p.Profit
 }
 
 // CalculateSuggestedPrice calcula o preço sugerido baseado no custo e margem desejada
 // PreçoSugerido = Custo / (1 - MargemDesejada)
-func (p *Product) CalculateSuggestedPrice(desiredMargin float64) float64 {
+func (p *Product) CalculateSuggestedPrice(desiredMargin float64) Money {
 	if desiredMargin >= 1.0 {
 		desiredMargin = 0.5 // Se margem >= 100%, assume 50%
 	}
 	if desiredMargin < 0 {
 		desiredMargin = 0.3 // Se margem negativa, assume 30%
 	}
-	suggestedPrice := p.Cost / (1.0 - desiredMargin)
-	p.SuggestedPrice = suggestedPrice
-	return suggestedPrice
+	costFloat := p.Cost.ToFloat64()
+	suggestedPrice := costFloat / (1.0 - desiredMargin)
+	p.SuggestedPrice = FromFloat64(suggestedPrice)
+	return p.SuggestedPrice
 }
 
 // HasRecipe verifica se o produto tem ficha técnica

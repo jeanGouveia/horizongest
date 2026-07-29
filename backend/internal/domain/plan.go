@@ -8,7 +8,7 @@ type Plan struct {
 	Name        string    `json:"name" gorm:"size:100;not null"`
 	Slug        string    `json:"slug" gorm:"size:50;uniqueIndex;not null"`
 	Description string    `json:"description" gorm:"type:text"`
-	Price       float64   `json:"price" gorm:"type:decimal(10,2);default:0"`
+	Price       Money     `json:"price" gorm:"type:bigint;default:0"`
 	Currency    string    `json:"currency" gorm:"size:3;default:'BRL'"`
 	Interval    string    `json:"interval" gorm:"size:20;default:'monthly'"` // monthly, yearly
 	MaxUsers    int       `json:"max_users" gorm:"default:1"`
