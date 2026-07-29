@@ -27,7 +27,14 @@ func main() {
 	_ = godotenv.Load()
 
 	// --- Banco de dados ---
-	db, err := database.Connect(database.DBConfig{DSN: getEnv("DB_DSN", "app.db")})
+	db, err := database.Connect(database.DBConfig{
+		Host:     getEnv("DB_HOST", "localhost"),
+		Port:     getEnv("DB_PORT", "5432"),
+		DBName:   getEnv("DB_NAME", "horizongest"),
+		User:     getEnv("DB_USER", "horizongest_user"),
+		Password: getEnv("DB_PASSWORD", "horizongest_secure_password"),
+		SSLMode:  getEnv("DB_SSLMODE", "disable"),
+	})
 	if err != nil {
 		log.Fatalf("FATAL: falha ao conectar banco: %v", err)
 	}
@@ -66,7 +73,8 @@ func main() {
 			if err := platformUserRepo.Create(ctx, adminUser); err != nil {
 				log.Fatalf("Erro ao criar usuário admin: %v", err)
 			}
-			log.Println("Usuário admin criado com sucesso: admin@platform.com / admin123")
+			// Sprint 4A: Remover senha do log por segurança
+			log.Println("Usuário admin criado com sucesso: admin@platform.com")
 		} else {
 			log.Println("Usuário admin já existe, pulando seed")
 		}
@@ -94,8 +102,30 @@ func main() {
 	impersonationAuditRepo := repository.NewGormImpersonationAuditRepository(db)
 
 	// JWT secrets (Sprint 3.4 - Security Hardening)
-	jwtPlatformSecret := getEnv("JWT_PLATFORM_SECRET", "your-platform-secret-key-change-in-production")
-	jwtTenantSecret := getEnv("JWT_TENANT_SECRET", "your-tenant-secret-key-change-in-production")
+	// Sprint 4A: Validar secrets em produção - não aceitar valores padrão
+	env := getEnv("ENVIRONMENT", "development")
+	jwtPlatformSecret := getEnv("JWT_PLATFORM_SECRET", "")
+	jwtTenantSecret := getEnv("JWT_TENANT_SECRET", "")
+
+	// Em produção, falhar se secrets não estiverem configurados
+	if env == "production" {
+		if jwtPlatformSecret == "" || jwtPlatformSecret == "your-platform-secret-key-change-in-production" {
+			log.Fatalf("FATAL: JWT_PLATFORM_SECRET não configurado ou usando valor padrão em produção")
+		}
+		if jwtTenantSecret == "" || jwtTenantSecret == "your-tenant-secret-key-change-in-production" {
+			log.Fatalf("FATAL: JWT_TENANT_SECRET não configurado ou usando valor padrão em produção")
+		}
+	}
+
+	// Em desenvolvimento/staging, usar fallback com warning
+	if jwtPlatformSecret == "" {
+		jwtPlatformSecret = "your-platform-secret-key-change-in-production"
+		log.Println("WARNING: JWT_PLATFORM_SECRET não configurado, usando valor padrão (apenas para desenvolvimento)")
+	}
+	if jwtTenantSecret == "" {
+		jwtTenantSecret = "your-tenant-secret-key-change-in-production"
+		log.Println("WARNING: JWT_TENANT_SECRET não configurado, usando valor padrão (apenas para desenvolvimento)")
+	}
 
 	// Platform services (Sprint 3.2)
 	sessionDuration := 24 * time.Hour
@@ -107,7 +137,7 @@ func main() {
 	categorySvc := service.NewCategoryService(categoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
-	stockMovementSvc := service.NewStockMovementService(stockMovementRepo, productRepo)
+	stockMovementSvc := service.NewStockMovementService(stockMovementRepo, productRepo, db)
 	mediaSvc := service.NewMediaService(mediaRepo)
 	companySvc := service.NewCompanyService(companyRepo)
 	companySettingsSvc := service.NewCompanySettingsService(companyRepo, userRepo)
