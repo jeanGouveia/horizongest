@@ -46,7 +46,7 @@ func main() {
 		UserID:    1,
 		CompanyID: companyID, // Sprint 3: non-nullable
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// PASSO 1: Criar Ingrediente
 	fmt.Println("=== PASSO 1: Criar Ingrediente ===")
@@ -111,10 +111,11 @@ func main() {
 		product.ID: productIngredientsLoaded,
 	}
 
-	if err := orderRepo.CreateOrder(ctx, order, productIngredientsMap); err != nil {
+	createdOrder, err := orderRepo.CreateOrder(ctx, order, productIngredientsMap)
+	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Pedido criado: ID=%d, Total=%.2f\n", order.ID, order.TotalPrice)
+	fmt.Printf("Pedido criado: ID=%d, Total=%.2f\n", createdOrder.ID, createdOrder.TotalPrice)
 
 	// PASSO 4: Cancelar Pedido (gera ajustes pendentes)
 	fmt.Println("\n=== PASSO 4: Cancelar Pedido ===")
@@ -157,7 +158,8 @@ func main() {
 	fmt.Println("\n=== PASSO 6: Alterar Ingrediente ===")
 	ingredient.Name = "Queijo Mussarela Premium"
 	ingredient.Unit = "g" // Altera de kg para g
-	if err := productRepo.UpdateIngredient(ctx, ingredient); err != nil {
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	if err := productRepo.UpdateIngredient(ctx, ingredient, nil); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Ingrediente alterado: ID=%d, Nome=%s, Unidade=%s\n", ingredient.ID, ingredient.Name, ingredient.Unit)
@@ -192,6 +194,7 @@ func main() {
 	}
 
 	// Verifica o ingrediente atual
-	currentIngredient, _ := productRepo.FindIngredientByID(ctx, ingredient.ID)
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	currentIngredient, _ := productRepo.FindIngredientByID(ctx, ingredient.ID, nil)
 	fmt.Printf("\nIngrediente atual no cadastro: %s, %s\n", currentIngredient.Name, currentIngredient.Unit)
 }
