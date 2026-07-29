@@ -75,60 +75,60 @@ func generateSlug(name string) string {
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
 type CreateProductInput struct {
-	Name                   string     `json:"name"                    validate:"required,min=2,max=120"`
-	Description            string     `json:"description"`
-	Price                  float64    `json:"price"                   validate:"required,gt=0"`
-	IsComposto             bool       `json:"is_composto"`
-	PhotoURL               string     `json:"photo_url"`
-	CategoryID             *uint      `json:"category_id"`
-	DisplayOrder           int        `json:"display_order"           validate:"gte=0"`
-	PreparationTimeMinutes int        `json:"preparation_time_minutes" validate:"gte=0"`
-	Featured               bool       `json:"featured"`
-	IsNew                  bool       `json:"is_new"`
-	PromotionPrice         *float64   `json:"promotion_price"          validate:"omitempty,gt=0"`
-	PromotionStart         *time.Time `json:"promotion_start"`
-	PromotionEnd           *time.Time `json:"promotion_end"`
-	AvailableFrom          string     `json:"available_from"`
-	AvailableUntil         string     `json:"available_until"`
-	SKU                    string     `json:"sku"`
-	InternalNotes          string     `json:"internal_notes"`
-	Slug                   string     `json:"slug"`
-	MetaTitle              string     `json:"meta_title"`
-	MetaDescription        string     `json:"meta_description"`
-	AltImage               string     `json:"alt_image"`
-	Canonical              string     `json:"canonical"`
-	ExternalID             string     `json:"external_id"`
-	MarketplaceID          string     `json:"marketplace_id"`
-	SyncStatus             string     `json:"sync_status"`
+	Name                   string        `json:"name"                    validate:"required,min=2,max=120"`
+	Description            string        `json:"description"`
+	Price                  domain.Money  `json:"price"                   validate:"required,gt=0"`
+	IsComposto             bool          `json:"is_composto"`
+	PhotoURL               string        `json:"photo_url"`
+	CategoryID             *uint         `json:"category_id"`
+	DisplayOrder           int           `json:"display_order"           validate:"gte=0"`
+	PreparationTimeMinutes int           `json:"preparation_time_minutes" validate:"gte=0"`
+	Featured               bool          `json:"featured"`
+	IsNew                  bool          `json:"is_new"`
+	PromotionPrice         *domain.Money `json:"promotion_price"          validate:"omitempty,gt=0"`
+	PromotionStart         *time.Time    `json:"promotion_start"`
+	PromotionEnd           *time.Time    `json:"promotion_end"`
+	AvailableFrom          string        `json:"available_from"`
+	AvailableUntil         string        `json:"available_until"`
+	SKU                    string        `json:"sku"`
+	InternalNotes          string        `json:"internal_notes"`
+	Slug                   string        `json:"slug"`
+	MetaTitle              string        `json:"meta_title"`
+	MetaDescription        string        `json:"meta_description"`
+	AltImage               string        `json:"alt_image"`
+	Canonical              string        `json:"canonical"`
+	ExternalID             string        `json:"external_id"`
+	MarketplaceID          string        `json:"marketplace_id"`
+	SyncStatus             string        `json:"sync_status"`
 }
 
 type UpdateProductInput struct {
-	Name                   string     `json:"name"                    validate:"required,min=2,max=120"`
-	Description            string     `json:"description"`
-	Price                  float64    `json:"price"                   validate:"required,gt=0"`
-	IsComposto             *bool      `json:"is_composto"`
-	Active                 *bool      `json:"active"`
-	PhotoURL               string     `json:"photo_url"`
-	CategoryID             *uint      `json:"category_id"`
-	DisplayOrder           int        `json:"display_order"           validate:"gte=0"`
-	PreparationTimeMinutes int        `json:"preparation_time_minutes" validate:"gte=0"`
-	Featured               *bool      `json:"featured"`
-	IsNew                  *bool      `json:"is_new"`
-	PromotionPrice         *float64   `json:"promotion_price"          validate:"omitempty,gt=0"`
-	PromotionStart         *time.Time `json:"promotion_start"`
-	PromotionEnd           *time.Time `json:"promotion_end"`
-	AvailableFrom          string     `json:"available_from"`
-	AvailableUntil         string     `json:"available_until"`
-	SKU                    string     `json:"sku"`
-	InternalNotes          string     `json:"internal_notes"`
-	Slug                   string     `json:"slug"`
-	MetaTitle              string     `json:"meta_title"`
-	MetaDescription        string     `json:"meta_description"`
-	AltImage               string     `json:"alt_image"`
-	Canonical              string     `json:"canonical"`
-	ExternalID             string     `json:"external_id"`
-	MarketplaceID          string     `json:"marketplace_id"`
-	SyncStatus             string     `json:"sync_status"`
+	Name                   string        `json:"name"                    validate:"required,min=2,max=120"`
+	Description            string        `json:"description"`
+	Price                  domain.Money  `json:"price"                   validate:"required,gt=0"`
+	IsComposto             *bool         `json:"is_composto"`
+	Active                 *bool         `json:"active"`
+	PhotoURL               string        `json:"photo_url"`
+	CategoryID             *uint         `json:"category_id"`
+	DisplayOrder           int           `json:"display_order"           validate:"gte=0"`
+	PreparationTimeMinutes int           `json:"preparation_time_minutes" validate:"gte=0"`
+	Featured               *bool         `json:"featured"`
+	IsNew                  *bool         `json:"is_new"`
+	PromotionPrice         *domain.Money `json:"promotion_price"          validate:"omitempty,gt=0"`
+	PromotionStart         *time.Time    `json:"promotion_start"`
+	PromotionEnd           *time.Time    `json:"promotion_end"`
+	AvailableFrom          string        `json:"available_from"`
+	AvailableUntil         string        `json:"available_until"`
+	SKU                    string        `json:"sku"`
+	InternalNotes          string        `json:"internal_notes"`
+	Slug                   string        `json:"slug"`
+	MetaTitle              string        `json:"meta_title"`
+	MetaDescription        string        `json:"meta_description"`
+	AltImage               string        `json:"alt_image"`
+	Canonical              string        `json:"canonical"`
+	ExternalID             string        `json:"external_id"`
+	MarketplaceID          string        `json:"marketplace_id"`
+	SyncStatus             string        `json:"sync_status"`
 }
 
 type CreateIngredientInput struct {
@@ -317,7 +317,8 @@ func (s *ProductService) ListIngredients(ctx context.Context) ([]domain.Ingredie
 }
 
 func (s *ProductService) GetIngredient(ctx context.Context, id uint) (*domain.Ingredient, error) {
-	i, err := s.repo.FindIngredientByID(ctx, id)
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
 		return nil, fmt.Errorf("ProductService.GetIngredient: %w", err)
 	}
@@ -328,7 +329,8 @@ func (s *ProductService) GetIngredient(ctx context.Context, id uint) (*domain.In
 }
 
 func (s *ProductService) UpdateIngredientStock(ctx context.Context, id uint, in UpdateStockInput) (*domain.Ingredient, error) {
-	i, err := s.repo.FindIngredientByID(ctx, id)
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
 		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: %w", err)
 	}
@@ -345,14 +347,16 @@ func (s *ProductService) UpdateIngredientStock(ctx context.Context, id uint, in 
 	} else {
 		i.StockQuantity = in.Quantity
 	}
-	if err := s.repo.UpdateIngredient(ctx, i); err != nil {
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	if err := s.repo.UpdateIngredient(ctx, i, nil); err != nil {
 		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: %w", err)
 	}
 	return i, nil
 }
 
 func (s *ProductService) UpdateIngredient(ctx context.Context, id uint, in UpdateIngredientInput) (*domain.Ingredient, error) {
-	i, err := s.repo.FindIngredientByID(ctx, id)
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
 		return nil, fmt.Errorf("ProductService.UpdateIngredient: %w", err)
 	}
@@ -365,14 +369,16 @@ func (s *ProductService) UpdateIngredient(ctx context.Context, id uint, in Updat
 	i.StockQuantity = in.StockQuantity
 	i.MinStock = in.MinStock
 
-	if err := s.repo.UpdateIngredient(ctx, i); err != nil {
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	if err := s.repo.UpdateIngredient(ctx, i, nil); err != nil {
 		return nil, fmt.Errorf("ProductService.UpdateIngredient: %w", err)
 	}
 	return i, nil
 }
 
 func (s *ProductService) DeleteIngredient(ctx context.Context, id uint) error {
-	i, err := s.repo.FindIngredientByID(ctx, id)
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
 		return fmt.Errorf("ProductService.DeleteIngredient: %w", err)
 	}
@@ -398,7 +404,8 @@ func (s *ProductService) SetProductIngredients(
 	items := make([]domain.ProductIngredient, len(in.Items))
 	for i, item := range in.Items {
 		// Valida que o ingrediente existe
-		ing, err := s.repo.FindIngredientByID(ctx, item.IngredientID)
+		// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+		ing, err := s.repo.FindIngredientByID(ctx, item.IngredientID, nil)
 		if err != nil {
 			return fmt.Errorf("ProductService.SetProductIngredients: %w", err)
 		}

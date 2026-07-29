@@ -64,8 +64,9 @@ type OrderItemInput struct {
 }
 
 type CreateOrderInput struct {
-	Items []OrderItemInput `json:"items" validate:"required,min=1,dive"`
-	Notes string           `json:"notes"`
+	Items          []OrderItemInput `json:"items" validate:"required,min=1,dive"`
+	Notes          string           `json:"notes"`
+	IdempotencyKey *string          `json:"idempotency_key"` // Sprint 4C: Idempotency key
 }
 
 type UpdateOrderStatusInput struct {
@@ -81,12 +82,44 @@ type UpdateOrderInput struct {
 
 func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*domain.Order, error) {
 	log.Printf("Service - Iniciando CreateOrder com %d itens", len(in.Items))
-	order := &domain.Order{
-		Status: domain.OrderStatusPending,
-		Notes:  in.Notes,
+
+	// Sprint 4C: Verificar idempotência antes de criar pedido
+	// Se a chave de idempotência for fornecida, buscar pedido existente
+	if in.IdempotencyKey != nil && *in.IdempotencyKey != "" {
+		// Obter companyID do contexto
+		tenantCtxValue := ctx.Value("tenant")
+		if tenantCtxValue == nil {
+			return nil, fmt.Errorf("OrderService.CreateOrder: tenant context not found")
+		}
+		tenantCtx, ok := tenantCtxValue.(*domain.TenantContext)
+		if !ok {
+			return nil, fmt.Errorf("OrderService.CreateOrder: invalid tenant context type")
+		}
+		companyID := tenantCtx.CompanyID
+
+		// Buscar pedido existente pela chave de idempotência
+		existingOrder, err := s.orderRepo.FindByIdempotencyKey(ctx, companyID, *in.IdempotencyKey)
+		if err != nil {
+			return nil, fmt.Errorf("OrderService.CreateOrder: buscar por idempotency_key: %w", err)
+		}
+		if existingOrder != nil {
+			log.Printf("Service - Pedido já existe (idempotência): ID=%d, Key=%s", existingOrder.ID, *in.IdempotencyKey)
+			// Carregar itens do pedido existente
+			orderWithItems, err := s.orderRepo.FindOrderByID(ctx, existingOrder.ID)
+			if err != nil {
+				return nil, fmt.Errorf("OrderService.CreateOrder: carregar itens do pedido existente: %w", err)
+			}
+			return orderWithItems, nil
+		}
 	}
 
-	var total float64
+	order := &domain.Order{
+		Status:         domain.OrderStatusPending,
+		Notes:          in.Notes,
+		IdempotencyKey: in.IdempotencyKey, // Sprint 4C: Idempotency key
+	}
+
+	var total domain.Money
 
 	// Pré-carrega produtos e fichas técnicas antes da transação para evitar context deadline
 	productData := make(map[uint]*domain.Product)
@@ -129,12 +162,12 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 			ProductFeatured:       p.Featured,       // snapshot do destaque
 			ProductIsNew:          p.IsNew,          // snapshot do selo novo
 		}
-		total += p.Price * itemIn.Quantity
+		total = total.Add(p.Price.Mul(int64(itemIn.Quantity * 100)).Div(100))
 	}
 
 	order.Items = items
 	order.TotalPrice = total
-	log.Printf("Service - Pedido montado: TotalPrice=%f, Items=%d", order.TotalPrice, len(order.Items))
+	log.Printf("Service - Pedido montado: TotalPrice=%d, Items=%d", order.TotalPrice, len(order.Items))
 
 	// Pré-validação de estoque: coletar TODOS os ingredientes insuficientes
 	// antes de tentar criar o pedido, para retornar mensagem completa
@@ -146,13 +179,15 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 
 	// CreateOrder executa a baixa de estoque em transação
 	// Passamos os snapshots pré-carregados para evitar chamadas dentro da transação
-	if err := s.orderRepo.CreateOrder(ctx, order, productIngredients); err != nil {
+	// Sprint 4C: Repository retorna o pedido criado ou o pedido existente em caso de colisão
+	createdOrder, err := s.orderRepo.CreateOrder(ctx, order, productIngredients)
+	if err != nil {
 		log.Printf("Service - Erro ao criar pedido no repository: %v", err)
 		return nil, fmt.Errorf("OrderService.CreateOrder: %w", err)
 	}
 
-	log.Printf("Service - Pedido criado com sucesso: ID=%d", order.ID)
-	return order, nil
+	log.Printf("Service - Pedido criado com sucesso: ID=%d", createdOrder.ID)
+	return createdOrder, nil
 }
 
 // validateStock verifica se há estoque suficiente para todos os ingredientes
@@ -179,7 +214,8 @@ func (s *OrderService) validateStock(ctx context.Context, items []OrderItemInput
 
 	// Verificar estoque disponível para cada ingrediente necessário
 	for ingredientID, required := range requiredByIngredient {
-		ing, err := s.productRepo.FindIngredientByID(ctx, ingredientID)
+		// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+		ing, err := s.productRepo.FindIngredientByID(ctx, ingredientID, nil)
 		if err != nil || ing == nil {
 			// Se não conseguir buscar o ingrediente, considera como insuficiente
 			insufficient = append(insufficient, InsufficientIngredient{
@@ -327,7 +363,7 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, in UpdateOrderI
 	}
 
 	// Calculate new total and build items
-	var total float64
+	var total domain.Money
 	items := make([]domain.OrderItem, len(in.Items))
 	for i, itemIn := range in.Items {
 		p := productData[itemIn.ProductID]
@@ -344,7 +380,7 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, in UpdateOrderI
 			ProductFeatured:       p.Featured,
 			ProductIsNew:          p.IsNew,
 		}
-		total += p.Price * itemIn.Quantity
+		total = total.Add(p.Price.Mul(int64(itemIn.Quantity * 100)).Div(100))
 	}
 
 	// Validate stock for new items

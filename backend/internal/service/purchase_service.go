@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	ErrSupplierNotFound       = errors.New("fornecedor não encontrado")
-	ErrPurchaseOrderNotFound  = errors.New("pedido de compra não encontrado")
-	ErrPurchaseOrderInvalid   = errors.New("pedido de compra inválido")
-	ErrPurchaseOrderSent      = errors.New("pedido já enviado, não pode ser alterado")
-	ErrPurchaseOrderReceived  = errors.New("pedido já recebido")
+	ErrSupplierNotFound      = errors.New("fornecedor não encontrado")
+	ErrPurchaseOrderNotFound = errors.New("pedido de compra não encontrado")
+	ErrPurchaseOrderInvalid  = errors.New("pedido de compra inválido")
+	ErrPurchaseOrderSent     = errors.New("pedido já enviado, não pode ser alterado")
+	ErrPurchaseOrderReceived = errors.New("pedido já recebido")
 )
 
 type PurchaseService struct {
@@ -96,12 +96,15 @@ func (s *PurchaseService) CreatePurchaseOrder(ctx context.Context, companyID, us
 	orderNumber := fmt.Sprintf("PC-%d-%d", companyID, time.Now().Unix())
 
 	// Calcular totais
-	subtotal := 0.0
+	var subtotal domain.Money
 	for _, item := range input.Items {
-		subtotal += item.Quantity * item.UnitPrice
+		itemPrice := domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100)
+		subtotal = subtotal.Add(itemPrice)
 	}
 
-	total := subtotal + input.Tax - input.Discount
+	tax := domain.FromFloat64(input.Tax)
+	discount := domain.FromFloat64(input.Discount)
+	total := subtotal.Add(tax).Sub(discount)
 
 	order := &domain.PurchaseOrder{
 		CompanyID:    companyID,
@@ -111,8 +114,8 @@ func (s *PurchaseService) CreatePurchaseOrder(ctx context.Context, companyID, us
 		OrderDate:    input.OrderDate,
 		ExpectedDate: input.ExpectedDate,
 		Subtotal:     subtotal,
-		Tax:          input.Tax,
-		Discount:     input.Discount,
+		Tax:          tax,
+		Discount:     discount,
 		Total:        total,
 		Notes:        input.Notes,
 		CreatedBy:    userID,
@@ -129,8 +132,8 @@ func (s *PurchaseService) CreatePurchaseOrder(ctx context.Context, companyID, us
 			IngredientID:    item.IngredientID,
 			Quantity:        item.Quantity,
 			Unit:            item.Unit,
-			UnitPrice:       item.UnitPrice,
-			Subtotal:        item.Quantity * item.UnitPrice,
+			UnitPrice:       domain.FromFloat64(item.UnitPrice),
+			Subtotal:        domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100),
 		}
 
 		if err := s.purchaseRepo.CreatePurchaseOrderItem(ctx, poItem); err != nil {
@@ -202,11 +205,11 @@ func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseO
 		receivingItem := &domain.PurchaseReceivingItem{
 			PurchaseReceivingID: receiving.ID,
 			PurchaseOrderItemID: item.PurchaseOrderItemID,
-			IngredientID:       item.IngredientID,
-			Quantity:           item.Quantity,
-			Unit:               item.Unit,
-			UnitPrice:          item.UnitPrice,
-			Subtotal:           item.Quantity * item.UnitPrice,
+			IngredientID:        item.IngredientID,
+			Quantity:            item.Quantity,
+			Unit:                item.Unit,
+			UnitPrice:           domain.FromFloat64(item.UnitPrice),
+			Subtotal:            domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100),
 		}
 
 		if err := s.purchaseRepo.CreatePurchaseReceivingItem(ctx, receivingItem); err != nil {
@@ -257,12 +260,12 @@ type CreateSupplierInput struct {
 }
 
 type CreatePurchaseOrderInput struct {
-	SupplierID   uint                          `json:"supplierId" validate:"required"`
-	OrderDate    time.Time                     `json:"orderDate" validate:"required"`
-	ExpectedDate *time.Time                    `json:"expectedDate"`
-	Tax          float64                       `json:"tax"`
-	Discount     float64                       `json:"discount"`
-	Notes        string                        `json:"notes"`
+	SupplierID   uint                           `json:"supplierId" validate:"required"`
+	OrderDate    time.Time                      `json:"orderDate" validate:"required"`
+	ExpectedDate *time.Time                     `json:"expectedDate"`
+	Tax          float64                        `json:"tax"`
+	Discount     float64                        `json:"discount"`
+	Notes        string                         `json:"notes"`
 	Items        []CreatePurchaseOrderItemInput `json:"items" validate:"required"`
 }
 
@@ -281,8 +284,8 @@ type CreatePurchaseReceivingInput struct {
 
 type CreatePurchaseReceivingItemInput struct {
 	PurchaseOrderItemID uint    `json:"purchaseOrderItemId" validate:"required"`
-	IngredientID       uint    `json:"ingredientId" validate:"required"`
-	Quantity           float64 `json:"quantity" validate:"required,gt=0"`
-	Unit               string  `json:"unit" validate:"required"`
-	UnitPrice          float64 `json:"unitPrice" validate:"required,gt=0"`
+	IngredientID        uint    `json:"ingredientId" validate:"required"`
+	Quantity            float64 `json:"quantity" validate:"required,gt=0"`
+	Unit                string  `json:"unit" validate:"required"`
+	UnitPrice           float64 `json:"unitPrice" validate:"required,gt=0"`
 }

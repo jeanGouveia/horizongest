@@ -12,9 +12,9 @@ import (
 
 var (
 	ErrTransactionCategoryNotFound = errors.New("categoria não encontrada")
-	ErrTransactionNotFound        = errors.New("transação não encontrada")
-	ErrInvalidAmount              = errors.New("valor inválido")
-	ErrInvalidDate               = errors.New("data inválida")
+	ErrTransactionNotFound         = errors.New("transação não encontrada")
+	ErrInvalidAmount               = errors.New("valor inválido")
+	ErrInvalidDate                 = errors.New("data inválida")
 )
 
 type FinanceService struct {
@@ -97,7 +97,7 @@ func (s *FinanceService) CreateTransaction(ctx context.Context, companyID, userI
 		CompanyID:   companyID,
 		CategoryID:  input.CategoryID,
 		Type:        input.Type,
-		Amount:      input.Amount,
+		Amount:      domain.FromFloat64(input.Amount),
 		Description: input.Description,
 		Date:        input.Date,
 		Reference:   input.Reference,
@@ -146,16 +146,16 @@ func (s *FinanceService) GetFinancialSummary(ctx context.Context, companyID uint
 // --- Inputs ---
 
 type CreateTransactionCategoryInput struct {
-	Name  string                `json:"name" validate:"required"`
+	Name  string                 `json:"name" validate:"required"`
 	Type  domain.TransactionType `json:"type" validate:"required"`
-	Color string                `json:"color"`
+	Color string                 `json:"color"`
 }
 
 type CreateTransactionInput struct {
-	CategoryID  uint                  `json:"categoryId" validate:"required"`
+	CategoryID  uint                   `json:"categoryId" validate:"required"`
 	Type        domain.TransactionType `json:"type" validate:"required"`
-	Amount      float64               `json:"amount" validate:"required,gt=0"`
-	Description string                `json:"description"`
-	Date        time.Time             `json:"date"`
-	Reference   string                `json:"reference"`
+	Amount      float64                `json:"amount" validate:"required,gt=0"`
+	Description string                 `json:"description"`
+	Date        time.Time              `json:"date"`
+	Reference   string                 `json:"reference"`
 }

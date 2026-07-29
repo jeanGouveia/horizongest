@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrPlanNotFound = errors.New("plan not found")
+	ErrPlanNotFound      = errors.New("plan not found")
 	ErrPlanAlreadyExists = errors.New("plan with this slug already exists")
 )
 
@@ -59,7 +59,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, input CreatePlanInput) (*d
 		Name:        input.Name,
 		Slug:        input.Slug,
 		Description: input.Description,
-		Price:       input.Price,
+		Price:       domain.FromFloat64(input.Price),
 		Currency:    input.Currency,
 		Interval:    input.Interval,
 		MaxUsers:    input.MaxUsers,
@@ -119,7 +119,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, id uint, input UpdatePlanI
 		plan.Description = *input.Description
 	}
 	if input.Price != nil {
-		plan.Price = *input.Price
+		plan.Price = domain.FromFloat64(*input.Price)
 	}
 	if input.Currency != nil {
 		plan.Currency = *input.Currency
