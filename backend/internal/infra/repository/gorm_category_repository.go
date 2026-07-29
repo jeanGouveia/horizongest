@@ -21,9 +21,9 @@ type GormCategory struct {
 	DisplayOrder int    `gorm:"not null;default:0"`
 	Active       bool   `gorm:"not null;default:true"`
 	CompanyID    uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
-	DeletedAt    *int64 `gorm:"index"`
-	CreatedAt    int64  `gorm:"autoCreateTime"`
-	UpdatedAt    int64  `gorm:"autoUpdateTime"`
+	DeletedAt    *time.Time `gorm:"index"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (GormCategory) TableName() string { return "categories" }
@@ -53,8 +53,8 @@ func (r *GormCategoryRepository) CreateCategory(ctx context.Context, c *domain.C
 	}
 	c.ID = m.ID
 	c.CompanyID = m.CompanyID
-	c.CreatedAt = time.Unix(m.CreatedAt, 0)
-	c.UpdatedAt = time.Unix(m.UpdatedAt, 0)
+	c.CreatedAt = m.CreatedAt
+	c.UpdatedAt = m.UpdatedAt
 	return nil
 }
 
@@ -153,7 +153,7 @@ func (r *GormCategoryRepository) CanDeleteCategory(ctx context.Context, id uint)
 func categoryToDomain(m *GormCategory) *domain.Category {
 	var deletedAt *time.Time
 	if m.DeletedAt != nil {
-		dt := time.Unix(*m.DeletedAt, 0)
+		dt := *m.DeletedAt
 		deletedAt = &dt
 	}
 	return &domain.Category{
@@ -164,7 +164,7 @@ func categoryToDomain(m *GormCategory) *domain.Category {
 		Active:       m.Active,
 		CompanyID:    m.CompanyID,
 		DeletedAt:    deletedAt,
-		CreatedAt:    time.Unix(m.CreatedAt, 0),
-		UpdatedAt:    time.Unix(m.UpdatedAt, 0),
+		CreatedAt:    m.CreatedAt,
+		UpdatedAt:    m.UpdatedAt,
 	}
 }

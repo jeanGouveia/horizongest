@@ -12,17 +12,17 @@ import (
 )
 
 type GormInvitationModel struct {
-	ID         uint   `gorm:"primaryKey;autoIncrement"`
-	CompanyID  uint   `gorm:"not null;index"`
-	Email      string `gorm:"not null;index"`
-	Role       string `gorm:"not null"`
-	Token      string `gorm:"not null;uniqueIndex"`
-	Status     string `gorm:"not null;index;default:'pending'"`
-	ExpiresAt  int64  `gorm:"not null;index"`
-	AcceptedAt *int64 `gorm:"index"`
-	CreatedBy  uint   `gorm:"not null"`
-	CreatedAt  int64  `gorm:"autoCreateTime"`
-	UpdatedAt  int64  `gorm:"autoUpdateTime"`
+	ID         uint       `gorm:"primaryKey;autoIncrement"`
+	CompanyID  uint       `gorm:"not null;index"`
+	Email      string     `gorm:"not null;index"`
+	Role       string     `gorm:"not null"`
+	Token      string     `gorm:"not null;uniqueIndex"`
+	Status     string     `gorm:"not null;index;default:'pending'"`
+	ExpiresAt  time.Time  `gorm:"not null;index"`
+	AcceptedAt *time.Time `gorm:"index"`
+	CreatedBy  uint       `gorm:"not null"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt  time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (GormInvitationModel) TableName() string { return "invitations" }
@@ -43,8 +43,8 @@ func (r *GormInvitationRepository) Create(ctx context.Context, invitation *domai
 		return fmt.Errorf("InvitationRepository.Create: %w", err)
 	}
 	invitation.ID = model.ID
-	invitation.CreatedAt = time.Unix(model.CreatedAt, 0)
-	invitation.UpdatedAt = time.Unix(model.UpdatedAt, 0)
+	invitation.CreatedAt = model.CreatedAt
+	invitation.UpdatedAt = model.UpdatedAt
 	return nil
 }
 
@@ -91,7 +91,7 @@ func (r *GormInvitationRepository) ListByCompanyID(ctx context.Context, companyI
 		Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("InvitationRepository.ListByCompanyID: %w", err)
 	}
-	
+
 	invitations := make([]*domain.Invitation, len(models))
 	for i, model := range models {
 		invitations[i] = toDomainInvitation(&model)
@@ -104,7 +104,7 @@ func (r *GormInvitationRepository) Update(ctx context.Context, invitation *domai
 	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return fmt.Errorf("InvitationRepository.Update: %w", err)
 	}
-	invitation.UpdatedAt = time.Unix(model.UpdatedAt, 0)
+	invitation.UpdatedAt = model.UpdatedAt
 	return nil
 }
 
@@ -117,36 +117,35 @@ func (r *GormInvitationRepository) Delete(ctx context.Context, id uint) error {
 
 func toGormInvitation(invitation *domain.Invitation) GormInvitationModel {
 	model := GormInvitationModel{
-		ID:         invitation.ID,
-		CompanyID:  invitation.CompanyID,
-		Email:      invitation.Email,
-		Role:       invitation.Role.String(),
-		Token:      invitation.Token,
-		Status:     invitation.Status.String(),
-		ExpiresAt:  invitation.ExpiresAt.Unix(),
-		CreatedBy:  invitation.CreatedBy,
-		CreatedAt:  invitation.CreatedAt.Unix(),
-		UpdatedAt:  invitation.UpdatedAt.Unix(),
+		ID:        invitation.ID,
+		CompanyID: invitation.CompanyID,
+		Email:     invitation.Email,
+		Role:      invitation.Role.String(),
+		Token:     invitation.Token,
+		Status:    invitation.Status.String(),
+		ExpiresAt: invitation.ExpiresAt,
+		CreatedBy: invitation.CreatedBy,
+		CreatedAt: invitation.CreatedAt,
+		UpdatedAt: invitation.UpdatedAt,
 	}
-	
+
 	if invitation.AcceptedAt != nil {
-		acceptedAt := invitation.AcceptedAt.Unix()
-		model.AcceptedAt = &acceptedAt
+		model.AcceptedAt = invitation.AcceptedAt
 	}
-	
+
 	return model
 }
 
 func toDomainInvitation(model *GormInvitationModel) *domain.Invitation {
 	var acceptedAt *time.Time
 	if model.AcceptedAt != nil {
-		at := time.Unix(*model.AcceptedAt, 0)
+		at := *model.AcceptedAt
 		acceptedAt = &at
 	}
-	
+
 	status, _ := domain.ParseInvitationStatus(model.Status)
 	role, _ := domain.ParseRole(model.Role)
-	
+
 	return &domain.Invitation{
 		ID:         model.ID,
 		CompanyID:  model.CompanyID,
@@ -154,10 +153,10 @@ func toDomainInvitation(model *GormInvitationModel) *domain.Invitation {
 		Role:       role,
 		Token:      model.Token,
 		Status:     status,
-		ExpiresAt:  time.Unix(model.ExpiresAt, 0),
+		ExpiresAt:  model.ExpiresAt,
 		AcceptedAt: acceptedAt,
 		CreatedBy:  model.CreatedBy,
-		CreatedAt:  time.Unix(model.CreatedAt, 0),
-		UpdatedAt:  time.Unix(model.UpdatedAt, 0),
+		CreatedAt:  model.CreatedAt,
+		UpdatedAt:  model.UpdatedAt,
 	}
 }

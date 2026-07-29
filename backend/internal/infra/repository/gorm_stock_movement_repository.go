@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
@@ -19,10 +21,19 @@ func NewGormStockMovementRepository(db *gorm.DB) *GormStockMovementRepository {
 	return &GormStockMovementRepository{db: db}
 }
 
+// getDB retorna a transação se fornecida, senão retorna o DB padrão
+// Sprint 4B.1 v2: Transaction propagation
+func (r *GormStockMovementRepository) getDB(ctx context.Context, tx *gorm.DB) *gorm.DB {
+	if tx != nil {
+		return tx.WithContext(ctx)
+	}
+	return r.db.WithContext(ctx)
+}
+
 // --- Movimentações ---
 
-func (r *GormStockMovementRepository) Create(ctx context.Context, movement *domain.StockMovement) error {
-	return r.db.WithContext(ctx).Create(movement).Error
+func (r *GormStockMovementRepository) Create(ctx context.Context, movement *domain.StockMovement, tx *gorm.DB) error {
+	return r.getDB(ctx, tx).Create(movement).Error
 }
 
 func (r *GormStockMovementRepository) List(ctx context.Context, companyID uint, ingredientID *uint, limit, offset int) ([]domain.StockMovement, error) {
@@ -55,14 +66,26 @@ func (r *GormStockMovementRepository) Delete(ctx context.Context, id uint) error
 
 // --- Inventários ---
 
-func (r *GormStockMovementRepository) CreateInventory(ctx context.Context, inventory *domain.StockInventory) error {
-	return r.db.WithContext(ctx).Create(inventory).Error
+func (r *GormStockMovementRepository) CreateInventory(ctx context.Context, inventory *domain.StockInventory, tx *gorm.DB) error {
+	return r.getDB(ctx, tx).Create(inventory).Error
 }
 
-func (r *GormStockMovementRepository) GetInventoryByID(ctx context.Context, id uint) (*domain.StockInventory, error) {
+func (r *GormStockMovementRepository) GetInventoryByID(ctx context.Context, id uint, tx *gorm.DB) (*domain.StockInventory, error) {
 	var inventory domain.StockInventory
-	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), id)
 	err := query.Where("deleted_at IS NULL").
+		Preload("Items.Ingredient").
+		First(&inventory).Error
+	return &inventory, err
+}
+
+// Sprint 4B.5: FindInventoryByIDForUpdate busca inventário com SELECT FOR UPDATE
+// Isso previne double completion e modificações concorrentes durante CompleteInventory
+func (r *GormStockMovementRepository) FindInventoryByIDForUpdate(ctx context.Context, id uint, tx *gorm.DB) (*domain.StockInventory, error) {
+	var inventory domain.StockInventory
+	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), id)
+	err := query.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("deleted_at IS NULL").
 		Preload("Items.Ingredient").
 		First(&inventory).Error
 	return &inventory, err
@@ -82,10 +105,18 @@ func (r *GormStockMovementRepository) ListInventories(ctx context.Context, compa
 	return inventories, err
 }
 
-func (r *GormStockMovementRepository) UpdateInventoryStatus(ctx context.Context, id uint, status string) error {
-	return r.db.WithContext(ctx).Model(&domain.StockInventory{}).
-		Where("id = ?", id).
-		Update("status", status).Error
+func (r *GormStockMovementRepository) UpdateInventoryStatus(ctx context.Context, id uint, status string, tx *gorm.DB) error {
+	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), id)
+	result := query.Model(&domain.StockInventory{}).
+		Where("status = ?", "draft").
+		Update("status", status)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("inventory already completed or not found")
+	}
+	return nil
 }
 
 func (r *GormStockMovementRepository) DeleteInventory(ctx context.Context, id uint) error {
@@ -95,13 +126,17 @@ func (r *GormStockMovementRepository) DeleteInventory(ctx context.Context, id ui
 
 // --- Itens de Inventário ---
 
-func (r *GormStockMovementRepository) CreateInventoryItem(ctx context.Context, item *domain.StockInventoryItem) error {
-	return r.db.WithContext(ctx).Create(item).Error
+func (r *GormStockMovementRepository) CreateInventoryItem(ctx context.Context, item *domain.StockInventoryItem, tx *gorm.DB) error {
+	return r.getDB(ctx, tx).Create(item).Error
 }
 
-func (r *GormStockMovementRepository) ListInventoryItems(ctx context.Context, inventoryID uint) ([]domain.StockInventoryItem, error) {
+func (r *GormStockMovementRepository) ListInventoryItems(ctx context.Context, inventoryID uint, tx *gorm.DB) ([]domain.StockInventoryItem, error) {
+	// Sprint 4A: NOTA - Query sem filtro de tenant explícito
+	// NÃO é IDOR pois é chamado apenas após validação de inventory_id
+	// O inventoryID deve ser validado pelo service caller antes de chamar este método
+	// O service deve garantir que o inventory pertence ao tenant do usuário
 	var items []domain.StockInventoryItem
-	err := r.db.WithContext(ctx).Where("inventory_id = ? AND deleted_at IS NULL", inventoryID).
+	err := r.getDB(ctx, tx).Where("inventory_id = ? AND deleted_at IS NULL", inventoryID).
 		Preload("Ingredient").
 		Find(&items).Error
 	return items, err

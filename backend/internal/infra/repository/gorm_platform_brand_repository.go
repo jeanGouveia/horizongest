@@ -39,7 +39,7 @@ type GormPlatformBrand struct {
 	MaintenanceMessage string `gorm:"column:maintenance_message"`
 	PrimaryColor       string `gorm:"not null"`
 	SecondaryColor     string `gorm:"not null"`
-	UpdatedAt          int64  `gorm:"autoUpdateTime"`
+	UpdatedAt          time.Time  `gorm:"autoUpdateTime"`
 	UpdatedBy          uint
 }
 
@@ -159,7 +159,7 @@ func (r *GormPlatformBrandRepository) toGorm(brand *domain.PlatformBrandConfig) 
 		MaintenanceMessage: brand.MaintenanceMessage,
 		PrimaryColor:       brand.PrimaryColor,
 		SecondaryColor:     brand.SecondaryColor,
-		UpdatedAt:          brand.UpdatedAt.Unix(),
+		UpdatedAt:          brand.UpdatedAt,
 		UpdatedBy:          brand.UpdatedBy,
 	}
 }
@@ -193,7 +193,7 @@ func (r *GormPlatformBrandRepository) toDomain(gormBrand *GormPlatformBrand) *do
 		MaintenanceMessage: gormBrand.MaintenanceMessage,
 		PrimaryColor:       gormBrand.PrimaryColor,
 		SecondaryColor:     gormBrand.SecondaryColor,
-		UpdatedAt:          time.Unix(gormBrand.UpdatedAt, 0),
+		UpdatedAt:          gormBrand.UpdatedAt,
 		UpdatedBy:          gormBrand.UpdatedBy,
 	}
 }

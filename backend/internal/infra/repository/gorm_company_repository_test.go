@@ -3,16 +3,26 @@ package repository
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func setupCompanyTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=horizongest_user password=horizongest_secure_password dbname=horizongest_test sslmode=disable"
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
@@ -23,6 +33,13 @@ func setupCompanyTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
 
+	// Clean up before each test - drop and recreate schema
+	db.Exec("DROP SCHEMA public CASCADE")
+	db.Exec("CREATE SCHEMA public")
+	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO public")
+	db.AutoMigrate(&GormCompanyModel{})
+
 	return db
 }
 
@@ -31,14 +48,14 @@ func TestCompanyRepository_Create(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-create",
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 
 	err := repo.Create(context.Background(), company)
@@ -56,14 +73,14 @@ func TestCompanyRepository_FindByID(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company)
 	if err != nil {
@@ -100,21 +117,21 @@ func TestCompanyRepository_FindBySlug(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	found, err := repo.FindBySlug(context.Background(), "test-company")
+	found, err := repo.FindBySlug(context.Background(), company.Slug)
 	if err != nil {
 		t.Fatalf("FindBySlug failed: %v", err)
 	}
@@ -145,14 +162,14 @@ func TestCompanyRepository_List(t *testing.T) {
 
 	for i := 1; i <= 3; i++ {
 		company := &domain.Company{
-			Name:           fmt.Sprintf("Test Company %d", i),
-			Slug:           fmt.Sprintf("test-company-%d", i),
-			Description:    "A test company",
-			Active:         true,
-			BusinessType:   domain.BusinessTypeRestaurant,
-			Locale:         "pt-BR",
-			Currency:       "BRL",
-			Timezone:       "America/Sao_Paulo",
+			Name:         fmt.Sprintf("Test Company %d", i),
+			Slug:         fmt.Sprintf("test-company-%d", i),
+			Description:  "A test company",
+			Active:       true,
+			BusinessType: domain.BusinessTypeRestaurant,
+			Locale:       "pt-BR",
+			Currency:     "BRL",
+			Timezone:     "America/Sao_Paulo",
 		}
 		err := repo.Create(context.Background(), company)
 		if err != nil {
@@ -174,14 +191,14 @@ func TestCompanyRepository_Update(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company)
 	if err != nil {
@@ -213,14 +230,14 @@ func TestCompanyRepository_Delete(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company)
 	if err != nil {
@@ -247,14 +264,14 @@ func TestCompanyRepository_Create_DuplicateSlug(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company1 := &domain.Company{
-		Name:           "Test Company 1",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company 1",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company1)
 	if err != nil {
@@ -262,14 +279,14 @@ func TestCompanyRepository_Create_DuplicateSlug(t *testing.T) {
 	}
 
 	company2 := &domain.Company{
-		Name:           "Test Company 2",
-		Slug:           "test-company", // Same slug
-		Description:    "Another test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company 2",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())), // Same slug
+		Description:  "Another test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err = repo.Create(context.Background(), company2)
 	if err == nil {
@@ -282,14 +299,14 @@ func TestCompanyRepository_BusinessTypeParsing(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeBakery,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeBakery,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company)
 	if err != nil {
@@ -310,14 +327,14 @@ func TestCompanyRepository_Timestamps(t *testing.T) {
 	repo := NewGormCompanyRepository(db)
 
 	company := &domain.Company{
-		Name:           "Test Company",
-		Slug:           "test-company",
-		Description:    "A test company",
-		Active:         true,
-		BusinessType:   domain.BusinessTypeRestaurant,
-		Locale:         "pt-BR",
-		Currency:       "BRL",
-		Timezone:       "America/Sao_Paulo",
+		Name:         "Test Company",
+		Slug:         "test-company-" + t.Name() + "-" + strconv.Itoa(int(time.Now().Unix())),
+		Description:  "A test company",
+		Active:       true,
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
 	}
 	err := repo.Create(context.Background(), company)
 	if err != nil {

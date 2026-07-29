@@ -22,8 +22,8 @@ type GormStockAdjustmentPending struct {
 	OrderStatus     string  `gorm:"not null"`
 	Status          string  `gorm:"not null;default:'pending';index"`
 	CompanyID       uint    `gorm:"index;not null"` // Sprint 3: NOT NULL
-	CreatedAt       int64   `gorm:"autoCreateTime"`
-	ProcessedAt     *int64  `gorm:"index"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime"`
+	ProcessedAt     *time.Time  `gorm:"index"`
 	ProcessedBy     *uint   `gorm:"index"`
 	ProcessingNotes string  `gorm:"type:text"`
 	IngredientName  string  `gorm:"not null"`              // snapshot do nome
@@ -89,7 +89,7 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 	log.Printf("[STOCK_REPO] Ajuste criado com sucesso: id=%d", gAdjustment.ID)
 	adjustment.ID = gAdjustment.ID
 	adjustment.CompanyID = gAdjustment.CompanyID
-	adjustment.CreatedAt = time.Unix(gAdjustment.CreatedAt, 0)
+	adjustment.CreatedAt = gAdjustment.CreatedAt
 	return nil
 }
 
@@ -285,7 +285,7 @@ func (r *GormStockAdjustmentRepository) mapToDomain(g *GormStockAdjustmentPendin
 		OrderStatus:     g.OrderStatus,
 		Status:          domain.StockAdjustmentStatus(g.Status),
 		CompanyID:       g.CompanyID,
-		CreatedAt:       time.Unix(g.CreatedAt, 0),
+		CreatedAt:       g.CreatedAt,
 		ProcessedBy:     g.ProcessedBy,
 		ProcessingNotes: g.ProcessingNotes,
 		IngredientName:  g.IngredientName, // snapshot
@@ -293,7 +293,7 @@ func (r *GormStockAdjustmentRepository) mapToDomain(g *GormStockAdjustmentPendin
 		DeletedAt:       deletedAt,
 	}
 	if g.ProcessedAt != nil {
-		processedAt := time.Unix(*g.ProcessedAt, 0)
+		processedAt := *g.ProcessedAt
 		adjustment.ProcessedAt = &processedAt
 	}
 	return adjustment

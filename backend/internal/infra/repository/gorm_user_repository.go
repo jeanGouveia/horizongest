@@ -13,16 +13,16 @@ import (
 )
 
 type GormUserModel struct {
-	ID           uint   `gorm:"primaryKey;autoIncrement"`
-	Name         string `gorm:"not null"`
-	Email        string `gorm:"uniqueIndex;not null"`
-	PasswordHash string `gorm:"not null"`
-	Active       bool   `gorm:"not null;default:true"`
-	CompanyID    uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
-	Role         string `gorm:"index;not null"` // Sprint 3: NOT NULL
-	DeletedAt    *int64 `gorm:"index"`
-	CreatedAt    int64  `gorm:"autoCreateTime"`
-	UpdatedAt    int64  `gorm:"autoUpdateTime"`
+	ID           uint       `gorm:"primaryKey;autoIncrement"`
+	Name         string     `gorm:"not null"`
+	Email        string     `gorm:"uniqueIndex;not null"`
+	PasswordHash string     `gorm:"not null"`
+	Active       bool       `gorm:"not null;default:true"`
+	CompanyID    uint       `gorm:"index;not null"` // Sprint 3: NOT NULL
+	Role         string     `gorm:"index;not null"` // Sprint 3: NOT NULL
+	DeletedAt    *time.Time `gorm:"index"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (GormUserModel) TableName() string { return "users" }
@@ -51,8 +51,8 @@ func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) erro
 		return fmt.Errorf("UserRepository.Create: %w", err)
 	}
 	user.ID = model.ID
-	user.CreatedAt = time.Unix(model.CreatedAt, 0)
-	user.UpdatedAt = time.Unix(model.UpdatedAt, 0)
+	user.CreatedAt = model.CreatedAt
+	user.UpdatedAt = model.UpdatedAt
 	return nil
 }
 
@@ -95,11 +95,16 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) erro
 	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return fmt.Errorf("UserRepository.Update: %w", err)
 	}
-	user.UpdatedAt = time.Unix(model.UpdatedAt, 0)
+	user.UpdatedAt = model.UpdatedAt
 	return nil
 }
 
 func (r *GormUserRepository) List(ctx context.Context) ([]*domain.User, error) {
+	// Sprint 4A: NOTA - Este método retorna todos os usuários sem filtro de tenant
+	// NÃO é um IDOR pois é chamado apenas por user_management_service.ListUsers
+	// que filtra por companyID obtido do contexto do usuário autenticado
+	// O companyID não pode ser manipulado pelo usuário, é extraído do JWT
+	// Correção seria otimização de performance (filtro no banco), não segurança
 	var models []GormUserModel
 	if err := r.db.WithContext(ctx).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("UserRepository.List: %w", err)
@@ -113,12 +118,6 @@ func (r *GormUserRepository) List(ctx context.Context) ([]*domain.User, error) {
 }
 
 func toDomainUser(m *GormUserModel) *domain.User {
-	var deletedAt *time.Time
-	if m.DeletedAt != nil {
-		dt := time.Unix(*m.DeletedAt, 0)
-		deletedAt = &dt
-	}
-
 	role, _ := domain.ParseRole(m.Role)
 
 	return &domain.User{
@@ -129,8 +128,8 @@ func toDomainUser(m *GormUserModel) *domain.User {
 		Active:       m.Active,
 		CompanyID:    m.CompanyID,
 		Role:         role,
-		DeletedAt:    deletedAt,
-		CreatedAt:    time.Unix(m.CreatedAt, 0),
-		UpdatedAt:    time.Unix(m.UpdatedAt, 0),
+		DeletedAt:    m.DeletedAt,
+		CreatedAt:    m.CreatedAt,
+		UpdatedAt:    m.UpdatedAt,
 	}
 }

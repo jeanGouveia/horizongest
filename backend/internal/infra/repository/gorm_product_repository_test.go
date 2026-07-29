@@ -3,16 +3,27 @@ package repository
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func setupProductTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=horizongest_user password=horizongest_secure_password dbname=horizongest_test sslmode=disable"
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
@@ -23,6 +34,13 @@ func setupProductTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
 
+	// Clean up before each test - drop and recreate tables
+	db.Exec("DROP SCHEMA public CASCADE")
+	db.Exec("CREATE SCHEMA public")
+	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO public")
+	db.AutoMigrate(&GormProduct{}, &GormIngredient{}, &GormProductIngredient{})
+
 	return db
 }
 
@@ -31,7 +49,7 @@ func setupTenantContext(ctx context.Context, companyID uint) context.Context {
 		UserID:    1,
 		CompanyID: companyID,
 	}
-	return context.WithValue(ctx, middleware.ContextKeyTenant, tenantCtx)
+	return context.WithValue(ctx, domain.ContextKeyTenant, tenantCtx)
 }
 
 func TestProductRepository_CreateProduct(t *testing.T) {
@@ -115,7 +133,7 @@ func TestProductRepository_ListProducts(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		product := &domain.Product{
 			Name:      fmt.Sprintf("Test Product %d", i),
-			Slug:      fmt.Sprintf("test-product-%d", i),
+			Slug:      fmt.Sprintf("test-product-%s-%d", t.Name(), i),
 			Price:     float64(i) * 10.0,
 			CompanyID: 100,
 			Active:    true,
@@ -145,7 +163,7 @@ func TestProductRepository_ListProducts_TenantIsolation(t *testing.T) {
 	for i := 1; i <= 2; i++ {
 		product := &domain.Product{
 			Name:      fmt.Sprintf("Company 100 Product %d", i),
-			Slug:      fmt.Sprintf("company-100-product-%d", i),
+			Slug:      fmt.Sprintf("company-100-product-%s-%d", t.Name(), i),
 			Price:     10.0,
 			CompanyID: 100,
 			Active:    true,
@@ -161,7 +179,7 @@ func TestProductRepository_ListProducts_TenantIsolation(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		product := &domain.Product{
 			Name:      fmt.Sprintf("Company 200 Product %d", i),
-			Slug:      fmt.Sprintf("company-200-product-%d", i),
+			Slug:      fmt.Sprintf("company-200-product-%s-%d", t.Name(), i),
 			Price:     10.0,
 			CompanyID: 200,
 			Active:    true,
@@ -305,7 +323,7 @@ func TestProductRepository_FindIngredientByID(t *testing.T) {
 		t.Fatalf("CreateIngredient failed: %v", err)
 	}
 
-	found, err := repo.FindIngredientByID(ctx, ingredient.ID)
+	found, err := repo.FindIngredientByID(ctx, ingredient.ID, nil)
 	if err != nil {
 		t.Fatalf("FindIngredientByID failed: %v", err)
 	}
@@ -366,12 +384,13 @@ func TestProductRepository_UpdateIngredient(t *testing.T) {
 
 	ingredient.Name = "Sugar"
 	ingredient.StockQuantity = 20.0
-	err = repo.UpdateIngredient(ctx, ingredient)
+	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
+	err = repo.UpdateIngredient(ctx, ingredient, nil)
 	if err != nil {
 		t.Fatalf("UpdateIngredient failed: %v", err)
 	}
 
-	updated, err := repo.FindIngredientByID(ctx, ingredient.ID)
+	updated, err := repo.FindIngredientByID(ctx, ingredient.ID, nil)
 	if err != nil {
 		t.Fatalf("FindIngredientByID failed: %v", err)
 	}
@@ -406,7 +425,7 @@ func TestProductRepository_DeleteIngredient(t *testing.T) {
 		t.Fatalf("DeleteIngredient failed: %v", err)
 	}
 
-	found, err := repo.FindIngredientByID(ctx, ingredient.ID)
+	found, err := repo.FindIngredientByID(ctx, ingredient.ID, nil)
 	if err == nil && found != nil {
 		t.Error("expected nil when finding deleted ingredient")
 	}
@@ -566,7 +585,7 @@ func TestProductRepository_DecreaseIngredientStock(t *testing.T) {
 		t.Fatalf("DecreaseIngredientStock failed: %v", err)
 	}
 
-	updated, err := repo.FindIngredientByID(ctx, ingredient.ID)
+	updated, err := repo.FindIngredientByID(ctx, ingredient.ID, nil)
 	if err != nil {
 		t.Fatalf("FindIngredientByID failed: %v", err)
 	}
@@ -598,11 +617,212 @@ func TestProductRepository_IncreaseIngredientStock(t *testing.T) {
 		t.Fatalf("IncreaseIngredientStock failed: %v", err)
 	}
 
-	updated, err := repo.FindIngredientByID(ctx, ingredient.ID)
+	updated, err := repo.FindIngredientByID(ctx, ingredient.ID, nil)
 	if err != nil {
 		t.Fatalf("FindIngredientByID failed: %v", err)
 	}
 	if updated.StockQuantity != 15.0 {
 		t.Errorf("expected stock 15.0, got %f", updated.StockQuantity)
+	}
+}
+
+// Sprint 4B.4: Teste de concorrência para UpdateIngredient com SELECT FOR UPDATE
+func TestProductRepository_UpdateIngredientConcurrency(t *testing.T) {
+	db := setupProductTestDB(t)
+	repo := NewGormProductRepository(db)
+
+	ctx := setupTenantContext(context.Background(), 100)
+
+	ingredient := &domain.Ingredient{
+		Name:          "Flour",
+		Unit:          "kg",
+		StockQuantity: 10.0,
+		CompanyID:     100,
+		Active:        true,
+	}
+	err := repo.CreateIngredient(ctx, ingredient)
+	if err != nil {
+		t.Fatalf("CreateIngredient failed: %v", err)
+	}
+
+	// Cenário 1: Transação A e B tentam atualizar o mesmo ingrediente
+	// B deve aguardar A finalizar (SELECT FOR UPDATE garante isso)
+	done := make(chan bool, 2)
+
+	// Transação A
+	go func() {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			ingredientA := &domain.Ingredient{
+				ID:            ingredient.ID,
+				Name:          "Flour A",
+				Unit:          "kg",
+				StockQuantity: 15.0,
+				MinStock:      5.0,
+				Active:        true,
+				CompanyID:     100,
+			}
+			err := repo.UpdateIngredient(ctx, ingredientA, tx)
+			if err != nil {
+				return err
+			}
+			// Manter lock por um breve momento
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		})
+		if err != nil {
+			t.Errorf("Transaction A failed: %v", err)
+		}
+		done <- true
+	}()
+
+	// Transação B
+	go func() {
+		time.Sleep(10 * time.Millisecond) // Começa logo após A
+		err := db.Transaction(func(tx *gorm.DB) error {
+			ingredientB := &domain.Ingredient{
+				ID:            ingredient.ID,
+				Name:          "Flour B",
+				Unit:          "kg",
+				StockQuantity: 20.0,
+				MinStock:      5.0,
+				Active:        true,
+				CompanyID:     100,
+			}
+			err := repo.UpdateIngredient(ctx, ingredientB, tx)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("Transaction B failed: %v", err)
+		}
+		done <- true
+	}()
+
+	// Aguardar ambas as transações
+	<-done
+	<-done
+
+	// Verificar resultado final
+	updated, err := repo.FindIngredientByID(ctx, ingredient.ID, nil)
+	if err != nil {
+		t.Fatalf("FindIngredientByID failed: %v", err)
+	}
+	// Uma das transações deve ter sucesso
+	if updated.Name != "Flour A" && updated.Name != "Flour B" {
+		t.Errorf("expected name to be 'Flour A' or 'Flour B', got '%s'", updated.Name)
+	}
+}
+
+// Sprint 4B.4: Cenário 2 - Registro inexistente
+func TestProductRepository_UpdateIngredientNotFound(t *testing.T) {
+	db := setupProductTestDB(t)
+	repo := NewGormProductRepository(db)
+
+	ctx := setupTenantContext(context.Background(), 100)
+
+	ingredient := &domain.Ingredient{
+		ID:            99999, // ID inexistente
+		Name:          "Ghost",
+		Unit:          "kg",
+		StockQuantity: 10.0,
+		MinStock:      5.0,
+		Active:        true,
+		CompanyID:     100,
+	}
+	err := repo.UpdateIngredient(ctx, ingredient, nil)
+	if err == nil {
+		t.Error("expected error for non-existent ingredient")
+	}
+	if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "access denied") {
+		t.Errorf("expected 'not found' or 'access denied' error, got: %v", err)
+	}
+}
+
+// Sprint 4B.4: Cenário 3 - Soft delete
+func TestProductRepository_UpdateIngredientSoftDelete(t *testing.T) {
+	db := setupProductTestDB(t)
+	repo := NewGormProductRepository(db)
+
+	ctx := setupTenantContext(context.Background(), 100)
+
+	ingredient := &domain.Ingredient{
+		Name:          "Flour",
+		Unit:          "kg",
+		StockQuantity: 10.0,
+		CompanyID:     100,
+		Active:        true,
+	}
+	err := repo.CreateIngredient(ctx, ingredient)
+	if err != nil {
+		t.Fatalf("CreateIngredient failed: %v", err)
+	}
+
+	// Soft delete
+	err = repo.DeleteIngredient(ctx, ingredient.ID)
+	if err != nil {
+		t.Fatalf("DeleteIngredient failed: %v", err)
+	}
+
+	// Tentar atualizar registro deletado
+	ingredient.Name = "Updated Flour"
+	err = repo.UpdateIngredient(ctx, ingredient, nil)
+	if err == nil {
+		t.Error("expected error when updating soft-deleted ingredient")
+	}
+	if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "access denied") {
+		t.Errorf("expected 'not found' or 'access denied' error, got: %v", err)
+	}
+}
+
+// Sprint 4B.4: Cenário 4 - Filtro de tenant
+func TestProductRepository_UpdateIngredientTenantIsolation(t *testing.T) {
+	db := setupProductTestDB(t)
+	repo := NewGormProductRepository(db)
+
+	// Criar ingrediente para empresa 100
+	ctx100 := setupTenantContext(context.Background(), 100)
+	ingredient100 := &domain.Ingredient{
+		Name:          "Flour 100",
+		Unit:          "kg",
+		StockQuantity: 10.0,
+		CompanyID:     100,
+		Active:        true,
+	}
+	err := repo.CreateIngredient(ctx100, ingredient100)
+	if err != nil {
+		t.Fatalf("CreateIngredient failed for company 100: %v", err)
+	}
+
+	// Tentar atualizar com contexto de empresa 200
+	ctx200 := setupTenantContext(context.Background(), 200)
+	ingredient200 := &domain.Ingredient{
+		ID:            ingredient100.ID,
+		Name:          "Hacked",
+		Unit:          "kg",
+		StockQuantity: 999.0,
+		MinStock:      0.0,
+		Active:        true,
+		CompanyID:     200,
+	}
+	err = repo.UpdateIngredient(ctx200, ingredient200, nil)
+	if err == nil {
+		t.Error("expected error when updating ingredient from different tenant")
+	}
+	if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "access denied") {
+		t.Errorf("expected 'not found' or 'access denied' error, got: %v", err)
+	}
+
+	// Verificar que o registro não foi modificado
+	original, err := repo.FindIngredientByID(ctx100, ingredient100.ID, nil)
+	if err != nil {
+		t.Fatalf("FindIngredientByID failed: %v", err)
+	}
+	if original.Name != "Flour 100" {
+		t.Errorf("ingredient was modified despite tenant isolation, got name: %s", original.Name)
+	}
+	if original.StockQuantity != 10.0 {
+		t.Errorf("stock was modified despite tenant isolation, got: %f", original.StockQuantity)
 	}
 }

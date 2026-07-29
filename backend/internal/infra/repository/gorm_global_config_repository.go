@@ -32,7 +32,7 @@ type GormGlobalConfig struct {
 	EnableAI            bool   `gorm:"column:enable_ai"`
 	EnableDelivery      bool   `gorm:"column:enable_delivery"`
 	EnableMarketplace   bool   `gorm:"column:enable_marketplace"`
-	UpdatedAt           int64  `gorm:"autoUpdateTime"`
+	UpdatedAt           time.Time  `gorm:"autoUpdateTime"`
 	UpdatedBy           uint
 }
 
@@ -139,7 +139,7 @@ func (r *GormGlobalConfigRepository) toGorm(config *domain.GlobalConfig) *GormGl
 		EnableAI:           config.EnableAI,
 		EnableDelivery:     config.EnableDelivery,
 		EnableMarketplace:  config.EnableMarketplace,
-		UpdatedAt:          config.UpdatedAt.Unix(),
+		UpdatedAt:          config.UpdatedAt,
 		UpdatedBy:          config.UpdatedBy,
 	}
 }
@@ -166,7 +166,7 @@ func (r *GormGlobalConfigRepository) toDomain(gormConfig *GormGlobalConfig) *dom
 		EnableAI:           gormConfig.EnableAI,
 		EnableDelivery:     gormConfig.EnableDelivery,
 		EnableMarketplace:  gormConfig.EnableMarketplace,
-		UpdatedAt:          time.Unix(gormConfig.UpdatedAt, 0),
+		UpdatedAt:          gormConfig.UpdatedAt,
 		UpdatedBy:          gormConfig.UpdatedBy,
 	}
 }

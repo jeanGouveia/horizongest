@@ -13,8 +13,8 @@ type GormPlatformSession struct {
 	ID            uint   `gorm:"primaryKey;autoIncrement"`
 	PlatformUserID uint  `gorm:"not null;index"`
 	Token         string `gorm:"not null;uniqueIndex"`
-	ExpiresAt     int64  `gorm:"not null;index"`
-	CreatedAt     int64  `gorm:"autoCreateTime"`
+	ExpiresAt     time.Time  `gorm:"not null;index"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime"`
 }
 
 func (GormPlatformSession) TableName() string {
@@ -67,8 +67,8 @@ func (r *GormPlatformSessionRepository) toGorm(session *domain.PlatformSession) 
 		ID:            session.ID,
 		PlatformUserID: session.PlatformUserID,
 		Token:         session.Token,
-		ExpiresAt:     session.ExpiresAt.Unix(),
-		CreatedAt:     session.CreatedAt.Unix(),
+		ExpiresAt:     session.ExpiresAt,
+		CreatedAt:     session.CreatedAt,
 	}
 }
 
@@ -77,7 +77,7 @@ func (r *GormPlatformSessionRepository) toDomain(gormSession *GormPlatformSessio
 		ID:            gormSession.ID,
 		PlatformUserID: gormSession.PlatformUserID,
 		Token:         gormSession.Token,
-		ExpiresAt:     time.Unix(gormSession.ExpiresAt, 0),
-		CreatedAt:     time.Unix(gormSession.CreatedAt, 0),
+		ExpiresAt:     gormSession.ExpiresAt,
+		CreatedAt:     gormSession.CreatedAt,
 	}
 }

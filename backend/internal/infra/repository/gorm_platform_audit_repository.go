@@ -18,7 +18,7 @@ type GormPlatformAudit struct {
 	Changes       string `gorm:"type:text"`
 	IPAddress     string
 	UserAgent     string
-	CreatedAt     int64  `gorm:"autoCreateTime;index"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime;index"`
 }
 
 func (GormPlatformAudit) TableName() string {
@@ -105,7 +105,7 @@ func (r *GormPlatformAuditRepository) toGorm(audit *domain.PlatformAudit) *GormP
 		Changes:       audit.Changes,
 		IPAddress:     audit.IPAddress,
 		UserAgent:     audit.UserAgent,
-		CreatedAt:     audit.CreatedAt.Unix(),
+		CreatedAt:     audit.CreatedAt,
 	}
 }
 
@@ -119,6 +119,6 @@ func (r *GormPlatformAuditRepository) toDomain(gormAudit *GormPlatformAudit) *do
 		Changes:       gormAudit.Changes,
 		IPAddress:     gormAudit.IPAddress,
 		UserAgent:     gormAudit.UserAgent,
-		CreatedAt:     time.Unix(gormAudit.CreatedAt, 0),
+		CreatedAt:     gormAudit.CreatedAt,
 	}
 }

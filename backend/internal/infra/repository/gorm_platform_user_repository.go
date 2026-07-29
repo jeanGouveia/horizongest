@@ -11,15 +11,15 @@ import (
 )
 
 type GormPlatformUser struct {
-	ID            uint   `gorm:"primaryKey;autoIncrement"`
-	Name          string `gorm:"not null"`
-	Email         string `gorm:"not null;uniqueIndex"`
-	PasswordHash  string `gorm:"not null"`
-	Role          string `gorm:"not null;default:'PlatformSupport'"`
-	Active        bool   `gorm:"not null;default:true"`
-	DeletedAt     *int64 `gorm:"index"`
-	CreatedAt     int64  `gorm:"autoCreateTime"`
-	UpdatedAt     int64  `gorm:"autoUpdateTime"`
+	ID           uint       `gorm:"primaryKey;autoIncrement"`
+	Name         string     `gorm:"not null"`
+	Email        string     `gorm:"not null;uniqueIndex"`
+	PasswordHash string     `gorm:"not null"`
+	Role         string     `gorm:"not null;default:'PlatformSupport'"`
+	Active       bool       `gorm:"not null;default:true"`
+	DeletedAt    *time.Time `gorm:"index"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (GormPlatformUser) TableName() string {
@@ -73,11 +73,6 @@ func (r *GormPlatformUserRepository) Update(ctx context.Context, user *domain.Pl
 }
 
 func (r *GormPlatformUserRepository) toGorm(user *domain.PlatformUser) *GormPlatformUser {
-	var deletedAt *int64
-	if user.DeletedAt != nil {
-		t := user.DeletedAt.Unix()
-		deletedAt = &t
-	}
 	return &GormPlatformUser{
 		ID:           user.ID,
 		Name:         user.Name,
@@ -85,21 +80,21 @@ func (r *GormPlatformUserRepository) toGorm(user *domain.PlatformUser) *GormPlat
 		PasswordHash: user.PasswordHash,
 		Role:         user.Role.String(),
 		Active:       user.Active,
-		DeletedAt:    deletedAt,
-		CreatedAt:    user.CreatedAt.Unix(),
-		UpdatedAt:    user.UpdatedAt.Unix(),
+		DeletedAt:    user.DeletedAt,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}
 }
 
 func (r *GormPlatformUserRepository) toDomain(gormUser *GormPlatformUser) *domain.PlatformUser {
 	var deletedAt *time.Time
 	if gormUser.DeletedAt != nil {
-		t := time.Unix(*gormUser.DeletedAt, 0)
+		t := *gormUser.DeletedAt
 		deletedAt = &t
 	}
-	
+
 	role, _ := domain.ParsePlatformRole(gormUser.Role)
-	
+
 	return &domain.PlatformUser{
 		ID:           gormUser.ID,
 		Name:         gormUser.Name,
@@ -108,8 +103,8 @@ func (r *GormPlatformUserRepository) toDomain(gormUser *GormPlatformUser) *domai
 		Role:         role,
 		Active:       gormUser.Active,
 		DeletedAt:    deletedAt,
-		CreatedAt:    time.Unix(gormUser.CreatedAt, 0),
-		UpdatedAt:    time.Unix(gormUser.UpdatedAt, 0),
+		CreatedAt:    gormUser.CreatedAt,
+		UpdatedAt:    gormUser.UpdatedAt,
 	}
 }
 

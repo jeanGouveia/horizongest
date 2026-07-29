@@ -2,16 +2,25 @@ package repository
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=horizongest_user password=horizongest_secure_password dbname=horizongest_test sslmode=disable"
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
@@ -26,7 +35,7 @@ func TestApplyTenantFilter(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// Apply tenant filter
 	filteredDB := ApplyTenantFilter(ctx, db)
@@ -64,7 +73,7 @@ func TestApplyTenantFilterWithID(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// Apply tenant filter with ID
 	filteredDB := ApplyTenantFilterWithID(ctx, db, 456)
@@ -96,7 +105,7 @@ func TestGetCompanyIDFromContext(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// Get CompanyID
 	companyID, err := GetCompanyIDFromContext(ctx)
@@ -125,7 +134,7 @@ func TestHasCompanyContext(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// Check if has company context
 	hasContext := HasCompanyContext(ctx)
@@ -153,7 +162,7 @@ func TestTenantIsolation_CrossTenantAccess(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, userTenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, userTenantCtx)
 
 	// Apply tenant filter - should only allow access to company 123
 	filteredDB := ApplyTenantFilter(ctx, db)
@@ -172,7 +181,7 @@ func TestTenantIsolation_IDORPrevention(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, userTenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, userTenantCtx)
 
 	// Apply tenant filter with ID - should require both ID match AND company match
 	filteredDB := ApplyTenantFilterWithID(ctx, db, 456)
@@ -189,7 +198,7 @@ func TestTenantContext_CompanyIDRequired(t *testing.T) {
 		UserID:    1,
 		CompanyID: 0, // Invalid - CompanyID is required
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// HasCompanyContext returns true if context exists, regardless of CompanyID value
 	// The validation of CompanyID > 0 happens at the user creation level
@@ -205,7 +214,7 @@ func TestTenantContext_ValidCompanyID(t *testing.T) {
 		UserID:    1,
 		CompanyID: 123,
 	}
-	ctx := context.WithValue(context.Background(), middleware.ContextKeyTenant, tenantCtx)
+	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	// HasCompanyContext should return true for valid CompanyID
 	hasContext := HasCompanyContext(ctx)

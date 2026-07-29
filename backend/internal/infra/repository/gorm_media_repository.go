@@ -27,9 +27,9 @@ type GormMedia struct {
 	EntityType    string `gorm:"not null;index"`
 	EntityID      *uint  `gorm:"index"`
 	CompanyID     uint   `gorm:"index;not null"` // Sprint 3: NOT NULL
-	DeletedAt     *int64 `gorm:"index"`
-	CreatedAt     int64  `gorm:"autoCreateTime"`
-	UpdatedAt     int64  `gorm:"autoUpdateTime"`
+	DeletedAt     *time.Time `gorm:"index"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (GormMedia) TableName() string { return "media" }
@@ -68,8 +68,8 @@ func (r *GormMediaRepository) CreateMedia(ctx context.Context, m *domain.Media) 
 	}
 	m.ID = gm.ID
 	m.CompanyID = gm.CompanyID
-	m.CreatedAt = time.Unix(gm.CreatedAt, 0)
-	m.UpdatedAt = time.Unix(gm.UpdatedAt, 0)
+	m.CreatedAt = gm.CreatedAt
+	m.UpdatedAt = gm.UpdatedAt
 	return nil
 }
 
@@ -127,7 +127,7 @@ func (r *GormMediaRepository) DeleteMediaByEntity(ctx context.Context, entityTyp
 func mediaToDomain(m *GormMedia) *domain.Media {
 	var deletedAt *time.Time
 	if m.DeletedAt != nil {
-		dt := time.Unix(*m.DeletedAt, 0)
+		dt := *m.DeletedAt
 		deletedAt = &dt
 	}
 	return &domain.Media{
@@ -145,7 +145,7 @@ func mediaToDomain(m *GormMedia) *domain.Media {
 		EntityID:      m.EntityID,
 		CompanyID:     m.CompanyID,
 		DeletedAt:     deletedAt,
-		CreatedAt:     time.Unix(m.CreatedAt, 0),
-		UpdatedAt:     time.Unix(m.UpdatedAt, 0),
+		CreatedAt:     m.CreatedAt,
+		UpdatedAt:     m.UpdatedAt,
 	}
 }

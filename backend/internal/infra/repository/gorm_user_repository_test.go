@@ -3,15 +3,24 @@ package repository
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func setupUserTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=horizongest_user password=horizongest_secure_password dbname=horizongest_test sslmode=disable"
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
@@ -21,6 +30,13 @@ func setupUserTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
+
+	// Clean up before each test - drop and recreate schema
+	db.Exec("DROP SCHEMA public CASCADE")
+	db.Exec("CREATE SCHEMA public")
+	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO public")
+	db.AutoMigrate(&GormUserModel{})
 
 	return db
 }
