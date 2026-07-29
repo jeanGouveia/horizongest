@@ -36,12 +36,12 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 
 	// --- KPIs Hoje ---
 	// Receita de hoje
-	var todayRevenue float64
+	var todayRevenue int64
 	r.db.WithContext(ctx).Model(&GormOrder{}).
 		Where("date(datetime(created_at, 'unixepoch')) = ? AND company_id = ? AND deleted_at IS NULL", today, companyID).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&todayRevenue)
-	dashboard.Metrics.TodayRevenue = todayRevenue
+	dashboard.Metrics.TodayRevenue = domain.Money(todayRevenue)
 
 	// Pedidos de hoje
 	var todayOrders int64
@@ -61,21 +61,23 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 
 	// Ticket médio hoje
 	if todayOrders > 0 {
-		dashboard.Metrics.TodayAverageTicket = todayRevenue / float64(todayOrders)
+		avgTicket := domain.Money(todayRevenue).Div(int64(todayOrders))
+		dashboard.Metrics.TodayAverageTicket = avgTicket
 	}
 
 	// CMV hoje (simplificado - assume custo fixo de 30%)
-	dashboard.Metrics.TodayCMV = todayRevenue * 0.30
-	dashboard.Metrics.TodayGrossProfit = todayRevenue - dashboard.Metrics.TodayCMV
+	todayCMV := domain.Money(todayRevenue).MulFloat(0.30)
+	dashboard.Metrics.TodayCMV = todayCMV
+	dashboard.Metrics.TodayGrossProfit = domain.Money(todayRevenue).Sub(todayCMV)
 
 	// --- KPIs Ontem ---
 	// Receita de ontem
-	var yesterdayRevenue float64
+	var yesterdayRevenue int64
 	r.db.WithContext(ctx).Model(&GormOrder{}).
 		Where("date(datetime(created_at, 'unixepoch')) = ? AND company_id = ? AND deleted_at IS NULL", yesterday, companyID).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&yesterdayRevenue)
-	dashboard.Metrics.YesterdayRevenue = yesterdayRevenue
+	dashboard.Metrics.YesterdayRevenue = domain.Money(yesterdayRevenue)
 
 	// Pedidos de ontem
 	var yesterdayOrders int64
@@ -95,17 +97,18 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 
 	// Ticket médio ontem
 	if yesterdayOrders > 0 {
-		dashboard.Metrics.YesterdayAverageTicket = yesterdayRevenue / float64(yesterdayOrders)
+		avgTicket := domain.Money(yesterdayRevenue).Div(int64(yesterdayOrders))
+		dashboard.Metrics.YesterdayAverageTicket = avgTicket
 	}
 
 	// --- KPIs Semana ---
 	// Receita da semana
-	var weekRevenue float64
+	var weekRevenue int64
 	r.db.WithContext(ctx).Model(&GormOrder{}).
 		Where("date(datetime(created_at, 'unixepoch')) >= ? AND company_id = ? AND deleted_at IS NULL", weekStart, companyID).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&weekRevenue)
-	dashboard.Metrics.WeekRevenue = weekRevenue
+	dashboard.Metrics.WeekRevenue = domain.Money(weekRevenue)
 
 	// Pedidos da semana
 	var weekOrders int64
@@ -125,17 +128,18 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 
 	// Ticket médio da semana
 	if weekOrders > 0 {
-		dashboard.Metrics.WeekAverageTicket = weekRevenue / float64(weekOrders)
+		avgTicket := domain.Money(weekRevenue).Div(int64(weekOrders))
+		dashboard.Metrics.WeekAverageTicket = avgTicket
 	}
 
 	// --- KPIs Mês ---
 	// Receita do mês
-	var monthRevenue float64
+	var monthRevenue int64
 	r.db.WithContext(ctx).Model(&GormOrder{}).
 		Where("date(datetime(created_at, 'unixepoch')) >= ? AND company_id = ? AND deleted_at IS NULL", monthStart, companyID).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&monthRevenue)
-	dashboard.Metrics.MonthRevenue = monthRevenue
+	dashboard.Metrics.MonthRevenue = domain.Money(monthRevenue)
 
 	// Pedidos do mês
 	var monthOrders int64
@@ -155,7 +159,8 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 
 	// Ticket médio do mês
 	if monthOrders > 0 {
-		dashboard.Metrics.MonthAverageTicket = monthRevenue / float64(monthOrders)
+		avgTicket := domain.Money(monthRevenue).Div(int64(monthOrders))
+		dashboard.Metrics.MonthAverageTicket = avgTicket
 	}
 
 	// --- KPIs Gerais ---
@@ -217,11 +222,11 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 
 	// --- Pedidos recentes (últimos 10) ---
 	type OrderResult struct {
-		ID          uint    `gorm:"column:id"`
-		OrderNumber int     `gorm:"column:order_number"`
-		Status      string  `gorm:"column:status"`
-		TotalPrice  float64 `gorm:"column:total_price"`
-		CreatedAt   int64   `gorm:"column:created_at"`
+		ID          uint      `gorm:"column:id"`
+		OrderNumber int       `gorm:"column:order_number"`
+		Status      string    `gorm:"column:status"`
+		TotalPrice  int64     `gorm:"column:total_price"`
+		CreatedAt   time.Time `gorm:"column:created_at"`
 	}
 	var recentOrders []OrderResult
 	r.db.WithContext(ctx).Model(&GormOrder{}).
@@ -242,8 +247,8 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 			ID:          o.ID,
 			OrderNumber: o.OrderNumber,
 			Status:      domain.OrderStatus(o.Status),
-			TotalPrice:  o.TotalPrice,
-			CreatedAt:   time.Unix(o.CreatedAt, 0).Format("2006-01-02 15:04"),
+			TotalPrice:  domain.Money(o.TotalPrice),
+			CreatedAt:   o.CreatedAt.Format("2006-01-02 15:04"),
 			ItemsCount:  int(itemsCount),
 		}
 	}
@@ -312,14 +317,14 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 // getSalesByDay retorna vendas por dia (últimos 7 dias)
 func (r *GormDashboardRepository) getSalesByDay(ctx context.Context, now time.Time, companyID uint) []domain.ChartPoint {
 	type DayResult struct {
-		Date  string  `gorm:"column:date"`
-		Total float64 `gorm:"column:total"`
+		Date  string `gorm:"column:date"`
+		Total int64  `gorm:"column:total"`
 	}
 
 	var results []DayResult
 	for i := 6; i >= 0; i-- {
 		date := now.AddDate(0, 0, -i).Format("2006-01-02")
-		var total float64
+		var total int64
 		r.db.WithContext(ctx).Model(&GormOrder{}).
 			Where("date(datetime(created_at, 'unixepoch')) = ? AND company_id = ? AND deleted_at IS NULL", date, companyID).
 			Select("COALESCE(SUM(total_price), 0)").
@@ -332,7 +337,7 @@ func (r *GormDashboardRepository) getSalesByDay(ctx context.Context, now time.Ti
 		// Format date as "DD/MM"
 		parsedTime, _ := time.Parse("2006-01-02", r.Date)
 		label := parsedTime.Format("02/01")
-		chartPoints[i] = domain.ChartPoint{Label: label, Value: r.Total}
+		chartPoints[i] = domain.ChartPoint{Label: label, Value: domain.Money(r.Total)}
 	}
 
 	return chartPoints
@@ -341,8 +346,8 @@ func (r *GormDashboardRepository) getSalesByDay(ctx context.Context, now time.Ti
 // getSalesByHour retorna vendas por hora (hoje)
 func (r *GormDashboardRepository) getSalesByHour(ctx context.Context, today string, companyID uint) []domain.ChartPoint {
 	type HourResult struct {
-		Hour  int     `gorm:"column:hour"`
-		Total float64 `gorm:"column:total"`
+		Hour  int   `gorm:"column:hour"`
+		Total int64 `gorm:"column:total"`
 	}
 
 	var results []HourResult
@@ -356,7 +361,7 @@ func (r *GormDashboardRepository) getSalesByHour(ctx context.Context, today stri
 	chartPoints := make([]domain.ChartPoint, len(results))
 	for i, r := range results {
 		label := fmt.Sprintf("%02d:00", r.Hour)
-		chartPoints[i] = domain.ChartPoint{Label: label, Value: r.Total}
+		chartPoints[i] = domain.ChartPoint{Label: label, Value: domain.Money(r.Total)}
 	}
 
 	return chartPoints
@@ -365,10 +370,10 @@ func (r *GormDashboardRepository) getSalesByHour(ctx context.Context, today stri
 // getTopProducts retorna produtos mais vendidos (últimos 30 dias)
 func (r *GormDashboardRepository) getTopProducts(ctx context.Context, now time.Time, companyID uint) []domain.TopItem {
 	type ProductResult struct {
-		ID       uint    `gorm:"column:id"`
-		Name     string  `gorm:"column:name"`
-		Quantity int64   `gorm:"column:quantity"`
-		Total    float64 `gorm:"column:total"`
+		ID       uint   `gorm:"column:id"`
+		Name     string `gorm:"column:name"`
+		Quantity int64  `gorm:"column:quantity"`
+		Total    int64  `gorm:"column:total"`
 	}
 
 	monthAgo := now.AddDate(0, 0, -30).Format("2006-01-02")
@@ -388,7 +393,7 @@ func (r *GormDashboardRepository) getTopProducts(ctx context.Context, now time.T
 		topItems[i] = domain.TopItem{
 			ID:    r.ID,
 			Name:  r.Name,
-			Value: r.Total,
+			Value: domain.Money(r.Total),
 			Count: int(r.Quantity),
 		}
 	}
@@ -399,10 +404,10 @@ func (r *GormDashboardRepository) getTopProducts(ctx context.Context, now time.T
 // getTopCategories retorna categorias mais vendidas (últimos 30 dias)
 func (r *GormDashboardRepository) getTopCategories(ctx context.Context, now time.Time, companyID uint) []domain.TopItem {
 	type CategoryResult struct {
-		ID       uint    `gorm:"column:id"`
-		Name     string  `gorm:"column:name"`
-		Quantity int64   `gorm:"column:quantity"`
-		Total    float64 `gorm:"column:total"`
+		ID       uint   `gorm:"column:id"`
+		Name     string `gorm:"column:name"`
+		Quantity int64  `gorm:"column:quantity"`
+		Total    int64  `gorm:"column:total"`
 	}
 
 	monthAgo := now.AddDate(0, 0, -30).Format("2006-01-02")
@@ -423,7 +428,7 @@ func (r *GormDashboardRepository) getTopCategories(ctx context.Context, now time
 		topItems[i] = domain.TopItem{
 			ID:    r.ID,
 			Name:  r.Name,
-			Value: r.Total,
+			Value: domain.Money(r.Total),
 			Count: int(r.Quantity),
 		}
 	}

@@ -143,34 +143,34 @@ func (r *GormFinanceRepository) GetCashFlow(ctx context.Context, companyID uint,
 	}
 
 	// Calcular saldo de abertura (transações antes da data inicial)
-	var openingBalance float64
+	var openingBalance int64
 	r.db.WithContext(ctx).Model(&domain.Transaction{}).
 		Where("company_id = ? AND date < ? AND deleted_at IS NULL", companyID, startDate).
 		Select("COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END)), 0)").
 		Scan(&openingBalance)
-	cashFlow.OpeningBalance = openingBalance
+	cashFlow.OpeningBalance = domain.Money(openingBalance)
 
 	// Calcular receitas no período
-	var income float64
+	var income int64
 	r.db.WithContext(ctx).Model(&domain.Transaction{}).
 		Where("company_id = ? AND type = 'income' AND date >= ? AND date <= ? AND deleted_at IS NULL", companyID, startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&income)
-	cashFlow.Income = income
+	cashFlow.Income = domain.Money(income)
 
 	// Calcular despesas no período
-	var expense float64
+	var expense int64
 	r.db.WithContext(ctx).Model(&domain.Transaction{}).
 		Where("company_id = ? AND type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", companyID, startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&expense)
-	cashFlow.Expense = expense
+	cashFlow.Expense = domain.Money(expense)
 
 	// Calcular saldo no período
-	cashFlow.Balance = income - expense
+	cashFlow.Balance = cashFlow.Income.Sub(cashFlow.Expense)
 
 	// Calcular saldo de fechamento
-	cashFlow.ClosingBalance = openingBalance + cashFlow.Balance
+	cashFlow.ClosingBalance = cashFlow.OpeningBalance.Add(cashFlow.Balance)
 
 	return cashFlow, nil
 }

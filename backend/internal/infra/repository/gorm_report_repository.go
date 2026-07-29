@@ -65,10 +65,10 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 
 	// Top produtos (simplificado - retorna até 10)
 	type ProductResult struct {
-		ID       uint    `gorm:"column:id"`
-		Name     string  `gorm:"column:name"`
-		Quantity int64   `gorm:"column:quantity"`
-		Total    float64 `gorm:"column:total"`
+		ID       uint   `gorm:"column:id"`
+		Name     string `gorm:"column:name"`
+		Quantity int64  `gorm:"column:quantity"`
+		Total    int64  `gorm:"column:total"`
 	}
 	var topProducts []ProductResult
 	r.db.WithContext(ctx).Model(&GormOrderItem{}).
@@ -86,7 +86,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 		report.TopProducts[i] = domain.TopItem{
 			ID:    p.ID,
 			Name:  p.Name,
-			Value: p.Total,
+			Value: domain.Money(p.Total),
 			Count: int(p.Quantity),
 		}
 	}
@@ -328,15 +328,15 @@ func (r *GormReportRepository) GetFinancialReport(ctx context.Context, companyID
 // Helper method para vendas por dia
 func (r *GormReportRepository) getSalesByDayForReport(ctx context.Context, companyID uint, startDate, endDate time.Time) []domain.ChartPoint {
 	type DayResult struct {
-		Date  string  `gorm:"column:date"`
-		Total float64 `gorm:"column:total"`
+		Date  string `gorm:"column:date"`
+		Total int64  `gorm:"column:total"`
 	}
 
 	var results []DayResult
 	currentDate := startDate
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
 		dateStr := currentDate.Format("2006-01-02")
-		var total float64
+		var total int64
 		r.db.WithContext(ctx).Model(&GormOrder{}).
 			Where("company_id = ? AND DATE(FROM_UNIXTIME(created_at)) = ? AND deleted_at IS NULL", companyID, dateStr).
 			Select("COALESCE(SUM(total_price), 0)").
@@ -349,7 +349,7 @@ func (r *GormReportRepository) getSalesByDayForReport(ctx context.Context, compa
 	for i, r := range results {
 		parsedTime, _ := time.Parse("2006-01-02", r.Date)
 		label := parsedTime.Format("02/01")
-		chartPoints[i] = domain.ChartPoint{Label: label, Value: r.Total}
+		chartPoints[i] = domain.ChartPoint{Label: label, Value: domain.Money(r.Total)}
 	}
 
 	return chartPoints
