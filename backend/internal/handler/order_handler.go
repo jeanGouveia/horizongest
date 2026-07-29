@@ -29,6 +29,14 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		jsonValidationError(w, err)
 		return
 	}
+
+	// BUG 1 FIX: idempotency_key é obrigatório para garantir idempotência em retries
+	// O cliente deve gerar e enviar a chave para garantir que retries usem o mesmo valor
+	if in.IdempotencyKey == nil || *in.IdempotencyKey == "" {
+		jsonError(w, "idempotency_key é obrigatório. Envie um UUID gerado pelo cliente para garantir idempotência em retries.", http.StatusBadRequest)
+		return
+	}
+
 	order, err := h.svc.CreateOrder(r.Context(), in)
 	if err != nil {
 		log.Printf("Handler - Erro ao criar pedido: %v", err)

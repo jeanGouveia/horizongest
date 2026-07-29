@@ -66,7 +66,7 @@ func (h *StockMovementHandler) CreateStockMovement(w http.ResponseWriter, r *htt
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -104,7 +104,7 @@ func (h *StockMovementHandler) ListStockMovements(w http.ResponseWriter, r *http
 	limit := 50
 	offset := 0
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -160,7 +160,7 @@ func (h *StockMovementHandler) CreateInventory(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -187,7 +187,7 @@ func (h *StockMovementHandler) ListInventories(w http.ResponseWriter, r *http.Re
 	limit := 50
 	offset := 0
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return

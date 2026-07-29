@@ -49,7 +49,7 @@ func (h *FinanceHandler) CreateTransactionCategory(w http.ResponseWriter, r *htt
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -76,7 +76,7 @@ func (h *FinanceHandler) ListTransactionCategories(w http.ResponseWriter, r *htt
 	limit := 50
 	offset := 0
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -150,7 +150,7 @@ func (h *FinanceHandler) CreateTransaction(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -201,7 +201,7 @@ func (h *FinanceHandler) ListTransactions(w http.ResponseWriter, r *http.Request
 	limit := 50
 	offset := 0
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -283,7 +283,7 @@ func (h *FinanceHandler) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -314,7 +314,7 @@ func (h *FinanceHandler) GetFinancialSummary(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return

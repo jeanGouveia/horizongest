@@ -120,12 +120,12 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// DEBUG: Log JWT claims from context
-	claims, _ := middleware.GetClaimsFromContext(r.Context())
-	if claims != nil {
-		log.Printf("[DEBUG] /api/me - JWT recebido: UserID=%d, CompanyID=%d, Email=%s, Name=%s, IsImpersonating=%v",
-			claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating)
-	}
+	// Sprint 4A: Remover logs de claims sensíveis
+	// claims, _ := middleware.GetClaimsFromContext(r.Context())
+	// if claims != nil {
+	//	log.Printf("[DEBUG] /api/me - JWT recebido: UserID=%d, CompanyID=%d, Email=%s, Name=%s, IsImpersonating=%v",
+	//		claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating)
+	// }
 	log.Printf("[DEBUG] /api/me - UserID do contexto: %d", userID)
 
 	// Get full user data to include CompanyID
@@ -135,9 +135,9 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// DEBUG: Log user loaded from database
-	log.Printf("[DEBUG] /api/me - Usuário carregado do banco: ID=%d, Nome=%s, CompanyID=%d, Email=%s",
-		user.ID, user.Name, user.CompanyID, user.Email)
+	// Sprint 4A: Remover log de dados do usuário (não é sensível mas pode ser removido)
+	// log.Printf("[DEBUG] /api/me - Usuário carregado do banco: ID=%d, Nome=%s, CompanyID=%d, Email=%s",
+	//	user.ID, user.Name, user.CompanyID, user.Email)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"id":         user.ID,

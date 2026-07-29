@@ -54,7 +54,7 @@ func (h *PurchaseHandler) CreateSupplier(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -75,7 +75,7 @@ func (h *PurchaseHandler) ListSuppliers(w http.ResponseWriter, r *http.Request) 
 	limit := 50
 	offset := 0
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -149,7 +149,7 @@ func (h *PurchaseHandler) CreatePurchaseOrder(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return
@@ -176,7 +176,7 @@ func (h *PurchaseHandler) ListPurchaseOrders(w http.ResponseWriter, r *http.Requ
 	limit := 50
 	offset := 0
 
-	tenantCtx, ok := middleware.GetTenantContextFromContext(r.Context())
+	tenantCtx, ok := domain.GetTenantContextFromContext(r.Context())
 	if !ok {
 		jsonError(w, "contexto tenant não encontrado", http.StatusUnauthorized)
 		return

@@ -5,19 +5,28 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
+	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func setupCompanyTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=horizongest_user password=horizongest_secure_password dbname=horizongest_test sslmode=disable"
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
@@ -28,6 +37,13 @@ func setupCompanyTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
 
+	// Clean up before each test - drop and recreate schema
+	db.Exec("DROP SCHEMA public CASCADE")
+	db.Exec("CREATE SCHEMA public")
+	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO public")
+	db.AutoMigrate(&repository.GormCompanyModel{})
+
 	return db
 }
 
@@ -36,7 +52,7 @@ func setupTenantContext(ctx context.Context, companyID uint) context.Context {
 		UserID:    1,
 		CompanyID: companyID,
 	}
-	return context.WithValue(ctx, middleware.ContextKeyTenant, tenantCtx)
+	return context.WithValue(ctx, domain.ContextKeyTenant, tenantCtx)
 }
 
 func TestCompanyHandler_CreateCompany(t *testing.T) {
