@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -60,7 +59,7 @@ func TestProductRepository_CreateProduct(t *testing.T) {
 
 	product := &domain.Product{
 		Name:      "Test Product",
-		Price:     10.0,
+		Price:     domain.FromFloat64(10.0),
 		CompanyID: 100,
 		Active:    true,
 	}
@@ -84,7 +83,7 @@ func TestProductRepository_FindProductByID(t *testing.T) {
 	// Create a product first
 	product := &domain.Product{
 		Name:      "Test Product",
-		Price:     10.0,
+		Price:     domain.FromFloat64(10.0),
 		CompanyID: 100,
 		Active:    true,
 	}
@@ -134,7 +133,7 @@ func TestProductRepository_ListProducts(t *testing.T) {
 		product := &domain.Product{
 			Name:      fmt.Sprintf("Test Product %d", i),
 			Slug:      fmt.Sprintf("test-product-%s-%d", t.Name(), i),
-			Price:     float64(i) * 10.0,
+			Price:     domain.FromFloat64(float64(i) * 10.0),
 			CompanyID: 100,
 			Active:    true,
 		}
@@ -220,7 +219,7 @@ func TestProductRepository_UpdateProduct(t *testing.T) {
 	// Create a product
 	product := &domain.Product{
 		Name:      "Original Name",
-		Price:     10.0,
+		Price:     domain.FromFloat64(10.0),
 		CompanyID: 100,
 		Active:    true,
 	}
@@ -259,7 +258,7 @@ func TestProductRepository_DeleteProduct(t *testing.T) {
 	// Create a product
 	product := &domain.Product{
 		Name:      "To Delete",
-		Price:     10.0,
+		Price:     domain.FromFloat64(10.0),
 		CompanyID: 100,
 		Active:    true,
 	}
@@ -440,7 +439,7 @@ func TestProductRepository_SetProductIngredients(t *testing.T) {
 	// Create product
 	product := &domain.Product{
 		Name:      "Cake",
-		Price:     25.0,
+		Price:     domain.FromFloat64(25.0),
 		CompanyID: 100,
 		Active:    true,
 	}
@@ -510,7 +509,7 @@ func TestProductRepository_GetProductIngredients(t *testing.T) {
 
 	product := &domain.Product{
 		Name:      "Cake",
-		Price:     25.0,
+		Price:     domain.FromFloat64(25.0),
 		CompanyID: 100,
 		Active:    true,
 	}

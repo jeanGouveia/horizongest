@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

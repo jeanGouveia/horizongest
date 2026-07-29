@@ -156,7 +156,7 @@ func TestProductService_CreateProduct(t *testing.T) {
 
 	input := CreateProductInput{
 		Name:  "Test Product",
-		Price: 10.99,
+		Price: domain.FromFloat64(10.99),
 	}
 
 	product, err := svc.CreateProduct(context.Background(), input)
@@ -166,8 +166,8 @@ func TestProductService_CreateProduct(t *testing.T) {
 	if product.Name != "Test Product" {
 		t.Errorf("expected name 'Test Product', got '%s'", product.Name)
 	}
-	if product.Price != 10.99 {
-		t.Errorf("expected price 10.99, got %f", product.Price)
+	if product.Price != domain.FromFloat64(10.99) {
+		t.Errorf("expected price 10.99, got %f", product.Price.ToFloat64())
 	}
 	if !product.Active {
 		t.Error("expected product to be active by default")
@@ -184,7 +184,7 @@ func TestProductService_CreateProduct_WithSlug(t *testing.T) {
 	input := CreateProductInput{
 		Name:  "Test Product",
 		Slug:  "custom-slug",
-		Price: 10.99,
+		Price: domain.FromFloat64(10.99),
 	}
 
 	product, err := svc.CreateProduct(context.Background(), input)
@@ -294,11 +294,11 @@ func TestProductService_UpdateProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
 	svc := NewProductService(mockRepo)
 
-	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Old Name", Price: 9.99, Active: true}
+	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Old Name", Price: domain.FromFloat64(9.99), Active: true}
 
 	input := UpdateProductInput{
 		Name:  "New Name",
-		Price: 19.99,
+		Price: domain.FromFloat64(19.99),
 	}
 
 	product, err := svc.UpdateProduct(context.Background(), 1, input)
@@ -308,8 +308,8 @@ func TestProductService_UpdateProduct(t *testing.T) {
 	if product.Name != "New Name" {
 		t.Errorf("expected name 'New Name', got '%s'", product.Name)
 	}
-	if product.Price != 19.99 {
-		t.Errorf("expected price 19.99, got %f", product.Price)
+	if product.Price != domain.FromFloat64(19.99) {
+		t.Errorf("expected price 19.99, got %f", product.Price.ToFloat64())
 	}
 }
 
@@ -319,7 +319,7 @@ func TestProductService_UpdateProduct_NotFound(t *testing.T) {
 
 	input := UpdateProductInput{
 		Name:  "New Name",
-		Price: 19.99,
+		Price: domain.FromFloat64(19.99),
 	}
 
 	_, err := svc.UpdateProduct(context.Background(), 999, input)
@@ -546,7 +546,7 @@ func TestProductService_DuplicateProduct(t *testing.T) {
 		ID:          1,
 		Name:        "Original Product",
 		Description: "Original description",
-		Price:       10.99,
+		Price:       domain.FromFloat64(10.99),
 		Active:      true,
 		PhotoURL:    "http://example.com/photo.jpg",
 		CategoryID:  nil,
@@ -618,12 +618,12 @@ func TestProductService_UpdateProduct_WithPromotion(t *testing.T) {
 	svc := NewProductService(mockRepo)
 
 	now := time.Now()
-	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Test Product", Price: 20.0, Active: true}
+	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Test Product", Price: domain.FromFloat64(20.0), Active: true}
 
-	promotionPrice := 15.0
+	promotionPrice := domain.FromFloat64(15.0)
 	input := UpdateProductInput{
 		Name:           "Test Product",
-		Price:          20.0,
+		Price:          domain.FromFloat64(20.0),
 		PromotionPrice: &promotionPrice,
 		PromotionStart: &now,
 	}
@@ -635,7 +635,7 @@ func TestProductService_UpdateProduct_WithPromotion(t *testing.T) {
 	if product.PromotionPrice == nil {
 		t.Error("expected promotion price to be set")
 	}
-	if *product.PromotionPrice != 15.0 {
-		t.Errorf("expected promotion price 15.0, got %f", *product.PromotionPrice)
+	if *product.PromotionPrice != domain.FromFloat64(15.0) {
+		t.Errorf("expected promotion price 15.0, got %f", product.PromotionPrice.ToFloat64())
 	}
 }

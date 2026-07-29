@@ -65,7 +65,7 @@ func TestOrderHandler_CreateOrder_Success(t *testing.T) {
 	mockSvc := NewMockOrderService()
 	handler := NewOrderHandler(mockSvc)
 
-	body := `{"items": [{"product_id": 1, "quantity": 2}]}`
+	body := `{"items": [{"product_id": 1, "quantity": 2}], "idempotency_key": "test-key-123"}`
 	req := httptest.NewRequest("POST", "/api/orders", bytes.NewBufferString(body))
 	w := httptest.NewRecorder()
 
@@ -96,7 +96,7 @@ func TestOrderHandler_CreateOrder_ServiceError(t *testing.T) {
 	mockSvc.createError = errors.New("insufficient stock")
 	handler := NewOrderHandler(mockSvc)
 
-	body := `{"items": [{"product_id": 1, "quantity": 2}]}`
+	body := `{"items": [{"product_id": 1, "quantity": 2}], "idempotency_key": "test-key-123"}`
 	req := httptest.NewRequest("POST", "/api/orders", bytes.NewBufferString(body))
 	w := httptest.NewRecorder()
 

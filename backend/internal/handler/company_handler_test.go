@@ -11,7 +11,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

@@ -11,7 +11,6 @@ import (
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/database"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
-	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 )
 
@@ -115,7 +114,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Pedido criado: ID=%d, Total=%.2f\n", createdOrder.ID, createdOrder.TotalPrice)
+	fmt.Printf("Pedido criado: ID=%d, Total=%.2f\n", createdOrder.ID, createdOrder.TotalPrice.ToFloat64())
 
 	// PASSO 4: Cancelar Pedido (gera ajustes pendentes)
 	fmt.Println("\n=== PASSO 4: Cancelar Pedido ===")

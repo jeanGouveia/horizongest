@@ -27,6 +27,14 @@ func (m *MockOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 		return nil, m.createError
 	}
 	order.ID = uint(len(m.orders) + 1)
+
+	// Set CompanyID from context for idempotency test
+	if tenantCtxValue := ctx.Value("tenant"); tenantCtxValue != nil {
+		if tenantCtx, ok := tenantCtxValue.(*domain.TenantContext); ok {
+			order.CompanyID = tenantCtx.CompanyID
+		}
+	}
+
 	m.orders[order.ID] = order
 	return order, nil
 }
@@ -69,7 +77,7 @@ func (m *MockOrderRepository) UpdateOrderStatusWithAdjustments(ctx context.Conte
 	return nil
 }
 
-func (m *MockOrderRepository) UpdateOrder(ctx context.Context, id uint, items []domain.OrderItem, total float64, notes string, productIngredients map[uint][]domain.ProductIngredient) error {
+func (m *MockOrderRepository) UpdateOrder(ctx context.Context, id uint, items []domain.OrderItem, total domain.Money, notes string, productIngredients map[uint][]domain.ProductIngredient) error {
 	if order, exists := m.orders[id]; exists {
 		order.Items = items
 		order.TotalPrice = total
@@ -92,7 +100,7 @@ func TestOrderService_CreateOrder_Idempotency(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
@@ -151,7 +159,7 @@ func TestOrderService_CreateOrder_IdempotencyDifferentKeys(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
@@ -212,7 +220,7 @@ func TestOrderService_CreateOrder_NoIdempotencyKey(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
@@ -252,7 +260,7 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
@@ -270,8 +278,8 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 	if order.Status != domain.OrderStatusPending {
 		t.Errorf("expected status pending, got %s", order.Status)
 	}
-	if order.TotalPrice != 20.0 {
-		t.Errorf("expected total 20.0, got %f", order.TotalPrice)
+	if order.TotalPrice != domain.FromFloat64(20.0) {
+		t.Errorf("expected total 20.0, got %f", order.TotalPrice.ToFloat64())
 	}
 	if len(order.Items) != 1 {
 		t.Errorf("expected 1 item, got %d", len(order.Items))
@@ -304,7 +312,7 @@ func TestOrderService_CreateOrder_InactiveProduct(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: false,
 	}
 
@@ -329,7 +337,7 @@ func TestOrderService_CreateOrder_InsufficientStock(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
@@ -369,7 +377,7 @@ func TestOrderService_CreateOrder_SimpleProduct(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:         1,
 		Name:       "Water",
-		Price:      2.0,
+		Price:      domain.FromFloat64(2.0),
 		Active:     true,
 		IsComposto: false,
 	}
@@ -384,8 +392,8 @@ func TestOrderService_CreateOrder_SimpleProduct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrder failed: %v", err)
 	}
-	if order.TotalPrice != 10.0 {
-		t.Errorf("expected total 10.0, got %f", order.TotalPrice)
+	if order.TotalPrice != domain.FromFloat64(10.0) {
+		t.Errorf("expected total 10.0, got %f", order.TotalPrice.ToFloat64())
 	}
 }
 
@@ -398,7 +406,7 @@ func TestOrderService_ListOrders(t *testing.T) {
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:         1,
 		Status:     domain.OrderStatusPending,
-		TotalPrice: 10.0,
+		TotalPrice: domain.FromFloat64(10.0),
 	}
 
 	orders, err := svc.ListOrders(context.Background())
@@ -544,21 +552,21 @@ func TestOrderService_UpdateOrder_Success(t *testing.T) {
 		ID:     1,
 		Status: domain.OrderStatusPending,
 		Items: []domain.OrderItem{
-			{ProductID: 1, Quantity: 1, UnitPrice: 10.0},
+			{ProductID: 1, Quantity: 1, UnitPrice: domain.FromFloat64(10.0)},
 		},
 	}
 
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
 	mockProductRepo.products[2] = &domain.Product{
 		ID:     2,
 		Name:   "Coffee",
-		Price:  5.0,
+		Price:  domain.FromFloat64(5.0),
 		Active: true,
 	}
 
@@ -576,8 +584,8 @@ func TestOrderService_UpdateOrder_Success(t *testing.T) {
 	if len(order.Items) != 1 {
 		t.Errorf("expected 1 item, got %d", len(order.Items))
 	}
-	if order.TotalPrice != 10.0 {
-		t.Errorf("expected total 10.0, got %f", order.TotalPrice)
+	if order.TotalPrice != domain.FromFloat64(10.0) {
+		t.Errorf("expected total 10.0, got %f", order.TotalPrice.ToFloat64())
 	}
 }
 
@@ -616,7 +624,7 @@ func TestOrderService_UpdateOrder_InsufficientStock(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
@@ -706,14 +714,14 @@ func TestOrderService_CreateOrder_MultipleItems(t *testing.T) {
 	mockProductRepo.products[1] = &domain.Product{
 		ID:     1,
 		Name:   "Cake",
-		Price:  10.0,
+		Price:  domain.FromFloat64(10.0),
 		Active: true,
 	}
 
 	mockProductRepo.products[2] = &domain.Product{
 		ID:     2,
 		Name:   "Coffee",
-		Price:  5.0,
+		Price:  domain.FromFloat64(5.0),
 		Active: true,
 	}
 
@@ -728,8 +736,8 @@ func TestOrderService_CreateOrder_MultipleItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrder failed: %v", err)
 	}
-	if order.TotalPrice != 35.0 {
-		t.Errorf("expected total 35.0, got %f", order.TotalPrice)
+	if order.TotalPrice != domain.FromFloat64(35.0) {
+		t.Errorf("expected total 35.0, got %f", order.TotalPrice.ToFloat64())
 	}
 	if len(order.Items) != 2 {
 		t.Errorf("expected 2 items, got %d", len(order.Items))
@@ -742,15 +750,16 @@ func TestOrderService_CreateOrder_WithProductSnapshots(t *testing.T) {
 	svc := NewOrderService(mockOrderRepo, mockProductRepo)
 
 	// Setup product with all fields
+	promotionPrice := domain.FromFloat64(8.0)
 	mockProductRepo.products[1] = &domain.Product{
 		ID:             1,
 		Name:           "Cake",
 		Description:    "Delicious cake",
-		Price:          10.0,
+		Price:          domain.FromFloat64(10.0),
 		Active:         true,
 		PhotoURL:       "http://example.com/cake.jpg",
 		IsComposto:     true,
-		PromotionPrice: &[]float64{8.0}[0],
+		PromotionPrice: &promotionPrice,
 		Featured:       true,
 		IsNew:          true,
 	}
@@ -773,13 +782,13 @@ func TestOrderService_CreateOrder_WithProductSnapshots(t *testing.T) {
 	if item.ProductDescription != "Delicious cake" {
 		t.Errorf("expected product description 'Delicious cake', got '%s'", item.ProductDescription)
 	}
-	if item.UnitPrice != 10.0 {
-		t.Errorf("expected unit price 10.0, got %f", item.UnitPrice)
+	if item.UnitPrice != domain.FromFloat64(10.0) {
+		t.Errorf("expected unit price 10.0, got %f", item.UnitPrice.ToFloat64())
 	}
 	if !item.ProductIsComposto {
 		t.Error("expected product to be marked as composite")
 	}
-	if item.ProductPromotionPrice == nil || *item.ProductPromotionPrice != 8.0 {
+	if item.ProductPromotionPrice == nil || *item.ProductPromotionPrice != domain.FromFloat64(8.0) {
 		t.Error("expected promotion price to be set")
 	}
 	if !item.ProductFeatured {
