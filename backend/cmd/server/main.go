@@ -92,6 +92,9 @@ func main() {
 	tokenBlacklistRepo := repository.NewGormTokenBlacklistRepository(db)
 	passwordResetRepo := repository.NewGormPasswordResetRepository(db)
 	stockMovementRepo := repository.NewGormStockMovementRepository(db)
+	financeRepo := repository.NewGormFinanceRepository(db)
+	purchaseRepo := repository.NewGormPurchaseRepository(db)
+	reportRepo := repository.NewGormReportRepository(db)
 
 	// Platform repositories (Sprint 3.2)
 	platformUserRepo := repository.NewGormPlatformUserRepository(db)
@@ -145,6 +148,9 @@ func main() {
 	businessSvc := service.NewBusinessService(companyRepo, userRepo)
 	rbacSvc := service.NewRBACService(userRepo)
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
+	financeSvc := service.NewFinanceService(financeRepo)
+	purchaseSvc := service.NewPurchaseService(purchaseRepo, productRepo)
+	reportSvc := service.NewReportService(reportRepo)
 
 	// Initialize platform brand config (Sprint 3.6)
 	if err := platformBrandSvc.Initialize(context.Background()); err != nil {
@@ -214,6 +220,9 @@ func main() {
 	platformBrandHandler := handler.NewPlatformBrandHandler(platformBrandSvc) // Sprint 3.5
 	impersonationHandler := handler.NewImpersonationHandler(impersonationSvc)
 	forensicHandler := handler.NewForensicHandler() // Forensic investigation
+	financeHandler := handler.NewFinanceHandler(financeSvc)
+	purchaseHandler := handler.NewPurchaseHandler(purchaseSvc)
+	reportHandler := handler.NewReportHandler(reportSvc)
 
 	// --- Router ---
 	r := chi.NewRouter()
@@ -491,6 +500,24 @@ func main() {
 
 		// Stock Movements (Sprint 4)
 		stockMovementHandler.RegisterRoutes(r)
+
+		// Finance (Sprint 5B.1)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			financeHandler.RegisterRoutes(r)
+		})
+
+		// Purchase (Sprint 5B.1)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			purchaseHandler.RegisterRoutes(r)
+		})
+
+		// Reports (Sprint 5B.1)
+		r.Group(func(r chi.Router) {
+			r.Use(roleMw.RequireAny(domain.RoleOwner, domain.RoleAdmin, domain.RoleManager))
+			reportHandler.RegisterRoutes(r)
+		})
 
 		// Mídia
 		r.Group(func(r chi.Router) {
