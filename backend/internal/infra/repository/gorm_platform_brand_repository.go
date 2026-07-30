@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,22 +25,22 @@ type GormPlatformBrand struct {
 	LogoLight          string `gorm:"column:logo_light"`
 	LogoDark           string `gorm:"column:logo_dark"`
 	Icon               string
-	LoginBackground    string `gorm:"column:login_background"`
-	LoginIllustration  string `gorm:"column:login_illustration"`
-	Copyright          string `gorm:"not null"`
-	PrivacyPolicyURL   string `gorm:"column:privacy_policy_url"`
-	TermsURL           string `gorm:"column:terms_url"`
-	InstagramURL       string `gorm:"column:instagram_url"`
-	FacebookURL        string `gorm:"column:facebook_url"`
-	LinkedInURL        string `gorm:"column:linkedin_url"`
-	YoutubeURL         string `gorm:"column:youtube_url"`
-	DefaultLanguage    string `gorm:"column:default_language"`
-	DefaultTimezone    string `gorm:"column:default_timezone"`
-	MaintenanceMode    bool   `gorm:"column:maintenance_mode"`
-	MaintenanceMessage string `gorm:"column:maintenance_message"`
-	PrimaryColor       string `gorm:"not null"`
-	SecondaryColor     string `gorm:"not null"`
-	UpdatedAt          time.Time  `gorm:"autoUpdateTime"`
+	LoginBackground    string    `gorm:"column:login_background"`
+	LoginIllustration  string    `gorm:"column:login_illustration"`
+	Copyright          string    `gorm:"not null"`
+	PrivacyPolicyURL   string    `gorm:"column:privacy_policy_url"`
+	TermsURL           string    `gorm:"column:terms_url"`
+	InstagramURL       string    `gorm:"column:instagram_url"`
+	FacebookURL        string    `gorm:"column:facebook_url"`
+	LinkedInURL        string    `gorm:"column:linkedin_url"`
+	YoutubeURL         string    `gorm:"column:youtube_url"`
+	DefaultLanguage    string    `gorm:"column:default_language"`
+	DefaultTimezone    string    `gorm:"column:default_timezone"`
+	MaintenanceMode    bool      `gorm:"column:maintenance_mode"`
+	MaintenanceMessage string    `gorm:"column:maintenance_message"`
+	PrimaryColor       string    `gorm:"not null"`
+	SecondaryColor     string    `gorm:"not null"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
 	UpdatedBy          uint
 }
 
@@ -85,7 +86,7 @@ func (r *GormPlatformBrandRepository) Get(ctx context.Context) (*domain.Platform
 			// Return default brand if not found
 			return domain.DefaultPlatformBrand(), nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("PlatformBrandRepository.Get: %w", err)
 	}
 
 	brand := r.toDomain(&gormBrand)
@@ -107,7 +108,7 @@ func (r *GormPlatformBrandRepository) Update(ctx context.Context, brand *domain.
 	gormBrand.UpdatedBy = updatedBy
 	err := r.db.WithContext(ctx).Save(gormBrand).Error
 	if err != nil {
-		return err
+		return fmt.Errorf("PlatformBrandRepository.Update: %w", err)
 	}
 	// Invalidate cache after successful update
 	r.InvalidateCache()
@@ -119,13 +120,15 @@ func (r *GormPlatformBrandRepository) Initialize(ctx context.Context) error {
 	var count int64
 	err := r.db.WithContext(ctx).Table("platform_brand_config").Count(&count).Error
 	if err != nil {
-		return err
+		return fmt.Errorf("PlatformBrandRepository.Initialize: %w", err)
 	}
 
 	if count == 0 {
 		defaultBrand := r.toGorm(domain.DefaultPlatformBrand())
 		defaultBrand.ID = 1
-		return r.db.WithContext(ctx).Create(defaultBrand).Error
+		if err := r.db.WithContext(ctx).Create(defaultBrand).Error; err != nil {
+			return fmt.Errorf("PlatformBrandRepository.Initialize: %w", err)
+		}
 	}
 	return nil
 }
@@ -212,5 +215,5 @@ func (r *GormPlatformBrandRepository) InvalidateCache() {
 func (r *GormPlatformBrandRepository) ReloadCache(ctx context.Context) error {
 	r.InvalidateCache()
 	_, err := r.Get(ctx)
-	return err
+	return fmt.Errorf("PlatformBrandRepository.ReloadCache: %w", err)
 }

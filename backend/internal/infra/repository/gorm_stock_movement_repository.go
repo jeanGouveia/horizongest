@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -33,7 +34,7 @@ func (r *GormStockMovementRepository) getDB(ctx context.Context, tx *gorm.DB) *g
 // --- Movimentações ---
 
 func (r *GormStockMovementRepository) Create(ctx context.Context, movement *domain.StockMovement, tx *gorm.DB) error {
-	return r.getDB(ctx, tx).Create(movement).Error
+	return fmt.Errorf("StockMovementRepository.Create: %w", r.getDB(ctx, tx).Create(movement).Error)
 }
 
 func (r *GormStockMovementRepository) List(ctx context.Context, companyID uint, ingredientID *uint, limit, offset int) ([]domain.StockMovement, error) {
@@ -47,7 +48,7 @@ func (r *GormStockMovementRepository) List(ctx context.Context, companyID uint, 
 	query = query.Order("created_at DESC").Limit(limit).Offset(offset)
 
 	err := query.Preload("Ingredient").Preload("Performer").Find(&movements).Error
-	return movements, err
+	return movements, fmt.Errorf("StockMovementRepository.List: %w", err)
 }
 
 func (r *GormStockMovementRepository) GetByID(ctx context.Context, id uint) (*domain.StockMovement, error) {
@@ -56,18 +57,22 @@ func (r *GormStockMovementRepository) GetByID(ctx context.Context, id uint) (*do
 	err := query.Where("deleted_at IS NULL").
 		Preload("Ingredient").Preload("Performer").
 		First(&movement).Error
-	return &movement, err
+	return &movement, fmt.Errorf("StockMovementRepository.GetByID: %w", err)
 }
 
 func (r *GormStockMovementRepository) Delete(ctx context.Context, id uint) error {
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
-	return query.Delete(&domain.StockMovement{}).Error
+	return fmt.Errorf("StockMovementRepository.Delete: %w", query.Delete(&domain.StockMovement{}).Error)
 }
 
 // --- Inventários ---
 
 func (r *GormStockMovementRepository) CreateInventory(ctx context.Context, inventory *domain.StockInventory, tx *gorm.DB) error {
-	return r.getDB(ctx, tx).Create(inventory).Error
+	err := r.getDB(ctx, tx).Create(inventory).Error
+	if err != nil {
+		return fmt.Errorf("StockMovementRepository.CreateInventory: %w", err)
+	}
+	return nil
 }
 
 func (r *GormStockMovementRepository) GetInventoryByID(ctx context.Context, id uint, tx *gorm.DB) (*domain.StockInventory, error) {
@@ -76,7 +81,10 @@ func (r *GormStockMovementRepository) GetInventoryByID(ctx context.Context, id u
 	err := query.Where("deleted_at IS NULL").
 		Preload("Items.Ingredient").
 		First(&inventory).Error
-	return &inventory, err
+	if err != nil {
+		return nil, fmt.Errorf("StockMovementRepository.GetInventoryByID: %w", err)
+	}
+	return &inventory, nil
 }
 
 // Sprint 4B.5: FindInventoryByIDForUpdate busca inventário com SELECT FOR UPDATE
@@ -88,7 +96,10 @@ func (r *GormStockMovementRepository) FindInventoryByIDForUpdate(ctx context.Con
 		Where("deleted_at IS NULL").
 		Preload("Items.Ingredient").
 		First(&inventory).Error
-	return &inventory, err
+	if err != nil {
+		return nil, fmt.Errorf("StockMovementRepository.FindInventoryByIDForUpdate: %w", err)
+	}
+	return &inventory, nil
 }
 
 func (r *GormStockMovementRepository) ListInventories(ctx context.Context, companyID uint, status string, limit, offset int) ([]domain.StockInventory, error) {
@@ -102,7 +113,7 @@ func (r *GormStockMovementRepository) ListInventories(ctx context.Context, compa
 	query = query.Order("created_at DESC").Limit(limit).Offset(offset)
 
 	err := query.Find(&inventories).Error
-	return inventories, err
+	return inventories, fmt.Errorf("StockMovementRepository.ListInventories: %w", err)
 }
 
 func (r *GormStockMovementRepository) UpdateInventoryStatus(ctx context.Context, id uint, status string, tx *gorm.DB) error {
@@ -121,13 +132,17 @@ func (r *GormStockMovementRepository) UpdateInventoryStatus(ctx context.Context,
 
 func (r *GormStockMovementRepository) DeleteInventory(ctx context.Context, id uint) error {
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
-	return query.Delete(&domain.StockInventory{}).Error
+	return fmt.Errorf("StockMovementRepository.DeleteInventory: %w", query.Delete(&domain.StockInventory{}).Error)
 }
 
 // --- Itens de Inventário ---
 
 func (r *GormStockMovementRepository) CreateInventoryItem(ctx context.Context, item *domain.StockInventoryItem, tx *gorm.DB) error {
-	return r.getDB(ctx, tx).Create(item).Error
+	err := r.getDB(ctx, tx).Create(item).Error
+	if err != nil {
+		return fmt.Errorf("StockMovementRepository.CreateInventoryItem: %w", err)
+	}
+	return nil
 }
 
 func (r *GormStockMovementRepository) ListInventoryItems(ctx context.Context, inventoryID uint, tx *gorm.DB) ([]domain.StockInventoryItem, error) {
@@ -139,11 +154,11 @@ func (r *GormStockMovementRepository) ListInventoryItems(ctx context.Context, in
 	err := r.getDB(ctx, tx).Where("inventory_id = ? AND deleted_at IS NULL", inventoryID).
 		Preload("Ingredient").
 		Find(&items).Error
-	return items, err
+	return items, fmt.Errorf("StockMovementRepository.ListInventoryItems: %w", err)
 }
 
 func (r *GormStockMovementRepository) DeleteInventoryItem(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.StockInventoryItem{}).Error
+	return fmt.Errorf("StockMovementRepository.DeleteInventoryItem: %w", r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.StockInventoryItem{}).Error)
 }
 
 // --- Histórico ---
@@ -155,5 +170,5 @@ func (r *GormStockMovementRepository) GetMovementHistory(ctx context.Context, co
 		Limit(limit).
 		Preload("Performer").
 		Find(&movements).Error
-	return movements, err
+	return movements, fmt.Errorf("StockMovementRepository.GetMovementHistory: %w", err)
 }

@@ -38,13 +38,17 @@ func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 }
 
 func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) error {
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("UserRepository.Create: %w", err)
+	}
 	role := user.Role.String()
 	model := GormUserModel{
 		Name:         user.Name,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		Active:       user.Active,
-		CompanyID:    user.CompanyID,
+		CompanyID:    companyID, // Preenchido automaticamente do contexto
 		Role:         role,
 	}
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
@@ -58,7 +62,8 @@ func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) erro
 
 func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var model GormUserModel
-	err := r.db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", email).First(&model).Error
+	query := ApplyTenantFilter(ctx, r.db)
+	err := query.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", email).First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -70,7 +75,8 @@ func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*do
 
 func (r *GormUserRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
 	var model GormUserModel
-	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&model, id).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	err := query.Where("deleted_at IS NULL").First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -92,7 +98,8 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) erro
 		Role:         role,
 	}
 
-	if err := r.db.WithContext(ctx).Save(&model).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, user.ID)
+	if err := query.WithContext(ctx).Save(&model).Error; err != nil {
 		return fmt.Errorf("UserRepository.Update: %w", err)
 	}
 	user.UpdatedAt = model.UpdatedAt
@@ -100,13 +107,10 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) erro
 }
 
 func (r *GormUserRepository) List(ctx context.Context) ([]*domain.User, error) {
-	// Sprint 4A: NOTA - Este método retorna todos os usuários sem filtro de tenant
-	// NÃO é um IDOR pois é chamado apenas por user_management_service.ListUsers
-	// que filtra por companyID obtido do contexto do usuário autenticado
-	// O companyID não pode ser manipulado pelo usuário, é extraído do JWT
-	// Correção seria otimização de performance (filtro no banco), não segurança
+	// Usar ApplyTenantFilter para isolamento de tenant e performance
+	query := ApplyTenantFilter(ctx, r.db)
 	var models []GormUserModel
-	if err := r.db.WithContext(ctx).Find(&models).Error; err != nil {
+	if err := query.WithContext(ctx).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("UserRepository.List: %w", err)
 	}
 

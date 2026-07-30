@@ -67,11 +67,12 @@ func TestStockMovementRepository_DoubleCompletion(t *testing.T) {
 	}
 
 	// Criar inventário em draft
+	ctx := setupTenantContext(context.Background(), company.ID)
 	inventory := &domain.StockInventory{
 		CompanyID: company.ID,
 		Status:    "draft",
 	}
-	if err := repo.CreateInventory(context.Background(), inventory, nil); err != nil {
+	if err := repo.CreateInventory(ctx, inventory, nil); err != nil {
 		t.Fatalf("failed to create inventory: %v", err)
 	}
 
@@ -97,7 +98,7 @@ func TestStockMovementRepository_DoubleCompletion(t *testing.T) {
 		UserID:    1,
 		CompanyID: company.ID,
 	}
-	ctx := context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
+	ctx = context.WithValue(context.Background(), domain.ContextKeyTenant, tenantCtx)
 
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
@@ -198,11 +199,12 @@ func TestStockMovementRepository_AddItemDuringCompletion(t *testing.T) {
 	}
 
 	// Criar inventário em draft
+	ctx := setupTenantContext(context.Background(), company.ID)
 	inventory := &domain.StockInventory{
 		CompanyID: company.ID,
 		Status:    "draft",
 	}
-	if err := repo.CreateInventory(context.Background(), inventory, nil); err != nil {
+	if err := repo.CreateInventory(ctx, inventory, nil); err != nil {
 		t.Fatalf("failed to create inventory: %v", err)
 	}
 
@@ -331,11 +333,12 @@ func TestStockMovementRepository_DeleteDuringCompletion(t *testing.T) {
 	}
 
 	// Criar inventário em draft
+	ctx := setupTenantContext(context.Background(), company.ID)
 	inventory := &domain.StockInventory{
 		CompanyID: company.ID,
 		Status:    "draft",
 	}
-	if err := repo.CreateInventory(context.Background(), inventory, nil); err != nil {
+	if err := repo.CreateInventory(ctx, inventory, nil); err != nil {
 		t.Fatalf("failed to create inventory: %v", err)
 	}
 
@@ -427,16 +430,17 @@ func TestStockMovementRepository_FindInventoryByIDForUpdate(t *testing.T) {
 	}
 
 	// Criar inventário
+	ctx := setupTenantContext(context.Background(), company.ID)
 	inventory := &domain.StockInventory{
 		CompanyID: company.ID,
 		Status:    "draft",
 	}
-	if err := repo.CreateInventory(context.Background(), inventory, nil); err != nil {
+	if err := repo.CreateInventory(ctx, inventory, nil); err != nil {
 		t.Fatalf("failed to create inventory: %v", err)
 	}
 
 	// Testar FindInventoryByIDForUpdate
-	found, err := repo.FindInventoryByIDForUpdate(context.Background(), inventory.ID, nil)
+	found, err := repo.FindInventoryByIDForUpdate(ctx, inventory.ID, nil)
 	if err != nil {
 		t.Fatalf("FindInventoryByIDForUpdate failed: %v", err)
 	}
@@ -492,11 +496,12 @@ func TestStockMovementRepository_StressTest_100Goroutines(t *testing.T) {
 	}
 
 	// Criar inventário em draft
+	ctx := setupTenantContext(context.Background(), company.ID)
 	inventory := &domain.StockInventory{
 		CompanyID: company.ID,
 		Status:    "draft",
 	}
-	if err := repo.CreateInventory(context.Background(), inventory, nil); err != nil {
+	if err := repo.CreateInventory(ctx, inventory, nil); err != nil {
 		t.Fatalf("failed to create inventory: %v", err)
 	}
 
@@ -605,11 +610,12 @@ func TestStockMovementRepository_RollbackTest(t *testing.T) {
 	}
 
 	// Criar inventário em draft
+	ctx := setupTenantContext(context.Background(), company.ID)
 	inventory := &domain.StockInventory{
 		CompanyID: company.ID,
 		Status:    "draft",
 	}
-	if err := repo.CreateInventory(context.Background(), inventory, nil); err != nil {
+	if err := repo.CreateInventory(ctx, inventory, nil); err != nil {
 		t.Fatalf("failed to create inventory: %v", err)
 	}
 

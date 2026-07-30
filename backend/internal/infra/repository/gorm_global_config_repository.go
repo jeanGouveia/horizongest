@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,29 +12,29 @@ import (
 )
 
 type GormGlobalConfig struct {
-	ID                  uint   `gorm:"primaryKey;autoIncrement"`
-	DefaultTimezone     string `gorm:"column:default_timezone"`
-	DefaultLocale       string `gorm:"column:default_locale"`
-	MonetaryFormat      string `gorm:"column:monetary_format"`
-	DateFormat          string `gorm:"column:date_format"`
-	TimeFormat          string `gorm:"column:time_format"`
-	MaxUploadSizeMB     int64  `gorm:"column:max_upload_size_mb"`
-	MaxImageSizeMB      int64  `gorm:"column:max_image_size_mb"`
-	AllowedImageTypes   string `gorm:"column:allowed_image_types"`
-	AllowedFileTypes    string `gorm:"column:allowed_file_types"`
-	MaintenanceMode     bool   `gorm:"column:maintenance_mode"`
-	MaintenanceMessage  string `gorm:"column:maintenance_message"`
-	EnableFinance       bool   `gorm:"column:enable_finance"`
-	EnablePurchasing    bool   `gorm:"column:enable_purchasing"`
-	EnableInventory     bool   `gorm:"column:enable_inventory"`
-	EnableCRM           bool   `gorm:"column:enable_crm"`
-	EnableCalendar      bool   `gorm:"column:enable_calendar"`
-	EnablePOS           bool   `gorm:"column:enable_pos"`
-	EnableAI            bool   `gorm:"column:enable_ai"`
-	EnableDelivery      bool   `gorm:"column:enable_delivery"`
-	EnableMarketplace   bool   `gorm:"column:enable_marketplace"`
-	UpdatedAt           time.Time  `gorm:"autoUpdateTime"`
-	UpdatedBy           uint
+	ID                 uint      `gorm:"primaryKey;autoIncrement"`
+	DefaultTimezone    string    `gorm:"column:default_timezone"`
+	DefaultLocale      string    `gorm:"column:default_locale"`
+	MonetaryFormat     string    `gorm:"column:monetary_format"`
+	DateFormat         string    `gorm:"column:date_format"`
+	TimeFormat         string    `gorm:"column:time_format"`
+	MaxUploadSizeMB    int64     `gorm:"column:max_upload_size_mb"`
+	MaxImageSizeMB     int64     `gorm:"column:max_image_size_mb"`
+	AllowedImageTypes  string    `gorm:"column:allowed_image_types"`
+	AllowedFileTypes   string    `gorm:"column:allowed_file_types"`
+	MaintenanceMode    bool      `gorm:"column:maintenance_mode"`
+	MaintenanceMessage string    `gorm:"column:maintenance_message"`
+	EnableFinance      bool      `gorm:"column:enable_finance"`
+	EnablePurchasing   bool      `gorm:"column:enable_purchasing"`
+	EnableInventory    bool      `gorm:"column:enable_inventory"`
+	EnableCRM          bool      `gorm:"column:enable_crm"`
+	EnableCalendar     bool      `gorm:"column:enable_calendar"`
+	EnablePOS          bool      `gorm:"column:enable_pos"`
+	EnableAI           bool      `gorm:"column:enable_ai"`
+	EnableDelivery     bool      `gorm:"column:enable_delivery"`
+	EnableMarketplace  bool      `gorm:"column:enable_marketplace"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
+	UpdatedBy          uint
 }
 
 func (GormGlobalConfig) TableName() string {
@@ -72,7 +73,7 @@ func (r *GormGlobalConfigRepository) Get(ctx context.Context) (*domain.GlobalCon
 			// Return default config if not found
 			return domain.DefaultGlobalConfig(), nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("GlobalConfigRepository.Get: %w", err)
 	}
 
 	config := r.toDomain(&gormConfig)
@@ -94,7 +95,7 @@ func (r *GormGlobalConfigRepository) Update(ctx context.Context, config *domain.
 	gormConfig.UpdatedBy = updatedBy
 	err := r.db.WithContext(ctx).Save(gormConfig).Error
 	if err != nil {
-		return err
+		return fmt.Errorf("GlobalConfigRepository.Update: %w", err)
 	}
 	// Invalidate cache after successful update
 	r.InvalidateCache()
@@ -106,13 +107,15 @@ func (r *GormGlobalConfigRepository) Initialize(ctx context.Context) error {
 	var count int64
 	err := r.db.WithContext(ctx).Table("global_config").Count(&count).Error
 	if err != nil {
-		return err
+		return fmt.Errorf("GlobalConfigRepository.Initialize: %w", err)
 	}
 
 	if count == 0 {
 		defaultConfig := r.toGorm(domain.DefaultGlobalConfig())
 		defaultConfig.ID = 1
-		return r.db.WithContext(ctx).Create(defaultConfig).Error
+		if err := r.db.WithContext(ctx).Create(defaultConfig).Error; err != nil {
+			return fmt.Errorf("GlobalConfigRepository.Initialize: %w", err)
+		}
 	}
 	return nil
 }
@@ -183,5 +186,5 @@ func (r *GormGlobalConfigRepository) InvalidateCache() {
 func (r *GormGlobalConfigRepository) ReloadCache(ctx context.Context) error {
 	r.InvalidateCache()
 	_, err := r.Get(ctx)
-	return err
+	return fmt.Errorf("GlobalConfigRepository.ReloadCache: %w", err)
 }

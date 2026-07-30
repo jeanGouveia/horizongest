@@ -26,7 +26,7 @@ func setupUserTestDB(t *testing.T) *gorm.DB {
 	}
 
 	// Auto-migrate the schema
-	err = db.AutoMigrate(&GormUserModel{})
+	err = db.AutoMigrate(&GormUserModel{}, &GormCompanyModel{})
 	if err != nil {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
@@ -36,7 +36,7 @@ func setupUserTestDB(t *testing.T) *gorm.DB {
 	db.Exec("CREATE SCHEMA public")
 	db.Exec("GRANT ALL ON SCHEMA public TO prato")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
-	db.AutoMigrate(&GormUserModel{})
+	db.AutoMigrate(&GormUserModel{}, &GormCompanyModel{})
 
 	return db
 }
@@ -45,16 +45,32 @@ func TestUserRepository_Create(t *testing.T) {
 	db := setupUserTestDB(t)
 	repo := NewGormUserRepository(db)
 
+	// Create company first
+	companyRepo := NewGormCompanyRepository(db)
+	company := &domain.Company{
+		Name:         "Test Company",
+		Slug:         "test-company",
+		BusinessType: domain.BusinessTypeRestaurant,
+		Locale:       "pt-BR",
+		Currency:     "BRL",
+		Timezone:     "America/Sao_Paulo",
+	}
+	ctx := setupTenantContext(context.Background(), 100)
+	err := companyRepo.Create(ctx, company)
+	if err != nil {
+		t.Fatalf("CreateCompany failed: %v", err)
+	}
+
 	user := &domain.User{
 		Name:         "Test User",
 		Email:        "test@example.com",
 		PasswordHash: "hashedpassword",
 		Active:       true,
-		CompanyID:    100,
+		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
 
-	err := repo.Create(context.Background(), user)
+	err = repo.Create(ctx, user)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -76,12 +92,13 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 		CompanyID:    100,
 		Role:         domain.RoleOwner,
 	}
-	err := repo.Create(context.Background(), user)
+	ctx := setupTenantContext(context.Background(), 100)
+	err := repo.Create(ctx, user)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	found, err := repo.FindByEmail(context.Background(), "test@example.com")
+	found, err := repo.FindByEmail(ctx, "test@example.com")
 	if err != nil {
 		t.Fatalf("FindByEmail failed: %v", err)
 	}
@@ -118,12 +135,13 @@ func TestUserRepository_FindByID(t *testing.T) {
 		CompanyID:    100,
 		Role:         domain.RoleOwner,
 	}
-	err := repo.Create(context.Background(), user)
+	ctx := setupTenantContext(context.Background(), 100)
+	err := repo.Create(ctx, user)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	found, err := repo.FindByID(context.Background(), user.ID)
+	found, err := repo.FindByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("FindByID failed: %v", err)
 	}
@@ -160,19 +178,20 @@ func TestUserRepository_Update(t *testing.T) {
 		CompanyID:    100,
 		Role:         domain.RoleOwner,
 	}
-	err := repo.Create(context.Background(), user)
+	ctx := setupTenantContext(context.Background(), 100)
+	err := repo.Create(ctx, user)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	user.Name = "Updated Name"
 	user.Active = false
-	err = repo.Update(context.Background(), user)
+	err = repo.Update(ctx, user)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	updated, err := repo.FindByID(context.Background(), user.ID)
+	updated, err := repo.FindByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("FindByID failed: %v", err)
 	}
@@ -188,6 +207,7 @@ func TestUserRepository_List(t *testing.T) {
 	db := setupUserTestDB(t)
 	repo := NewGormUserRepository(db)
 
+	ctx := setupTenantContext(context.Background(), 100)
 	for i := 1; i <= 3; i++ {
 		user := &domain.User{
 			Name:         "Test User",
@@ -197,13 +217,13 @@ func TestUserRepository_List(t *testing.T) {
 			CompanyID:    100,
 			Role:         domain.RoleOwner,
 		}
-		err := repo.Create(context.Background(), user)
+		err := repo.Create(ctx, user)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	users, err := repo.List(context.Background())
+	users, err := repo.List(ctx)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -216,6 +236,7 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 	db := setupUserTestDB(t)
 	repo := NewGormUserRepository(db)
 
+	ctx := setupTenantContext(context.Background(), 100)
 	user1 := &domain.User{
 		Name:         "Test User 1",
 		Email:        "test@example.com",
@@ -224,7 +245,7 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 		CompanyID:    100,
 		Role:         domain.RoleOwner,
 	}
-	err := repo.Create(context.Background(), user1)
+	err := repo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -237,7 +258,7 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 		CompanyID:    100,
 		Role:         domain.RoleAdmin,
 	}
-	err = repo.Create(context.Background(), user2)
+	err = repo.Create(ctx, user2)
 	if err == nil {
 		t.Error("expected error when creating user with duplicate email")
 	}
@@ -255,12 +276,13 @@ func TestUserRepository_RoleParsing(t *testing.T) {
 		CompanyID:    100,
 		Role:         domain.RoleManager,
 	}
-	err := repo.Create(context.Background(), user)
+	ctx := setupTenantContext(context.Background(), 100)
+	err := repo.Create(ctx, user)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	found, err := repo.FindByID(context.Background(), user.ID)
+	found, err := repo.FindByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("FindByID failed: %v", err)
 	}

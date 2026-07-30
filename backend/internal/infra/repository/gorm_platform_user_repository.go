@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -37,7 +38,7 @@ func NewGormPlatformUserRepository(db *gorm.DB) *GormPlatformUserRepository {
 func (r *GormPlatformUserRepository) Create(ctx context.Context, user *domain.PlatformUser) error {
 	gormUser := r.toGorm(user)
 	if err := r.db.WithContext(ctx).Create(gormUser).Error; err != nil {
-		return err
+		return fmt.Errorf("PlatformUserRepository.Create: %w", err)
 	}
 	user.ID = gormUser.ID
 	return nil
@@ -50,7 +51,7 @@ func (r *GormPlatformUserRepository) FindByEmail(ctx context.Context, email stri
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("PlatformUserRepository.FindByEmail: %w", err)
 	}
 	return r.toDomain(&gormUser), nil
 }
@@ -62,14 +63,14 @@ func (r *GormPlatformUserRepository) FindByID(ctx context.Context, id uint) (*do
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("PlatformUserRepository.FindByID: %w", err)
 	}
 	return r.toDomain(&gormUser), nil
 }
 
 func (r *GormPlatformUserRepository) Update(ctx context.Context, user *domain.PlatformUser) error {
 	gormUser := r.toGorm(user)
-	return r.db.WithContext(ctx).Save(gormUser).Error
+	return fmt.Errorf("PlatformUserRepository.Update: %w", r.db.WithContext(ctx).Save(gormUser).Error)
 }
 
 func (r *GormPlatformUserRepository) toGorm(user *domain.PlatformUser) *GormPlatformUser {
@@ -113,7 +114,7 @@ func (r *GormPlatformUserRepository) CreateInitialAdmin(ctx context.Context, ema
 	// Check if admin already exists
 	existing, err := r.FindByEmail(ctx, email)
 	if err != nil {
-		return err
+		return fmt.Errorf("PlatformUserRepository.CreateInitialAdmin: %w", err)
 	}
 	if existing != nil {
 		return nil // Already exists
@@ -122,7 +123,7 @@ func (r *GormPlatformUserRepository) CreateInitialAdmin(ctx context.Context, ema
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return fmt.Errorf("PlatformUserRepository.CreateInitialAdmin: %w", err)
 	}
 
 	// Create admin

@@ -245,7 +245,7 @@ func TestProductRepository_UpdateProduct(t *testing.T) {
 		t.Errorf("expected 'Updated Name', got '%s'", updated.Name)
 	}
 	if updated.Price != 20.0 {
-		t.Errorf("expected price 20.0, got %f", updated.Price)
+		t.Errorf("expected price 20.0, got %v", updated.Price)
 	}
 }
 

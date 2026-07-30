@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -55,6 +56,11 @@ func (GormTransaction) TableName() string { return "transactions" }
 // --- Categorias ---
 
 func (r *GormFinanceRepository) CreateTransactionCategory(ctx context.Context, category *domain.TransactionCategory) error {
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateTransactionCategory: %w", err)
+	}
+	category.CompanyID = companyID
 	return r.db.WithContext(ctx).Create(category).Error
 }
 
@@ -69,18 +75,19 @@ func (r *GormFinanceRepository) ListTransactionCategories(ctx context.Context, c
 	query = query.Order("name ASC").Limit(limit).Offset(offset)
 
 	err := query.Find(&categories).Error
-	return categories, err
+	return categories, fmt.Errorf("ListTransactionCategories: %w", err)
 }
 
 func (r *GormFinanceRepository) GetTransactionCategoryByID(ctx context.Context, id uint) (*domain.TransactionCategory, error) {
 	var category domain.TransactionCategory
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	err := query.Where("deleted_at IS NULL").First(&category).Error
-	return &category, err
+	return &category, fmt.Errorf("GetTransactionCategoryByID: %w", err)
 }
 
 func (r *GormFinanceRepository) UpdateTransactionCategory(ctx context.Context, category *domain.TransactionCategory) error {
-	return r.db.WithContext(ctx).Save(category).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, category.ID)
+	return query.WithContext(ctx).Save(category).Error
 }
 
 func (r *GormFinanceRepository) DeleteTransactionCategory(ctx context.Context, id uint) error {
@@ -91,6 +98,11 @@ func (r *GormFinanceRepository) DeleteTransactionCategory(ctx context.Context, i
 // --- Transações ---
 
 func (r *GormFinanceRepository) CreateTransaction(ctx context.Context, transaction *domain.Transaction) error {
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateTransaction: %w", err)
+	}
+	transaction.CompanyID = companyID
 	return r.db.WithContext(ctx).Create(transaction).Error
 }
 
@@ -113,7 +125,7 @@ func (r *GormFinanceRepository) ListTransactions(ctx context.Context, companyID 
 	query = query.Order("date DESC").Limit(limit).Offset(offset)
 
 	err := query.Preload("Category").Find(&transactions).Error
-	return transactions, err
+	return transactions, fmt.Errorf("ListTransactions: %w", err)
 }
 
 func (r *GormFinanceRepository) GetTransactionByID(ctx context.Context, id uint) (*domain.Transaction, error) {
@@ -122,11 +134,12 @@ func (r *GormFinanceRepository) GetTransactionByID(ctx context.Context, id uint)
 	err := query.Where("deleted_at IS NULL").
 		Preload("Category").
 		First(&transaction).Error
-	return &transaction, err
+	return &transaction, fmt.Errorf("GetTransactionByID: %w", err)
 }
 
 func (r *GormFinanceRepository) UpdateTransaction(ctx context.Context, transaction *domain.Transaction) error {
-	return r.db.WithContext(ctx).Save(transaction).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, transaction.ID)
+	return query.WithContext(ctx).Save(transaction).Error
 }
 
 func (r *GormFinanceRepository) DeleteTransaction(ctx context.Context, id uint) error {

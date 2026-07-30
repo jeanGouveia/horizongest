@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -10,15 +11,15 @@ import (
 )
 
 type GormPlatformAudit struct {
-	ID            uint   `gorm:"primaryKey;autoIncrement"`
-	PlatformUserID *uint `gorm:"index"`
-	Action        string `gorm:"not null;index"`
-	EntityType    string `gorm:"not null;index"`
-	EntityID      *uint  `gorm:"index"`
-	Changes       string `gorm:"type:text"`
-	IPAddress     string
-	UserAgent     string
-	CreatedAt     time.Time  `gorm:"autoCreateTime;index"`
+	ID             uint   `gorm:"primaryKey;autoIncrement"`
+	PlatformUserID *uint  `gorm:"index"`
+	Action         string `gorm:"not null;index"`
+	EntityType     string `gorm:"not null;index"`
+	EntityID       *uint  `gorm:"index"`
+	Changes        string `gorm:"type:text"`
+	IPAddress      string
+	UserAgent      string
+	CreatedAt      time.Time `gorm:"autoCreateTime;index"`
 }
 
 func (GormPlatformAudit) TableName() string {
@@ -36,7 +37,7 @@ func NewGormPlatformAuditRepository(db *gorm.DB) *GormPlatformAuditRepository {
 func (r *GormPlatformAuditRepository) Create(ctx context.Context, audit *domain.PlatformAudit) error {
 	gormAudit := r.toGorm(audit)
 	if err := r.db.WithContext(ctx).Create(gormAudit).Error; err != nil {
-		return err
+		return fmt.Errorf("PlatformAuditRepository.Create: %w", err)
 	}
 	audit.ID = gormAudit.ID
 	return nil
@@ -50,9 +51,9 @@ func (r *GormPlatformAuditRepository) ListByPlatformUserID(ctx context.Context, 
 		Limit(limit).
 		Find(&gormAudits).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("PlatformAuditRepository.ListByPlatformUserID: %w", err)
 	}
-	
+
 	result := make([]*domain.PlatformAudit, len(gormAudits))
 	for i := range gormAudits {
 		result[i] = r.toDomain(&gormAudits[i])
@@ -68,9 +69,9 @@ func (r *GormPlatformAuditRepository) ListByEntity(ctx context.Context, entityTy
 		Limit(limit).
 		Find(&gormAudits).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("PlatformAuditRepository.ListByEntity: %w", err)
 	}
-	
+
 	result := make([]*domain.PlatformAudit, len(gormAudits))
 	for i := range gormAudits {
 		result[i] = r.toDomain(&gormAudits[i])
@@ -85,9 +86,9 @@ func (r *GormPlatformAuditRepository) ListRecent(ctx context.Context, limit int)
 		Limit(limit).
 		Find(&gormAudits).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("PlatformAuditRepository.ListRecent: %w", err)
 	}
-	
+
 	result := make([]*domain.PlatformAudit, len(gormAudits))
 	for i := range gormAudits {
 		result[i] = r.toDomain(&gormAudits[i])
@@ -97,28 +98,28 @@ func (r *GormPlatformAuditRepository) ListRecent(ctx context.Context, limit int)
 
 func (r *GormPlatformAuditRepository) toGorm(audit *domain.PlatformAudit) *GormPlatformAudit {
 	return &GormPlatformAudit{
-		ID:            audit.ID,
+		ID:             audit.ID,
 		PlatformUserID: audit.PlatformUserID,
-		Action:        audit.Action,
-		EntityType:    audit.EntityType,
-		EntityID:      audit.EntityID,
-		Changes:       audit.Changes,
-		IPAddress:     audit.IPAddress,
-		UserAgent:     audit.UserAgent,
-		CreatedAt:     audit.CreatedAt,
+		Action:         audit.Action,
+		EntityType:     audit.EntityType,
+		EntityID:       audit.EntityID,
+		Changes:        audit.Changes,
+		IPAddress:      audit.IPAddress,
+		UserAgent:      audit.UserAgent,
+		CreatedAt:      audit.CreatedAt,
 	}
 }
 
 func (r *GormPlatformAuditRepository) toDomain(gormAudit *GormPlatformAudit) *domain.PlatformAudit {
 	return &domain.PlatformAudit{
-		ID:            gormAudit.ID,
+		ID:             gormAudit.ID,
 		PlatformUserID: gormAudit.PlatformUserID,
-		Action:        gormAudit.Action,
-		EntityType:    gormAudit.EntityType,
-		EntityID:      gormAudit.EntityID,
-		Changes:       gormAudit.Changes,
-		IPAddress:     gormAudit.IPAddress,
-		UserAgent:     gormAudit.UserAgent,
-		CreatedAt:     gormAudit.CreatedAt,
+		Action:         gormAudit.Action,
+		EntityType:     gormAudit.EntityType,
+		EntityID:       gormAudit.EntityID,
+		Changes:        gormAudit.Changes,
+		IPAddress:      gormAudit.IPAddress,
+		UserAgent:      gormAudit.UserAgent,
+		CreatedAt:      gormAudit.CreatedAt,
 	}
 }

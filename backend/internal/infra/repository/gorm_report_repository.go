@@ -27,17 +27,20 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 		EndDate:   endDate,
 	}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	// Total de pedidos
 	var totalOrders int64
-	r.db.WithContext(ctx).Model(&GormOrder{}).
-		Where("company_id = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+	query.WithContext(ctx).Model(&GormOrder{}).
+		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Count(&totalOrders)
 	report.TotalOrders = int(totalOrders)
 
 	// Receita total
 	var totalRevenue float64
-	r.db.WithContext(ctx).Model(&GormOrder{}).
-		Where("company_id = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+	query.WithContext(ctx).Model(&GormOrder{}).
+		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&totalRevenue)
 	report.TotalRevenue = totalRevenue
@@ -49,17 +52,17 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 
 	// Produtos vendidos
 	var productsSold int64
-	r.db.WithContext(ctx).Model(&GormOrderItem{}).
+	query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("orders.company_id = ? AND DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
 		Scan(&productsSold)
 	report.ProductsSold = int(productsSold)
 
 	// Pedidos cancelados
 	var cancelledOrders int64
-	r.db.WithContext(ctx).Model(&GormOrder{}).
-		Where("company_id = ? AND status = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", companyID, "cancelled", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+	query.WithContext(ctx).Model(&GormOrder{}).
+		Where("status = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", "cancelled", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Count(&cancelledOrders)
 	report.CancelledOrders = int(cancelledOrders)
 
@@ -71,11 +74,11 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 		Total    int64  `gorm:"column:total"`
 	}
 	var topProducts []ProductResult
-	r.db.WithContext(ctx).Model(&GormOrderItem{}).
+	query.WithContext(ctx).Model(&GormOrderItem{}).
 		Select("products.id, products.name, SUM(order_items.quantity) as quantity, SUM(order_items.quantity * order_items.unit_price) as total").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("orders.company_id = ? AND DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL", companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Group("products.id, products.name").
 		Order("quantity DESC").
 		Limit(10).
@@ -101,17 +104,20 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 func (r *GormReportRepository) GetProductsReport(ctx context.Context, companyID uint) (*domain.ProductsReport, error) {
 	report := &domain.ProductsReport{}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	// Total de produtos
 	var totalProducts int64
-	r.db.WithContext(ctx).Model(&GormProduct{}).
-		Where("company_id = ? AND deleted_at IS NULL", companyID).
+	query.WithContext(ctx).Model(&GormProduct{}).
+		Where("deleted_at IS NULL").
 		Count(&totalProducts)
 	report.TotalProducts = int(totalProducts)
 
 	// Produtos ativos
 	var activeProducts int64
-	r.db.WithContext(ctx).Model(&GormProduct{}).
-		Where("company_id = ? AND active = ? AND deleted_at IS NULL", companyID, true).
+	query.WithContext(ctx).Model(&GormProduct{}).
+		Where("active = ? AND deleted_at IS NULL", true).
 		Count(&activeProducts)
 	report.ActiveProducts = int(activeProducts)
 
@@ -132,10 +138,13 @@ func (r *GormReportRepository) GetCMVReport(ctx context.Context, companyID uint,
 		EndDate:   endDate,
 	}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	// Receita total (reutilizando lógica de vendas)
 	var totalRevenue float64
-	r.db.WithContext(ctx).Model(&GormOrder{}).
-		Where("company_id = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+	query.WithContext(ctx).Model(&GormOrder{}).
+		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&totalRevenue)
 	report.TotalRevenue = totalRevenue
@@ -163,18 +172,21 @@ func (r *GormReportRepository) GetProfitReport(ctx context.Context, companyID ui
 		EndDate:   endDate,
 	}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	// Receita total
 	var totalRevenue float64
-	r.db.WithContext(ctx).Model(&GormOrder{}).
-		Where("company_id = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+	query.WithContext(ctx).Model(&GormOrder{}).
+		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&totalRevenue)
 	report.TotalRevenue = totalRevenue
 
 	// Despesa total (do módulo financeiro)
 	var totalExpense float64
-	r.db.WithContext(ctx).Model(&GormTransaction{}).
-		Where("company_id = ? AND type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", companyID, startDate, endDate).
+	query.WithContext(ctx).Model(&GormTransaction{}).
+		Where("type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&totalExpense)
 	report.TotalExpense = totalExpense
@@ -197,24 +209,27 @@ func (r *GormReportRepository) GetProfitReport(ctx context.Context, companyID ui
 func (r *GormReportRepository) GetStockReport(ctx context.Context, companyID uint) (*domain.StockReport, error) {
 	report := &domain.StockReport{}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	// Total de ingredientes
 	var totalIngredients int64
-	r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("company_id = ? AND deleted_at IS NULL", companyID).
+	query.WithContext(ctx).Model(&GormIngredient{}).
+		Where("deleted_at IS NULL").
 		Count(&totalIngredients)
 	report.TotalIngredients = int(totalIngredients)
 
 	// Estoque baixo
 	var lowStockCount int64
-	r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("company_id = ? AND stock_quantity < min_stock AND stock_quantity > 0 AND deleted_at IS NULL", companyID).
+	query.WithContext(ctx).Model(&GormIngredient{}).
+		Where("stock_quantity < min_stock AND stock_quantity > 0 AND deleted_at IS NULL").
 		Count(&lowStockCount)
 	report.LowStockCount = int(lowStockCount)
 
 	// Estoque zerado
 	var zeroStockCount int64
-	r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("company_id = ? AND stock_quantity = 0 AND deleted_at IS NULL", companyID).
+	query.WithContext(ctx).Model(&GormIngredient{}).
+		Where("stock_quantity = 0 AND deleted_at IS NULL").
 		Count(&zeroStockCount)
 	report.ZeroStockCount = int(zeroStockCount)
 
@@ -230,8 +245,8 @@ func (r *GormReportRepository) GetStockReport(ctx context.Context, companyID uin
 		Unit          string  `gorm:"column:unit"`
 	}
 	var lowStockItems []IngredientResult
-	r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("company_id = ? AND stock_quantity < min_stock AND stock_quantity > 0 AND deleted_at IS NULL", companyID).
+	query.WithContext(ctx).Model(&GormIngredient{}).
+		Where("stock_quantity < min_stock AND stock_quantity > 0 AND deleted_at IS NULL").
 		Order("stock_quantity ASC").
 		Limit(10).
 		Find(&lowStockItems)
@@ -249,8 +264,8 @@ func (r *GormReportRepository) GetStockReport(ctx context.Context, companyID uin
 
 	// Itens com estoque zerado
 	var zeroStockItems []IngredientResult
-	r.db.WithContext(ctx).Model(&GormIngredient{}).
-		Where("company_id = ? AND stock_quantity = 0 AND deleted_at IS NULL", companyID).
+	query.WithContext(ctx).Model(&GormIngredient{}).
+		Where("stock_quantity = 0 AND deleted_at IS NULL").
 		Order("name ASC").
 		Limit(10).
 		Find(&zeroStockItems)
@@ -279,6 +294,9 @@ func (r *GormReportRepository) GetPurchasesReport(ctx context.Context, companyID
 		EndDate:   endDate,
 	}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	_ = ApplyTenantFilter(ctx, r.db)
+
 	// Total de pedidos (placeholder - tabela de compras não integrada ainda)
 	report.TotalOrders = 0
 	report.TotalAmount = 0
@@ -297,18 +315,21 @@ func (r *GormReportRepository) GetFinancialReport(ctx context.Context, companyID
 		EndDate:   endDate,
 	}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	// Receita total
 	var totalIncome float64
-	r.db.WithContext(ctx).Model(&GormTransaction{}).
-		Where("company_id = ? AND type = 'income' AND date >= ? AND date <= ? AND deleted_at IS NULL", companyID, startDate, endDate).
+	query.WithContext(ctx).Model(&GormTransaction{}).
+		Where("type = 'income' AND date >= ? AND date <= ? AND deleted_at IS NULL", startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&totalIncome)
 	report.TotalIncome = totalIncome
 
 	// Despesa total
 	var totalExpense float64
-	r.db.WithContext(ctx).Model(&GormTransaction{}).
-		Where("company_id = ? AND type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", companyID, startDate, endDate).
+	query.WithContext(ctx).Model(&GormTransaction{}).
+		Where("type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&totalExpense)
 	report.TotalExpense = totalExpense
@@ -332,13 +353,16 @@ func (r *GormReportRepository) getSalesByDayForReport(ctx context.Context, compa
 		Total int64  `gorm:"column:total"`
 	}
 
+	// companyID parâmetro é ignorado - usamos ApplyTenantFilter do contexto
+	query := ApplyTenantFilter(ctx, r.db)
+
 	var results []DayResult
 	currentDate := startDate
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
 		dateStr := currentDate.Format("2006-01-02")
 		var total int64
-		r.db.WithContext(ctx).Model(&GormOrder{}).
-			Where("company_id = ? AND DATE(FROM_UNIXTIME(created_at)) = ? AND deleted_at IS NULL", companyID, dateStr).
+		query.WithContext(ctx).Model(&GormOrder{}).
+			Where("DATE(FROM_UNIXTIME(created_at)) = ? AND deleted_at IS NULL", dateStr).
 			Select("COALESCE(SUM(total_price), 0)").
 			Scan(&total)
 		results = append(results, DayResult{Date: dateStr, Total: total})

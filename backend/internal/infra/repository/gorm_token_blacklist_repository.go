@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -33,7 +34,7 @@ func (r *GormTokenBlacklistRepository) Add(ctx context.Context, entry *domain.To
 		ExpiresAt: entry.ExpiresAt,
 	}
 	if err := r.db.WithContext(ctx).Create(&gormEntry).Error; err != nil {
-		return errors.New("TokenBlacklistRepository.Add: falha ao adicionar token à blacklist")
+		return fmt.Errorf("TokenBlacklistRepository.Add: %w", err)
 	}
 	return nil
 }
@@ -45,7 +46,7 @@ func (r *GormTokenBlacklistRepository) IsBlacklisted(ctx context.Context, token 
 		return false, nil
 	}
 	if err != nil {
-		return false, errors.New("TokenBlacklistRepository.IsBlacklisted: falha ao consultar blacklist")
+		return false, fmt.Errorf("TokenBlacklistRepository.IsBlacklisted: %w", err)
 	}
 
 	// Se o token expirou, não está mais na blacklist efetivamente
@@ -59,7 +60,7 @@ func (r *GormTokenBlacklistRepository) IsBlacklisted(ctx context.Context, token 
 func (r *GormTokenBlacklistRepository) CleanExpired(ctx context.Context) error {
 	result := r.db.WithContext(ctx).Where("expires_at < ?", time.Now()).Delete(&GormTokenBlacklist{})
 	if result.Error != nil {
-		return errors.New("TokenBlacklistRepository.CleanExpired: falha ao limpar tokens expirados")
+		return fmt.Errorf("TokenBlacklistRepository.CleanExpired: %w", result.Error)
 	}
 	return nil
 }

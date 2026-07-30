@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"gorm.io/gorm"
 
@@ -22,6 +23,11 @@ func NewGormPurchaseRepository(db *gorm.DB) *GormPurchaseRepository {
 // --- Fornecedores ---
 
 func (r *GormPurchaseRepository) CreateSupplier(ctx context.Context, supplier *domain.Supplier) error {
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateSupplier: %w", err)
+	}
+	supplier.CompanyID = companyID
 	return r.db.WithContext(ctx).Create(supplier).Error
 }
 
@@ -36,18 +42,19 @@ func (r *GormPurchaseRepository) ListSuppliers(ctx context.Context, companyID ui
 	query = query.Order("name ASC").Limit(limit).Offset(offset)
 
 	err := query.Find(&suppliers).Error
-	return suppliers, err
+	return suppliers, fmt.Errorf("ListSuppliers: %w", err)
 }
 
 func (r *GormPurchaseRepository) GetSupplierByID(ctx context.Context, id uint) (*domain.Supplier, error) {
 	var supplier domain.Supplier
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	err := query.Where("deleted_at IS NULL").First(&supplier).Error
-	return &supplier, err
+	return &supplier, fmt.Errorf("GetSupplierByID: %w", err)
 }
 
 func (r *GormPurchaseRepository) UpdateSupplier(ctx context.Context, supplier *domain.Supplier) error {
-	return r.db.WithContext(ctx).Save(supplier).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, supplier.ID)
+	return query.WithContext(ctx).Save(supplier).Error
 }
 
 func (r *GormPurchaseRepository) DeleteSupplier(ctx context.Context, id uint) error {
@@ -58,6 +65,11 @@ func (r *GormPurchaseRepository) DeleteSupplier(ctx context.Context, id uint) er
 // --- Pedidos de Compra ---
 
 func (r *GormPurchaseRepository) CreatePurchaseOrder(ctx context.Context, order *domain.PurchaseOrder) error {
+	companyID, err := GetCompanyIDFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("CreatePurchaseOrder: %w", err)
+	}
+	order.CompanyID = companyID
 	return r.db.WithContext(ctx).Create(order).Error
 }
 
@@ -72,7 +84,7 @@ func (r *GormPurchaseRepository) ListPurchaseOrders(ctx context.Context, company
 	query = query.Order("created_at DESC").Limit(limit).Offset(offset)
 
 	err := query.Preload("Supplier").Preload("Items.Ingredient").Find(&orders).Error
-	return orders, err
+	return orders, fmt.Errorf("ListPurchaseOrders: %w", err)
 }
 
 func (r *GormPurchaseRepository) GetPurchaseOrderByID(ctx context.Context, id uint) (*domain.PurchaseOrder, error) {
@@ -82,16 +94,17 @@ func (r *GormPurchaseRepository) GetPurchaseOrderByID(ctx context.Context, id ui
 		Preload("Supplier").
 		Preload("Items.Ingredient").
 		First(&order).Error
-	return &order, err
+	return &order, fmt.Errorf("GetPurchaseOrderByID: %w", err)
 }
 
 func (r *GormPurchaseRepository) UpdatePurchaseOrder(ctx context.Context, order *domain.PurchaseOrder) error {
-	return r.db.WithContext(ctx).Save(order).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, order.ID)
+	return query.WithContext(ctx).Save(order).Error
 }
 
 func (r *GormPurchaseRepository) UpdatePurchaseOrderStatus(ctx context.Context, id uint, status domain.PurchaseOrderStatus) error {
-	return r.db.WithContext(ctx).Model(&domain.PurchaseOrder{}).
-		Where("id = ?", id).
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.WithContext(ctx).Model(&domain.PurchaseOrder{}).
 		Update("status", status).Error
 }
 
@@ -108,23 +121,29 @@ func (r *GormPurchaseRepository) CreatePurchaseOrderItem(ctx context.Context, it
 
 func (r *GormPurchaseRepository) ListPurchaseOrderItems(ctx context.Context, purchaseOrderID uint) ([]domain.PurchaseOrderItem, error) {
 	var items []domain.PurchaseOrderItem
-	err := r.db.WithContext(ctx).Where("purchase_order_id = ? AND deleted_at IS NULL", purchaseOrderID).
+	query := ApplyTenantFilter(ctx, r.db)
+	err := query.WithContext(ctx).
+		Where("purchase_order_id = ? AND deleted_at IS NULL", purchaseOrderID).
 		Preload("Ingredient").
 		Find(&items).Error
 	return items, err
 }
 
 func (r *GormPurchaseRepository) UpdatePurchaseOrderItem(ctx context.Context, item *domain.PurchaseOrderItem) error {
-	return r.db.WithContext(ctx).Save(item).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, item.ID)
+	return query.WithContext(ctx).Save(item).Error
 }
 
 func (r *GormPurchaseRepository) DeletePurchaseOrderItem(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.PurchaseOrderItem{}).Error
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	return query.WithContext(ctx).Delete(&domain.PurchaseOrderItem{}).Error
 }
 
 // --- Recebimentos ---
 
 func (r *GormPurchaseRepository) CreatePurchaseReceiving(ctx context.Context, receiving *domain.PurchaseReceiving) error {
+	// PurchaseReceiving não tem CompanyID direto - o tenant é herdado através de PurchaseOrder
+	// A validação de tenant deve ser feita no service layer verificando o PurchaseOrderID
 	return r.db.WithContext(ctx).Create(receiving).Error
 }
 
@@ -134,15 +153,17 @@ func (r *GormPurchaseRepository) GetPurchaseReceivingByID(ctx context.Context, i
 	err := query.Where("deleted_at IS NULL").
 		Preload("Items.Ingredient").
 		First(&receiving).Error
-	return &receiving, err
+	return &receiving, fmt.Errorf("GetPurchaseReceivingByID: %w", err)
 }
 
 func (r *GormPurchaseRepository) ListPurchaseReceivings(ctx context.Context, purchaseOrderID uint) ([]domain.PurchaseReceiving, error) {
 	var receivings []domain.PurchaseReceiving
-	err := r.db.WithContext(ctx).Where("purchase_order_id = ? AND deleted_at IS NULL", purchaseOrderID).
+	query := ApplyTenantFilter(ctx, r.db)
+	err := query.WithContext(ctx).
+		Where("purchase_order_id = ? AND deleted_at IS NULL", purchaseOrderID).
 		Preload("Items.Ingredient").
 		Find(&receivings).Error
-	return receivings, err
+	return receivings, fmt.Errorf("ListPurchaseReceivings: %w", err)
 }
 
 func (r *GormPurchaseRepository) DeletePurchaseReceiving(ctx context.Context, id uint) error {
