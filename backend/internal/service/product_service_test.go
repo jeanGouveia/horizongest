@@ -152,7 +152,7 @@ func (m *MockProductRepository) IncreaseIngredientStock(ctx context.Context, ing
 
 func TestProductService_CreateProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	input := CreateProductInput{
 		Name:  "Test Product",
@@ -179,7 +179,7 @@ func TestProductService_CreateProduct(t *testing.T) {
 
 func TestProductService_CreateProduct_WithSlug(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	input := CreateProductInput{
 		Name:  "Test Product",
@@ -198,7 +198,7 @@ func TestProductService_CreateProduct_WithSlug(t *testing.T) {
 
 func TestProductService_ListProducts(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	// Create some products
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Product 1", Active: true}
@@ -215,7 +215,7 @@ func TestProductService_ListProducts(t *testing.T) {
 
 func TestProductService_ListActiveProducts(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	// Create active and inactive products
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Active Product", Active: true}
@@ -235,7 +235,7 @@ func TestProductService_ListActiveProducts(t *testing.T) {
 
 func TestProductService_GetProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Test Product", Active: true}
 
@@ -250,7 +250,7 @@ func TestProductService_GetProduct(t *testing.T) {
 
 func TestProductService_GetProduct_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	_, err := svc.GetProduct(context.Background(), 999)
 	if err == nil {
@@ -263,7 +263,7 @@ func TestProductService_GetProduct_NotFound(t *testing.T) {
 
 func TestProductService_DeleteProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Test Product", Active: true}
 
@@ -279,7 +279,7 @@ func TestProductService_DeleteProduct(t *testing.T) {
 
 func TestProductService_DeleteProduct_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	err := svc.DeleteProduct(context.Background(), 999)
 	if err == nil {
@@ -292,7 +292,7 @@ func TestProductService_DeleteProduct_NotFound(t *testing.T) {
 
 func TestProductService_UpdateProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Old Name", Price: domain.FromFloat64(9.99), Active: true}
 
@@ -315,7 +315,7 @@ func TestProductService_UpdateProduct(t *testing.T) {
 
 func TestProductService_UpdateProduct_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	input := UpdateProductInput{
 		Name:  "New Name",
@@ -333,7 +333,7 @@ func TestProductService_UpdateProduct_NotFound(t *testing.T) {
 
 func TestProductService_CreateIngredient(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	input := CreateIngredientInput{
 		Name:          "Flour",
@@ -356,7 +356,7 @@ func TestProductService_CreateIngredient(t *testing.T) {
 
 func TestProductService_ListIngredients(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.ingredients[1] = &domain.Ingredient{ID: 1, Name: "Flour", Unit: "kg"}
 	mockRepo.ingredients[2] = &domain.Ingredient{ID: 2, Name: "Sugar", Unit: "kg"}
@@ -372,7 +372,7 @@ func TestProductService_ListIngredients(t *testing.T) {
 
 func TestProductService_GetIngredient(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.ingredients[1] = &domain.Ingredient{ID: 1, Name: "Flour", Unit: "kg"}
 
@@ -387,7 +387,7 @@ func TestProductService_GetIngredient(t *testing.T) {
 
 func TestProductService_GetIngredient_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	_, err := svc.GetIngredient(context.Background(), 999)
 	if err == nil {
@@ -400,7 +400,7 @@ func TestProductService_GetIngredient_NotFound(t *testing.T) {
 
 func TestProductService_UpdateIngredientStock(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.ingredients[1] = &domain.Ingredient{ID: 1, Name: "Flour", Unit: "kg", StockQuantity: 50.0}
 
@@ -419,7 +419,7 @@ func TestProductService_UpdateIngredientStock(t *testing.T) {
 
 func TestProductService_UpdateIngredientStock_QuantityField(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.ingredients[1] = &domain.Ingredient{ID: 1, Name: "Flour", Unit: "kg", StockQuantity: 50.0}
 
@@ -438,7 +438,7 @@ func TestProductService_UpdateIngredientStock_QuantityField(t *testing.T) {
 
 func TestProductService_UpdateIngredientStock_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	input := UpdateStockInput{
 		StockQuantity: 100.0,
@@ -455,7 +455,7 @@ func TestProductService_UpdateIngredientStock_NotFound(t *testing.T) {
 
 func TestProductService_UpdateIngredient(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.ingredients[1] = &domain.Ingredient{ID: 1, Name: "Flour", Unit: "kg", StockQuantity: 50.0, MinStock: 10.0}
 
@@ -480,7 +480,7 @@ func TestProductService_UpdateIngredient(t *testing.T) {
 
 func TestProductService_DeleteIngredient(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.ingredients[1] = &domain.Ingredient{ID: 1, Name: "Flour", Unit: "kg"}
 
@@ -496,7 +496,7 @@ func TestProductService_DeleteIngredient(t *testing.T) {
 
 func TestProductService_SetProductIngredients(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Cake", Active: true}
 	mockRepo.ingredients[2] = &domain.Ingredient{ID: 2, Name: "Flour", Unit: "kg"}
@@ -522,7 +522,7 @@ func TestProductService_SetProductIngredients(t *testing.T) {
 
 func TestProductService_SetProductIngredients_IngredientNotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Cake", Active: true}
 
@@ -540,7 +540,7 @@ func TestProductService_SetProductIngredients_IngredientNotFound(t *testing.T) {
 
 func TestProductService_DuplicateProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	original := &domain.Product{
 		ID:          1,
@@ -573,7 +573,7 @@ func TestProductService_DuplicateProduct(t *testing.T) {
 
 func TestProductService_DuplicateProduct_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	_, err := svc.DuplicateProduct(context.Background(), 999)
 	if err == nil {
@@ -586,7 +586,7 @@ func TestProductService_DuplicateProduct_NotFound(t *testing.T) {
 
 func TestProductService_ArchiveProduct(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Test Product", Active: true}
 
@@ -602,7 +602,7 @@ func TestProductService_ArchiveProduct(t *testing.T) {
 
 func TestProductService_ArchiveProduct_NotFound(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	err := svc.ArchiveProduct(context.Background(), 999)
 	if err == nil {
@@ -615,7 +615,7 @@ func TestProductService_ArchiveProduct_NotFound(t *testing.T) {
 
 func TestProductService_UpdateProduct_WithPromotion(t *testing.T) {
 	mockRepo := NewMockProductRepository()
-	svc := NewProductService(mockRepo)
+	svc := NewProductService(mockRepo, nil)
 
 	now := time.Now()
 	mockRepo.products[1] = &domain.Product{ID: 1, Name: "Test Product", Price: domain.FromFloat64(20.0), Active: true}

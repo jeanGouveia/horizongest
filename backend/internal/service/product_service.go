@@ -9,6 +9,7 @@ import (
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
+	"gorm.io/gorm"
 )
 
 var (
@@ -18,10 +19,11 @@ var (
 
 type ProductService struct {
 	repo ports.ProductRepository
+	db   *gorm.DB
 }
 
-func NewProductService(repo ports.ProductRepository) *ProductService {
-	return &ProductService{repo: repo}
+func NewProductService(repo ports.ProductRepository, db *gorm.DB) *ProductService {
+	return &ProductService{repo: repo, db: db}
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -421,70 +423,90 @@ func (s *ProductService) SetProductIngredients(
 	return s.repo.SetProductIngredients(ctx, productID, items)
 }
 
-// DuplicateProduct creates a copy of an existing product
+// DuplicateProduct creates a copy of an existing product in transação atômica
 func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain.Product, error) {
-	// Get the original product
-	original, err := s.repo.FindProductByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("ProductService.DuplicateProduct: %w", err)
-	}
-	if original == nil {
-		return nil, ErrProductNotFound
+	var duplicate *domain.Product
+
+	// Executar toda a operação em transação atômica (se db disponível)
+	executeInTx := func(fn func() error) error {
+		if s.db != nil {
+			return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				return fn()
+			})
+		}
+		return fn()
 	}
 
-	// Get original ingredients
-	ingredients, err := s.repo.GetProductIngredients(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("ProductService.DuplicateProduct: failed to get ingredients: %w", err)
-	}
+	err := executeInTx(func() error {
+		// Get the original product
+		original, err := s.repo.FindProductByID(ctx, id)
+		if err != nil {
+			return fmt.Errorf("ProductService.DuplicateProduct: %w", err)
+		}
+		if original == nil {
+			return ErrProductNotFound
+		}
 
-	// Create duplicate with modified name
-	duplicate := &domain.Product{
-		Name:                   original.Name + " (Cópia)",
-		Description:            original.Description,
-		Price:                  original.Price,
-		IsComposto:             original.IsComposto,
-		Active:                 true, // Always activate duplicates
-		PhotoURL:               original.PhotoURL,
-		CategoryID:             original.CategoryID,
-		DisplayOrder:           original.DisplayOrder,
-		PreparationTimeMinutes: original.PreparationTimeMinutes,
-		Featured:               false, // Reset featured flag
-		IsNew:                  true,  // Mark as new
-		PromotionPrice:         nil,   // Reset promotions
-		PromotionStart:         nil,
-		PromotionEnd:           nil,
-		AvailableFrom:          original.AvailableFrom,
-		AvailableUntil:         original.AvailableUntil,
-		SKU:                    "", // Reset SKU
-		InternalNotes:          original.InternalNotes,
-		Slug:                   generateSlug(original.Name + "-copia"),
-		MetaTitle:              original.MetaTitle,
-		MetaDescription:        original.MetaDescription,
-		AltImage:               original.AltImage,
-		Canonical:              original.Canonical,
-		ExternalID:             original.ExternalID,
-		MarketplaceID:          original.MarketplaceID,
-		SyncStatus:             original.SyncStatus,
-	}
+		// Get original ingredients
+		ingredients, err := s.repo.GetProductIngredients(ctx, id)
+		if err != nil {
+			return fmt.Errorf("ProductService.DuplicateProduct: failed to get ingredients: %w", err)
+		}
 
-	if err := s.repo.CreateProduct(ctx, duplicate); err != nil {
-		return nil, fmt.Errorf("ProductService.DuplicateProduct: failed to create duplicate: %w", err)
-	}
+		// Create duplicate with modified name
+		duplicate = &domain.Product{
+			Name:                   original.Name + " (Cópia)",
+			Description:            original.Description,
+			Price:                  original.Price,
+			IsComposto:             original.IsComposto,
+			Active:                 true, // Always activate duplicates
+			PhotoURL:               original.PhotoURL,
+			CategoryID:             original.CategoryID,
+			DisplayOrder:           original.DisplayOrder,
+			PreparationTimeMinutes: original.PreparationTimeMinutes,
+			Featured:               false, // Reset featured flag
+			IsNew:                  true,  // Mark as new
+			PromotionPrice:         nil,   // Reset promotions
+			PromotionStart:         nil,
+			PromotionEnd:           nil,
+			AvailableFrom:          original.AvailableFrom,
+			AvailableUntil:         original.AvailableUntil,
+			SKU:                    "", // Reset SKU
+			InternalNotes:          original.InternalNotes,
+			Slug:                   generateSlug(original.Name + "-copia"),
+			MetaTitle:              original.MetaTitle,
+			MetaDescription:        original.MetaDescription,
+			AltImage:               original.AltImage,
+			Canonical:              original.Canonical,
+			ExternalID:             original.ExternalID,
+			MarketplaceID:          original.MarketplaceID,
+			SyncStatus:             original.SyncStatus,
+		}
 
-	// Copy ingredients if it's a composite product
-	if len(ingredients) > 0 {
-		duplicateIngredients := make([]domain.ProductIngredient, len(ingredients))
-		for i, ing := range ingredients {
-			duplicateIngredients[i] = domain.ProductIngredient{
-				ProductID:    duplicate.ID,
-				IngredientID: ing.IngredientID,
-				Quantity:     ing.Quantity,
+		if err := s.repo.CreateProduct(ctx, duplicate); err != nil {
+			return fmt.Errorf("ProductService.DuplicateProduct: failed to create duplicate: %w", err)
+		}
+
+		// Copy ingredients if it's a composite product
+		if len(ingredients) > 0 {
+			duplicateIngredients := make([]domain.ProductIngredient, len(ingredients))
+			for i, ing := range ingredients {
+				duplicateIngredients[i] = domain.ProductIngredient{
+					ProductID:    duplicate.ID,
+					IngredientID: ing.IngredientID,
+					Quantity:     ing.Quantity,
+				}
+			}
+			if err := s.repo.SetProductIngredients(ctx, duplicate.ID, duplicateIngredients); err != nil {
+				return fmt.Errorf("ProductService.DuplicateProduct: failed to copy ingredients: %w", err)
 			}
 		}
-		if err := s.repo.SetProductIngredients(ctx, duplicate.ID, duplicateIngredients); err != nil {
-			return nil, fmt.Errorf("ProductService.DuplicateProduct: failed to copy ingredients: %w", err)
-		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return duplicate, nil
