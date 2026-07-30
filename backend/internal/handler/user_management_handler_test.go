@@ -48,6 +48,11 @@ func setupUserManagementTestDB(t *testing.T) *gorm.DB {
 }
 
 func setupUserContext(ctx context.Context, userID uint) context.Context {
+	tenantCtx := &domain.TenantContext{
+		UserID:    userID,
+		CompanyID: 1,
+	}
+	ctx = context.WithValue(ctx, domain.ContextKeyTenant, tenantCtx)
 	return context.WithValue(ctx, middleware.ContextKeyUserID, userID)
 }
 
@@ -64,7 +69,8 @@ func TestUserManagementHandler_ListUsers(t *testing.T) {
 		Currency:     "BRL",
 		Timezone:     "America/Sao_Paulo",
 	}
-	err := companyRepo.Create(context.Background(), company)
+	ctx := setupUserContext(context.Background(), 1)
+	err := companyRepo.Create(ctx, company)
 	if err != nil {
 		t.Fatalf("CreateCompany failed: %v", err)
 	}
@@ -79,7 +85,7 @@ func TestUserManagementHandler_ListUsers(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
-	err = userRepo.Create(context.Background(), user1)
+	err = userRepo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -92,7 +98,7 @@ func TestUserManagementHandler_ListUsers(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleAdmin,
 	}
-	err = userRepo.Create(context.Background(), user2)
+	err = userRepo.Create(ctx, user2)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -102,7 +108,7 @@ func TestUserManagementHandler_ListUsers(t *testing.T) {
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 	handler := NewUserManagementHandler(userManagementSvc, userRepo)
 
-	ctx := setupUserContext(context.Background(), user1.ID)
+	ctx = setupUserContext(context.Background(), user1.ID)
 	req := httptest.NewRequest("GET", "/api/company/users", nil)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -145,7 +151,8 @@ func TestUserManagementHandler_GetUser(t *testing.T) {
 		Currency:     "BRL",
 		Timezone:     "America/Sao_Paulo",
 	}
-	err := companyRepo.Create(context.Background(), company)
+	ctx := setupUserContext(context.Background(), 1)
+	err := companyRepo.Create(ctx, company)
 	if err != nil {
 		t.Fatalf("CreateCompany failed: %v", err)
 	}
@@ -160,7 +167,7 @@ func TestUserManagementHandler_GetUser(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
-	err = userRepo.Create(context.Background(), user1)
+	err = userRepo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -173,7 +180,7 @@ func TestUserManagementHandler_GetUser(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleAdmin,
 	}
-	err = userRepo.Create(context.Background(), user2)
+	err = userRepo.Create(ctx, user2)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -182,7 +189,7 @@ func TestUserManagementHandler_GetUser(t *testing.T) {
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 	handler := NewUserManagementHandler(userManagementSvc, userRepo)
 
-	ctx := setupUserContext(context.Background(), user1.ID)
+	ctx = setupUserContext(context.Background(), user1.ID)
 	req := httptest.NewRequest("GET", "/api/company/users/2", nil)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -211,7 +218,8 @@ func TestUserManagementHandler_GetUser_NotFound(t *testing.T) {
 		Currency:     "BRL",
 		Timezone:     "America/Sao_Paulo",
 	}
-	err := companyRepo.Create(context.Background(), company)
+	ctx := setupUserContext(context.Background(), 1)
+	err := companyRepo.Create(ctx, company)
 	if err != nil {
 		t.Fatalf("CreateCompany failed: %v", err)
 	}
@@ -226,7 +234,7 @@ func TestUserManagementHandler_GetUser_NotFound(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
-	err = userRepo.Create(context.Background(), user1)
+	err = userRepo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -235,7 +243,7 @@ func TestUserManagementHandler_GetUser_NotFound(t *testing.T) {
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 	handler := NewUserManagementHandler(userManagementSvc, userRepo)
 
-	ctx := setupUserContext(context.Background(), user1.ID)
+	ctx = setupUserContext(context.Background(), user1.ID)
 	req := httptest.NewRequest("GET", "/api/company/users/999", nil)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -264,7 +272,8 @@ func TestUserManagementHandler_ChangeRole(t *testing.T) {
 		Currency:     "BRL",
 		Timezone:     "America/Sao_Paulo",
 	}
-	err := companyRepo.Create(context.Background(), company)
+	ctx := setupUserContext(context.Background(), 1)
+	err := companyRepo.Create(ctx, company)
 	if err != nil {
 		t.Fatalf("CreateCompany failed: %v", err)
 	}
@@ -279,7 +288,7 @@ func TestUserManagementHandler_ChangeRole(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
-	err = userRepo.Create(context.Background(), user1)
+	err = userRepo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -292,7 +301,7 @@ func TestUserManagementHandler_ChangeRole(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleAdmin,
 	}
-	err = userRepo.Create(context.Background(), user2)
+	err = userRepo.Create(ctx, user2)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -302,7 +311,7 @@ func TestUserManagementHandler_ChangeRole(t *testing.T) {
 	handler := NewUserManagementHandler(userManagementSvc, userRepo)
 
 	body := `{"role":"manager"}`
-	ctx := setupUserContext(context.Background(), user1.ID)
+	ctx = setupUserContext(context.Background(), user1.ID)
 	req := httptest.NewRequest("PUT", "/api/company/users/2/role", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(ctx)
@@ -332,7 +341,8 @@ func TestUserManagementHandler_RemoveUser_NotAllowed(t *testing.T) {
 		Currency:     "BRL",
 		Timezone:     "America/Sao_Paulo",
 	}
-	err := companyRepo.Create(context.Background(), company)
+	ctx := setupUserContext(context.Background(), 1)
+	err := companyRepo.Create(ctx, company)
 	if err != nil {
 		t.Fatalf("CreateCompany failed: %v", err)
 	}
@@ -347,7 +357,7 @@ func TestUserManagementHandler_RemoveUser_NotAllowed(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
-	err = userRepo.Create(context.Background(), user1)
+	err = userRepo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -360,7 +370,7 @@ func TestUserManagementHandler_RemoveUser_NotAllowed(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleAdmin,
 	}
-	err = userRepo.Create(context.Background(), user2)
+	err = userRepo.Create(ctx, user2)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -369,7 +379,7 @@ func TestUserManagementHandler_RemoveUser_NotAllowed(t *testing.T) {
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 	handler := NewUserManagementHandler(userManagementSvc, userRepo)
 
-	ctx := setupUserContext(context.Background(), user1.ID)
+	ctx = setupUserContext(context.Background(), user1.ID)
 	req := httptest.NewRequest("DELETE", "/api/company/users/2", nil)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -399,7 +409,8 @@ func TestUserManagementHandler_SetUserActive(t *testing.T) {
 		Currency:     "BRL",
 		Timezone:     "America/Sao_Paulo",
 	}
-	err := companyRepo.Create(context.Background(), company)
+	ctx := setupUserContext(context.Background(), 1)
+	err := companyRepo.Create(ctx, company)
 	if err != nil {
 		t.Fatalf("CreateCompany failed: %v", err)
 	}
@@ -414,7 +425,7 @@ func TestUserManagementHandler_SetUserActive(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleOwner,
 	}
-	err = userRepo.Create(context.Background(), user1)
+	err = userRepo.Create(ctx, user1)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -427,7 +438,7 @@ func TestUserManagementHandler_SetUserActive(t *testing.T) {
 		CompanyID:    company.ID,
 		Role:         domain.RoleAdmin,
 	}
-	err = userRepo.Create(context.Background(), user2)
+	err = userRepo.Create(ctx, user2)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
@@ -437,7 +448,7 @@ func TestUserManagementHandler_SetUserActive(t *testing.T) {
 	handler := NewUserManagementHandler(userManagementSvc, userRepo)
 
 	body := `{"active":false}`
-	ctx := setupUserContext(context.Background(), user1.ID)
+	ctx = setupUserContext(context.Background(), user1.ID)
 	req := httptest.NewRequest("PUT", "/api/company/users/2/active", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(ctx)
