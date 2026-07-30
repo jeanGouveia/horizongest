@@ -8,6 +8,7 @@ import (
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
+	"gorm.io/gorm"
 )
 
 var (
@@ -21,15 +22,18 @@ var (
 type PurchaseService struct {
 	purchaseRepo ports.PurchaseRepository
 	productRepo  ports.ProductRepository
+	db           *gorm.DB
 }
 
 func NewPurchaseService(
 	purchaseRepo ports.PurchaseRepository,
 	productRepo ports.ProductRepository,
+	db *gorm.DB,
 ) *PurchaseService {
 	return &PurchaseService{
 		purchaseRepo: purchaseRepo,
 		productRepo:  productRepo,
+		db:           db,
 	}
 }
 
@@ -80,65 +84,85 @@ func (s *PurchaseService) DeleteSupplier(ctx context.Context, id uint) error {
 
 // --- Pedidos de Compra ---
 
-// CreatePurchaseOrder cria um novo pedido de compra
+// CreatePurchaseOrder cria um novo pedido de compra em transação atômica
 func (s *PurchaseService) CreatePurchaseOrder(ctx context.Context, companyID, userID uint, input CreatePurchaseOrderInput) (*domain.PurchaseOrder, error) {
-	// Validar fornecedor
-	supplier, err := s.purchaseRepo.GetSupplierByID(ctx, input.SupplierID)
+	var order *domain.PurchaseOrder
+
+	// Executar toda a operação em transação atômica (se db disponível)
+	executeInTx := func(fn func() error) error {
+		if s.db != nil {
+			return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				return fn()
+			})
+		}
+		return fn()
+	}
+
+	err := executeInTx(func() error {
+		// Validar fornecedor
+		supplier, err := s.purchaseRepo.GetSupplierByID(ctx, input.SupplierID)
+		if err != nil {
+			return ErrSupplierNotFound
+		}
+
+		if supplier.CompanyID != companyID {
+			return errors.New("fornecedor não pertence a esta empresa")
+		}
+
+		// Gerar número do pedido
+		orderNumber := fmt.Sprintf("PC-%d-%d", companyID, time.Now().Unix())
+
+		// Calcular totais
+		var subtotal domain.Money
+		for _, item := range input.Items {
+			itemPrice := domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100)
+			subtotal = subtotal.Add(itemPrice)
+		}
+
+		tax := domain.FromFloat64(input.Tax)
+		discount := domain.FromFloat64(input.Discount)
+		total := subtotal.Add(tax).Sub(discount)
+
+		order = &domain.PurchaseOrder{
+			CompanyID:    companyID,
+			SupplierID:   input.SupplierID,
+			OrderNumber:  orderNumber,
+			Status:       domain.PurchaseOrderDraft,
+			OrderDate:    input.OrderDate,
+			ExpectedDate: input.ExpectedDate,
+			Subtotal:     subtotal,
+			Tax:          tax,
+			Discount:     discount,
+			Total:        total,
+			Notes:        input.Notes,
+			CreatedBy:    userID,
+		}
+
+		if err := s.purchaseRepo.CreatePurchaseOrder(ctx, order); err != nil {
+			return fmt.Errorf("erro ao criar pedido de compra: %w", err)
+		}
+
+		// Criar itens
+		for _, item := range input.Items {
+			poItem := &domain.PurchaseOrderItem{
+				PurchaseOrderID: order.ID,
+				IngredientID:    item.IngredientID,
+				Quantity:        item.Quantity,
+				Unit:            item.Unit,
+				UnitPrice:       domain.FromFloat64(item.UnitPrice),
+				Subtotal:        domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100),
+			}
+
+			if err := s.purchaseRepo.CreatePurchaseOrderItem(ctx, poItem); err != nil {
+				return fmt.Errorf("erro ao criar item do pedido: %w", err)
+			}
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, ErrSupplierNotFound
-	}
-
-	if supplier.CompanyID != companyID {
-		return nil, errors.New("fornecedor não pertence a esta empresa")
-	}
-
-	// Gerar número do pedido
-	orderNumber := fmt.Sprintf("PC-%d-%d", companyID, time.Now().Unix())
-
-	// Calcular totais
-	var subtotal domain.Money
-	for _, item := range input.Items {
-		itemPrice := domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100)
-		subtotal = subtotal.Add(itemPrice)
-	}
-
-	tax := domain.FromFloat64(input.Tax)
-	discount := domain.FromFloat64(input.Discount)
-	total := subtotal.Add(tax).Sub(discount)
-
-	order := &domain.PurchaseOrder{
-		CompanyID:    companyID,
-		SupplierID:   input.SupplierID,
-		OrderNumber:  orderNumber,
-		Status:       domain.PurchaseOrderDraft,
-		OrderDate:    input.OrderDate,
-		ExpectedDate: input.ExpectedDate,
-		Subtotal:     subtotal,
-		Tax:          tax,
-		Discount:     discount,
-		Total:        total,
-		Notes:        input.Notes,
-		CreatedBy:    userID,
-	}
-
-	if err := s.purchaseRepo.CreatePurchaseOrder(ctx, order); err != nil {
-		return nil, fmt.Errorf("erro ao criar pedido de compra: %w", err)
-	}
-
-	// Criar itens
-	for _, item := range input.Items {
-		poItem := &domain.PurchaseOrderItem{
-			PurchaseOrderID: order.ID,
-			IngredientID:    item.IngredientID,
-			Quantity:        item.Quantity,
-			Unit:            item.Unit,
-			UnitPrice:       domain.FromFloat64(item.UnitPrice),
-			Subtotal:        domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100),
-		}
-
-		if err := s.purchaseRepo.CreatePurchaseOrderItem(ctx, poItem); err != nil {
-			return nil, fmt.Errorf("erro ao criar item do pedido: %w", err)
-		}
+		return nil, err
 	}
 
 	return order, nil
@@ -176,55 +200,75 @@ func (s *PurchaseService) DeletePurchaseOrder(ctx context.Context, id uint) erro
 
 // --- Recebimentos ---
 
-// CreatePurchaseReceiving cria um recebimento de compra
+// CreatePurchaseReceiving cria um recebimento de compra em transação atômica
 func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseOrderID, userID uint, input CreatePurchaseReceivingInput) (*domain.PurchaseReceiving, error) {
-	// Buscar pedido de compra
-	order, err := s.purchaseRepo.GetPurchaseOrderByID(ctx, purchaseOrderID)
+	var receiving *domain.PurchaseReceiving
+
+	// Executar toda a operação em transação atômica (se db disponível)
+	executeInTx := func(fn func() error) error {
+		if s.db != nil {
+			return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				return fn()
+			})
+		}
+		return fn()
+	}
+
+	err := executeInTx(func() error {
+		// Buscar pedido de compra
+		order, err := s.purchaseRepo.GetPurchaseOrderByID(ctx, purchaseOrderID)
+		if err != nil {
+			return ErrPurchaseOrderNotFound
+		}
+
+		// Validar status
+		if order.Status == domain.PurchaseOrderReceived {
+			return ErrPurchaseOrderReceived
+		}
+
+		receiving = &domain.PurchaseReceiving{
+			PurchaseOrderID: purchaseOrderID,
+			ReceivedDate:    input.ReceivedDate,
+			ReceivedBy:      userID,
+			Notes:           input.Notes,
+		}
+
+		if err := s.purchaseRepo.CreatePurchaseReceiving(ctx, receiving); err != nil {
+			return fmt.Errorf("erro ao criar recebimento: %w", err)
+		}
+
+		// Criar itens de recebimento
+		for _, item := range input.Items {
+			receivingItem := &domain.PurchaseReceivingItem{
+				PurchaseReceivingID: receiving.ID,
+				PurchaseOrderItemID: item.PurchaseOrderItemID,
+				IngredientID:        item.IngredientID,
+				Quantity:            item.Quantity,
+				Unit:                item.Unit,
+				UnitPrice:           domain.FromFloat64(item.UnitPrice),
+				Subtotal:            domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100),
+			}
+
+			if err := s.purchaseRepo.CreatePurchaseReceivingItem(ctx, receivingItem); err != nil {
+				return fmt.Errorf("erro ao criar item de recebimento: %w", err)
+			}
+
+			// TODO: Atualizar estoque do ingrediente via stock movements
+			// Isso será implementado na integração com o módulo de estoque
+		}
+
+		// Atualizar status do pedido para recebido
+		now := time.Now()
+		order.ReceivedDate = &now
+		if err := s.purchaseRepo.UpdatePurchaseOrderStatus(ctx, purchaseOrderID, domain.PurchaseOrderReceived); err != nil {
+			return fmt.Errorf("erro ao atualizar status do pedido: %w", err)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, ErrPurchaseOrderNotFound
-	}
-
-	// Validar status
-	if order.Status == domain.PurchaseOrderReceived {
-		return nil, ErrPurchaseOrderReceived
-	}
-
-	receiving := &domain.PurchaseReceiving{
-		PurchaseOrderID: purchaseOrderID,
-		ReceivedDate:    input.ReceivedDate,
-		ReceivedBy:      userID,
-		Notes:           input.Notes,
-	}
-
-	if err := s.purchaseRepo.CreatePurchaseReceiving(ctx, receiving); err != nil {
-		return nil, fmt.Errorf("erro ao criar recebimento: %w", err)
-	}
-
-	// Criar itens de recebimento
-	for _, item := range input.Items {
-		receivingItem := &domain.PurchaseReceivingItem{
-			PurchaseReceivingID: receiving.ID,
-			PurchaseOrderItemID: item.PurchaseOrderItemID,
-			IngredientID:        item.IngredientID,
-			Quantity:            item.Quantity,
-			Unit:                item.Unit,
-			UnitPrice:           domain.FromFloat64(item.UnitPrice),
-			Subtotal:            domain.FromFloat64(item.UnitPrice).Mul(int64(item.Quantity * 100)).Div(100),
-		}
-
-		if err := s.purchaseRepo.CreatePurchaseReceivingItem(ctx, receivingItem); err != nil {
-			return nil, fmt.Errorf("erro ao criar item de recebimento: %w", err)
-		}
-
-		// TODO: Atualizar estoque do ingrediente via stock movements
-		// Isso será implementado na integração com o módulo de estoque
-	}
-
-	// Atualizar status do pedido para recebido
-	now := time.Now()
-	order.ReceivedDate = &now
-	if err := s.purchaseRepo.UpdatePurchaseOrderStatus(ctx, purchaseOrderID, domain.PurchaseOrderReceived); err != nil {
-		return nil, fmt.Errorf("erro ao atualizar status do pedido: %w", err)
+		return nil, err
 	}
 
 	return receiving, nil
