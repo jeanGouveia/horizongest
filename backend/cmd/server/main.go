@@ -136,7 +136,7 @@ func main() {
 	platformBrandSvc := service.NewPlatformBrandService(platformBrandRepo) // Sprint 3.5
 
 	// Tenant services
-	productSvc := service.NewProductService(productRepo)
+	productSvc := service.NewProductService(productRepo, db)
 	categorySvc := service.NewCategoryService(categoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
@@ -149,7 +149,7 @@ func main() {
 	rbacSvc := service.NewRBACService(userRepo)
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 	financeSvc := service.NewFinanceService(financeRepo)
-	purchaseSvc := service.NewPurchaseService(purchaseRepo, productRepo)
+	purchaseSvc := service.NewPurchaseService(purchaseRepo, productRepo, db)
 	reportSvc := service.NewReportService(reportRepo)
 
 	// Initialize platform brand config (Sprint 3.6)
