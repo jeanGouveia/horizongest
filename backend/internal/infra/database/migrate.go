@@ -31,6 +31,7 @@ func RunMigrations(db *gorm.DB) error {
 		&repository.GormPlatformBrand{},
 		&repository.GormPlatformAudit{},
 		&repository.GormImpersonationAudit{},
+		&repository.GormOutboxEvent{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {
