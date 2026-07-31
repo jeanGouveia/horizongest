@@ -49,18 +49,26 @@ func LoggingMiddleware(consumerName string) Middleware {
 }
 
 // IdempotencyMiddleware checks if an event has already been processed
-func IdempotencyMiddleware(store *IdempotencyStore, consumerName string) Middleware {
+func IdempotencyMiddleware(store IdempotencyChecker, consumerName string) Middleware {
 	return func(next Handler) Handler {
 		return func(ctx context.Context, event Event) error {
-			if store.IsProcessed(event.ID) {
+			processed, err := store.IsProcessed(ctx, event.ID)
+			if err != nil {
+				log.Printf("[%s] Failed to check idempotency for event id=%d: %v", consumerName, event.ID, err)
+				// Continue processing even if idempotency check fails
+			}
+
+			if processed {
 				log.Printf("[%s] Event id=%d already processed, ignoring", consumerName, event.ID)
 				return &IdempotencyError{EventID: event.ID}
 			}
 
-			err := next(ctx, event)
+			err = next(ctx, event)
 
 			if err == nil {
-				store.MarkProcessed(event.ID)
+				if markErr := store.MarkProcessed(ctx, event.ID); markErr != nil {
+					log.Printf("[%s] Failed to mark event id=%d as processed: %v", consumerName, event.ID, markErr)
+				}
 			}
 
 			return err

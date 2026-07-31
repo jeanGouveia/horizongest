@@ -11,21 +11,32 @@ import (
 
 // TestIdempotencyStore tests the idempotency store
 func TestIdempotencyStore(t *testing.T) {
+	ctx := context.Background()
 	store := NewIdempotencyStore()
 
 	// Initially not processed
-	assert.False(t, store.IsProcessed(1))
+	processed, err := store.IsProcessed(ctx, 1)
+	assert.NoError(t, err)
+	assert.False(t, processed)
 
 	// Mark as processed
-	store.MarkProcessed(1)
-	assert.True(t, store.IsProcessed(1))
+	err = store.MarkProcessed(ctx, 1)
+	assert.NoError(t, err)
+
+	processed, err = store.IsProcessed(ctx, 1)
+	assert.NoError(t, err)
+	assert.True(t, processed)
 
 	// Different ID not processed
-	assert.False(t, store.IsProcessed(2))
+	processed, err = store.IsProcessed(ctx, 2)
+	assert.NoError(t, err)
+	assert.False(t, processed)
 
 	// Clear
 	store.Clear()
-	assert.False(t, store.IsProcessed(1))
+	processed, err = store.IsProcessed(ctx, 1)
+	assert.NoError(t, err)
+	assert.False(t, processed)
 }
 
 // TestRetry tests the retry logic with exponential backoff
@@ -218,7 +229,10 @@ func TestIdempotencyMiddleware(t *testing.T) {
 	// First call - success
 	err := handler(ctx, event)
 	assert.NoError(t, err)
-	assert.True(t, store.IsProcessed(1))
+
+	processed, err := store.IsProcessed(ctx, 1)
+	assert.NoError(t, err)
+	assert.True(t, processed)
 
 	// Second call - idempotency error
 	err = handler(ctx, event)
