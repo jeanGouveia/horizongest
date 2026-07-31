@@ -2,11 +2,9 @@ package email
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
-	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/jeanGouveia/horizongest/backend/internal/consumers/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,24 +28,6 @@ func (m *MockEmailProvider) Close() error {
 }
 
 var _ EmailProvider = (*MockEmailProvider)(nil)
-
-func TestIdempotencyStore(t *testing.T) {
-	store := NewIdempotencyStore()
-
-	// Initially not processed
-	assert.False(t, store.IsProcessed(1))
-
-	// Mark as processed
-	store.MarkProcessed(1)
-	assert.True(t, store.IsProcessed(1))
-
-	// Different ID not processed
-	assert.False(t, store.IsProcessed(2))
-
-	// Clear
-	store.Clear()
-	assert.False(t, store.IsProcessed(1))
-}
 
 func TestLogEmailProvider(t *testing.T) {
 	provider := NewLogEmailProvider()
@@ -98,12 +78,11 @@ func TestCompanyCreatedTemplate(t *testing.T) {
 	assert.Equal(t, "Your company has been successfully created. Welcome aboard!", body)
 }
 
-func TestEmailConsumer_ProcessEvent(t *testing.T) {
+func TestEmailProcessor_Process(t *testing.T) {
 	mockProvider := &MockEmailProvider{}
-	idempotencyStore := NewIdempotencyStore()
-	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, idempotencyStore)
+	processor := NewEmailProcessor(mockProvider)
 
-	event := Event{
+	event := framework.Event{
 		ID:            1,
 		EventType:     "order.created",
 		AggregateType: "order",
@@ -112,18 +91,17 @@ func TestEmailConsumer_ProcessEvent(t *testing.T) {
 		Payload:       map[string]interface{}{"order_id": 100},
 	}
 
-	err := consumer.processEvent(context.Background(), event)
+	err := processor.Process(context.Background(), event)
 	assert.NoError(t, err)
 	assert.Len(t, mockProvider.SentEmails, 1)
 	assert.Equal(t, "Order Confirmation", mockProvider.SentEmails[0].Subject)
 }
 
-func TestEmailConsumer_ProcessEvent_UnknownType(t *testing.T) {
+func TestEmailProcessor_Process_UnknownType(t *testing.T) {
 	mockProvider := &MockEmailProvider{}
-	idempotencyStore := NewIdempotencyStore()
-	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, idempotencyStore)
+	processor := NewEmailProcessor(mockProvider)
 
-	event := Event{
+	event := framework.Event{
 		ID:            1,
 		EventType:     "unknown.event",
 		AggregateType: "order",
@@ -132,19 +110,18 @@ func TestEmailConsumer_ProcessEvent_UnknownType(t *testing.T) {
 		Payload:       map[string]interface{}{},
 	}
 
-	err := consumer.processEvent(context.Background(), event)
+	err := processor.Process(context.Background(), event)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no template for event type")
 }
 
-func TestEmailConsumer_ProcessEvent_ProviderError(t *testing.T) {
+func TestEmailProcessor_Process_ProviderError(t *testing.T) {
 	mockProvider := &MockEmailProvider{
 		SendError: assert.AnError,
 	}
-	idempotencyStore := NewIdempotencyStore()
-	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, idempotencyStore)
+	processor := NewEmailProcessor(mockProvider)
 
-	event := Event{
+	event := framework.Event{
 		ID:            1,
 		EventType:     "order.created",
 		AggregateType: "order",
@@ -153,43 +130,16 @@ func TestEmailConsumer_ProcessEvent_ProviderError(t *testing.T) {
 		Payload:       map[string]interface{}{},
 	}
 
-	err := consumer.processEvent(context.Background(), event)
+	err := processor.Process(context.Background(), event)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to send email")
 }
 
-func TestEmailConsumer_Idempotency(t *testing.T) {
+func TestEmailProcessor_AllTemplates(t *testing.T) {
 	mockProvider := &MockEmailProvider{}
-	idempotencyStore := NewIdempotencyStore()
-	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, idempotencyStore)
+	processor := NewEmailProcessor(mockProvider)
 
-	event := Event{
-		ID:            1,
-		EventType:     "order.created",
-		AggregateType: "order",
-		AggregateID:   100,
-		TenantID:      1,
-		Payload:       map[string]interface{}{},
-	}
-
-	// First processing
-	err := consumer.processEvent(context.Background(), event)
-	assert.NoError(t, err)
-	assert.Len(t, mockProvider.SentEmails, 1)
-
-	// Mark as processed
-	idempotencyStore.MarkProcessed(event.ID)
-
-	// Second processing should be ignored (handled in processMessage, but we test the store)
-	assert.True(t, idempotencyStore.IsProcessed(event.ID))
-}
-
-func TestEmailConsumer_AllTemplates(t *testing.T) {
-	mockProvider := &MockEmailProvider{}
-	idempotencyStore := NewIdempotencyStore()
-	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, idempotencyStore)
-
-	events := []Event{
+	events := []framework.Event{
 		{
 			ID:            1,
 			EventType:     "invitation.created",
@@ -217,7 +167,7 @@ func TestEmailConsumer_AllTemplates(t *testing.T) {
 	}
 
 	for _, event := range events {
-		err := consumer.processEvent(context.Background(), event)
+		err := processor.Process(context.Background(), event)
 		assert.NoError(t, err)
 	}
 
@@ -227,34 +177,22 @@ func TestEmailConsumer_AllTemplates(t *testing.T) {
 	assert.Equal(t, "Welcome to HorizonGest", mockProvider.SentEmails[2].Subject)
 }
 
-func TestEmailConsumer_ProcessMessage(t *testing.T) {
+func TestEmailConsumer_Framework(t *testing.T) {
 	mockProvider := &MockEmailProvider{}
-	idempotencyStore := NewIdempotencyStore()
-	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, idempotencyStore)
+	config := framework.DefaultConfig()
+	config.EnableMetrics = false // Disable metrics for simpler testing
 
-	event := Event{
-		ID:            1,
-		EventType:     "order.created",
-		AggregateType: "order",
-		AggregateID:   100,
-		TenantID:      1,
-		Payload:       map[string]interface{}{},
-	}
+	consumer := NewEmailConsumer(nil, "test_queue", mockProvider, config)
+	require.NotNil(t, consumer)
 
-	body, err := json.Marshal(event)
-	require.NoError(t, err)
+	// Test that consumer has framework methods
+	assert.NotNil(t, consumer.GetMetrics())
+	assert.Equal(t, framework.StateClosed, consumer.GetCircuitBreakerState())
 
-	msg := amqp.Delivery{
-		Body: body,
-	}
+	// Test clear idempotency
+	consumer.ClearIdempotency()
 
-	// This would normally be called in the consume loop
-	// For testing, we simulate the processing
-	consumer.processMessage(context.Background(), msg)
-
-	// Give it a moment to process
-	time.Sleep(10 * time.Millisecond)
-
-	// Verify event was processed
-	assert.True(t, idempotencyStore.IsProcessed(event.ID))
+	// Test close
+	err := consumer.Close()
+	assert.NoError(t, err)
 }

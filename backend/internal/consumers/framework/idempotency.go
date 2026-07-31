@@ -1,11 +1,11 @@
-package email
+package framework
 
 import (
 	"sync"
 )
 
 // IdempotencyStore tracks processed event IDs to prevent duplicate processing
-// For production, this should be replaced with a persistent store (database, Redis, etc.)
+// This is a shared implementation used by all consumers
 type IdempotencyStore struct {
 	mu    sync.RWMutex
 	ids   map[uint]bool // event_id -> true

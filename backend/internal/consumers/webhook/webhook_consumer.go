@@ -1,4 +1,4 @@
-package email
+package webhook
 
 import (
 	"context"
@@ -7,59 +7,59 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// EmailConsumer is a thin wrapper around the framework's BaseConsumer
-// It only provides email-specific configuration and delegates to the framework
-type EmailConsumer struct {
+// WebhookConsumer is a thin wrapper around the framework's BaseConsumer
+// It only provides webhook-specific configuration and delegates to the framework
+type WebhookConsumer struct {
 	baseConsumer *framework.BaseConsumer
 }
 
-// NewEmailConsumer creates a new email consumer using the framework
-func NewEmailConsumer(
+// NewWebhookConsumer creates a new webhook consumer using the framework
+func NewWebhookConsumer(
 	conn *amqp.Connection,
 	queue string,
-	emailProvider EmailProvider,
+	webhookProvider WebhookProvider,
 	config framework.Config,
-) *EmailConsumer {
-	processor := NewEmailProcessor(emailProvider)
-	config.ConsumerName = "EmailConsumer"
+) *WebhookConsumer {
+	processor := NewWebhookProcessor(webhookProvider)
+	config.ConsumerName = "WebhookConsumer"
 	config.Queue = queue
 
-	return &EmailConsumer{
+	return &WebhookConsumer{
 		baseConsumer: framework.NewBaseConsumer(conn, config, processor),
 	}
 }
 
 // Start begins consuming events from the queue
-func (c *EmailConsumer) Start(ctx context.Context) error {
+func (c *WebhookConsumer) Start(ctx context.Context) error {
 	return c.baseConsumer.Start(ctx)
 }
 
 // Close closes the consumer
-func (c *EmailConsumer) Close() error {
+func (c *WebhookConsumer) Close() error {
 	return c.baseConsumer.Close()
 }
 
 // GetMetrics returns the current metrics snapshot
-func (c *EmailConsumer) GetMetrics() framework.MetricsSnapshot {
+func (c *WebhookConsumer) GetMetrics() framework.MetricsSnapshot {
 	return c.baseConsumer.GetMetrics()
 }
 
 // ResetMetrics resets all metrics
-func (c *EmailConsumer) ResetMetrics() {
+func (c *WebhookConsumer) ResetMetrics() {
 	c.baseConsumer.ResetMetrics()
 }
 
 // GetCircuitBreakerState returns the current circuit breaker state
-func (c *EmailConsumer) GetCircuitBreakerState() framework.CircuitBreakerState {
+func (c *WebhookConsumer) GetCircuitBreakerState() framework.CircuitBreakerState {
 	return c.baseConsumer.GetCircuitBreakerState()
 }
 
 // ResetCircuitBreaker resets the circuit breaker to closed state
-func (c *EmailConsumer) ResetCircuitBreaker() {
+func (c *WebhookConsumer) ResetCircuitBreaker() {
 	c.baseConsumer.ResetCircuitBreaker()
 }
 
 // ClearIdempotency clears all processed event IDs (useful for testing)
-func (c *EmailConsumer) ClearIdempotency() {
+func (c *WebhookConsumer) ClearIdempotency() {
 	c.baseConsumer.ClearIdempotency()
 }
