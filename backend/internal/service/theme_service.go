@@ -26,7 +26,7 @@ func (s *ThemeService) GetThemeForUser(ctx context.Context, userID uint) (*domai
 	// Get user to find their company
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("ThemeService.GetThemeForUser: failed to get user: %w", err)
+		return nil, fmt.Errorf("ThemeService.GetThemeForUser: buscar usuário: %w", err)
 	}
 
 	if user == nil {
@@ -42,7 +42,7 @@ func (s *ThemeService) GetThemeForUser(ctx context.Context, userID uint) (*domai
 	// Get company to retrieve theme configuration
 	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
-		return nil, fmt.Errorf("ThemeService.GetThemeForUser: failed to get company: %w", err)
+		return nil, fmt.Errorf("ThemeService.GetThemeForUser: buscar empresa: %w", err)
 	}
 
 	if company == nil {

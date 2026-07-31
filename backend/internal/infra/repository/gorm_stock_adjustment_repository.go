@@ -15,20 +15,20 @@ import (
 // ─── GORM models ────────────────────────────────────────────────────────────
 
 type GormStockAdjustmentPending struct {
-	ID              uint    `gorm:"primaryKey;autoIncrement"`
-	OrderID         uint    `gorm:"not null;index"`
-	IngredientID    uint    `gorm:"not null;index"`
-	Quantity        float64 `gorm:"not null"`
-	OrderStatus     string  `gorm:"not null"`
-	Status          string  `gorm:"not null;default:'pending';index"`
-	CompanyID       uint    `gorm:"index;not null"` // Sprint 3: NOT NULL
+	ID              uint       `gorm:"primaryKey;autoIncrement"`
+	OrderID         uint       `gorm:"not null;index"`
+	IngredientID    uint       `gorm:"not null;index"`
+	Quantity        float64    `gorm:"not null"`
+	OrderStatus     string     `gorm:"not null"`
+	Status          string     `gorm:"not null;default:'pending';index"`
+	CompanyID       uint       `gorm:"index;not null"` // Sprint 3: NOT NULL
 	CreatedAt       time.Time  `gorm:"autoCreateTime"`
-	ProcessedAt     *time.Time  `gorm:"index"`
-	ProcessedBy     *uint   `gorm:"index"`
-	ProcessingNotes string  `gorm:"type:text"`
-	IngredientName  string  `gorm:"not null"`              // snapshot do nome
-	IngredientUnit  string  `gorm:"not null;default:'un'"` // snapshot da unidade
-	DeletedAt       *int64  `gorm:"index"`
+	ProcessedAt     *time.Time `gorm:"index"`
+	ProcessedBy     *uint      `gorm:"index"`
+	ProcessingNotes string     `gorm:"type:text"`
+	IngredientName  string     `gorm:"not null"`              // snapshot do nome
+	IngredientUnit  string     `gorm:"not null;default:'un'"` // snapshot da unidade
+	DeletedAt       *int64     `gorm:"index"`
 }
 
 func (GormStockAdjustmentPending) TableName() string { return "stock_adjustments_pending" }
@@ -62,7 +62,7 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 	// Auto-fill CompanyID from tenant context
 	companyID, err := GetCompanyIDFromContext(ctx)
 	if err != nil {
-		return fmt.Errorf("CreateStockAdjustmentPendingWithTx: %w", err)
+		return fmt.Errorf("StockAdjustmentRepository.CreateStockAdjustmentPendingWithTx: obter companyID do contexto: %w", err)
 	}
 
 	db := r.db
@@ -84,7 +84,7 @@ func (r *GormStockAdjustmentRepository) CreateStockAdjustmentPendingWithTx(
 	}
 	if err := db.Create(&gAdjustment).Error; err != nil {
 		log.Printf("[STOCK_REPO] Erro ao criar ajuste: %v", err)
-		return fmt.Errorf("CreateStockAdjustmentPendingWithTx: %w", err)
+		return fmt.Errorf("StockAdjustmentRepository.CreateStockAdjustmentPendingWithTx: criar ajuste: %w", err)
 	}
 	log.Printf("[STOCK_REPO] Ajuste criado com sucesso: id=%d", gAdjustment.ID)
 	adjustment.ID = gAdjustment.ID
@@ -101,7 +101,7 @@ func (r *GormStockAdjustmentRepository) FindPendingByOrderID(
 	if err := query.WithContext(ctx).
 		Where("order_id = ? AND status = ? AND deleted_at IS NULL", orderID, domain.StockAdjustmentStatusPending).
 		Find(&gAdjustments).Error; err != nil {
-		return nil, fmt.Errorf("FindPendingByOrderID: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentRepository.FindPendingByOrderID: %w", err)
 	}
 	return r.mapToDomainSlice(gAdjustments), nil
 }
@@ -115,7 +115,7 @@ func (r *GormStockAdjustmentRepository) FindByOrderID(
 		Where("order_id = ? AND deleted_at IS NULL", orderID).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
-		return nil, fmt.Errorf("FindByOrderID: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentRepository.FindByOrderID: %w", err)
 	}
 	return r.mapToDomainSlice(gAdjustments), nil
 }
@@ -129,7 +129,7 @@ func (r *GormStockAdjustmentRepository) FindPendingByIngredientID(
 		Where("ingredient_id = ? AND status = ? AND deleted_at IS NULL", ingredientID, domain.StockAdjustmentStatusPending).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
-		return nil, fmt.Errorf("FindPendingByIngredientID: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentRepository.FindPendingByIngredientID: %w", err)
 	}
 	return r.mapToDomainSlice(gAdjustments), nil
 }
@@ -143,7 +143,7 @@ func (r *GormStockAdjustmentRepository) ListPending(
 		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Order("created_at desc").
 		Find(&gAdjustments).Error; err != nil {
-		return nil, fmt.Errorf("ListPending: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentRepository.ListPending: %w", err)
 	}
 	log.Printf("[STOCK_REPO] ListPending retornou %d registros", len(gAdjustments))
 	return r.mapToDomainSlice(gAdjustments), nil
@@ -164,7 +164,7 @@ func (r *GormStockAdjustmentRepository) UpdateStatus(
 		Model(&GormStockAdjustmentPending{}).
 		Where("deleted_at IS NULL").
 		Updates(updates).Error; err != nil {
-		return fmt.Errorf("UpdateStatus: %w", err)
+		return fmt.Errorf("StockAdjustmentRepository.UpdateStatus: erro ao atualizar status do ajuste: %w", err)
 	}
 	return nil
 }
@@ -198,10 +198,10 @@ func (r *GormStockAdjustmentRepository) approveWithTx(
 		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Updates(updates)
 	if result.Error != nil {
-		return fmt.Errorf("approveWithTx: %w", result.Error)
+		return fmt.Errorf("StockAdjustmentRepository.approveWithTx: erro ao aprovar ajuste: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("ajuste id=%d não encontrado ou já processado", id)
+		return fmt.Errorf("StockAdjustmentRepository.approveWithTx: ajuste id=%d não encontrado ou já processado", id)
 	}
 	return nil
 }
@@ -215,20 +215,22 @@ func (r *GormStockAdjustmentRepository) ApproveAndRestoreStock(
 		query := ApplyTenantFilterWithID(ctx, tx, id)
 		if err := query.Where("deleted_at IS NULL").First(&gAdjustment).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("ajuste id=%d não encontrado", id)
+				return fmt.Errorf("StockAdjustmentRepository.ApproveAndRestoreStock: ajuste id=%d não encontrado", id)
 			}
-			return fmt.Errorf("ApproveAndRestoreStock: buscar ajuste: %w", err)
+			return fmt.Errorf("StockAdjustmentRepository.ApproveAndRestoreStock: erro ao buscar ajuste: %w", err)
 		}
 		if gAdjustment.Status != string(domain.StockAdjustmentStatusPending) {
-			return fmt.Errorf("ajuste já processado (status: %s)", gAdjustment.Status)
+			return fmt.Errorf("StockAdjustmentRepository.ApproveAndRestoreStock: ajuste já processado (status: %s)", gAdjustment.Status)
 		}
 
 		if err := r.approveWithTx(ctx, id, processedBy, notes, tx); err != nil {
-			return err
+			tx.Rollback()
+			return fmt.Errorf("StockAdjustmentRepository.ApproveAndRestoreStock: erro ao aprovar ajuste: %w", err)
 		}
 
 		if err := r.productRepo.IncreaseIngredientStock(ctx, gAdjustment.IngredientID, gAdjustment.Quantity, tx); err != nil {
-			return fmt.Errorf("ApproveAndRestoreStock: repor estoque: %w", err)
+			tx.Rollback()
+			return fmt.Errorf("StockAdjustmentRepository.ApproveAndRestoreStock: erro ao repor estoque: %w", err)
 		}
 
 		return nil
@@ -250,7 +252,7 @@ func (r *GormStockAdjustmentRepository) Reject(
 		Model(&GormStockAdjustmentPending{}).
 		Where("status = ? AND deleted_at IS NULL", domain.StockAdjustmentStatusPending).
 		Updates(updates).Error; err != nil {
-		return fmt.Errorf("Reject: %w", err)
+		return fmt.Errorf("StockAdjustmentRepository.Reject: erro ao rejeitar ajuste: %w", err)
 	}
 	return nil
 }
@@ -264,7 +266,7 @@ func (r *GormStockAdjustmentRepository) FindByID(
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("FindByID: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentRepository.FindByID: %w", err)
 	}
 	return r.mapToDomain(&gAdjustment), nil
 }

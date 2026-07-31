@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -79,7 +80,7 @@ func (j *IdempotencyCleanupJob) RunOnce(ctx context.Context) error {
 	cutoff := time.Now().Add(-j.ttl)
 	deleted, err := j.idempotencyRepo.DeleteExpired(ctx, cutoff)
 	if err != nil {
-		return err
+		return fmt.Errorf("IdempotencyCleanupJob.RunOnce: %w", err)
 	}
 	log.Printf("[IdempotencyCleanup] RunOnce: %d chaves expiradas removidas (cutoff: %s)", deleted, cutoff.Format(time.RFC3339))
 	return nil

@@ -69,7 +69,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, input CreatePlanInput) (*d
 	}
 
 	if err := s.planRepo.Create(ctx, plan); err != nil {
-		return nil, fmt.Errorf("CreatePlan: failed to create plan: %w", err)
+		return nil, fmt.Errorf("PlanService.CreatePlan: criar plano: %w", err)
 	}
 
 	return plan, nil
@@ -78,7 +78,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, input CreatePlanInput) (*d
 func (s *PlanService) GetPlan(ctx context.Context, id uint) (*domain.Plan, error) {
 	plan, err := s.planRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("GetPlan: failed to get plan: %w", err)
+		return nil, fmt.Errorf("PlanService.GetPlan: buscar plano: %w", err)
 	}
 	if plan == nil {
 		return nil, ErrPlanNotFound
@@ -89,7 +89,7 @@ func (s *PlanService) GetPlan(ctx context.Context, id uint) (*domain.Plan, error
 func (s *PlanService) ListPlans(ctx context.Context) ([]*domain.Plan, error) {
 	plans, err := s.planRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ListPlans: failed to list plans: %w", err)
+		return nil, fmt.Errorf("PlanService.ListPlans: listar planos: %w", err)
 	}
 	return plans, nil
 }
@@ -97,7 +97,7 @@ func (s *PlanService) ListPlans(ctx context.Context) ([]*domain.Plan, error) {
 func (s *PlanService) ListActivePlans(ctx context.Context) ([]*domain.Plan, error) {
 	plans, err := s.planRepo.ListActive(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ListActivePlans: failed to list active plans: %w", err)
+		return nil, fmt.Errorf("PlanService.ListActivePlans: listar planos ativos: %w", err)
 	}
 	return plans, nil
 }
@@ -105,7 +105,7 @@ func (s *PlanService) ListActivePlans(ctx context.Context) ([]*domain.Plan, erro
 func (s *PlanService) UpdatePlan(ctx context.Context, id uint, input UpdatePlanInput) (*domain.Plan, error) {
 	plan, err := s.planRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("UpdatePlan: failed to get plan: %w", err)
+		return nil, fmt.Errorf("PlanService.UpdatePlan: buscar plano: %w", err)
 	}
 	if plan == nil {
 		return nil, ErrPlanNotFound
@@ -141,7 +141,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, id uint, input UpdatePlanI
 	}
 
 	if err := s.planRepo.Update(ctx, plan); err != nil {
-		return nil, fmt.Errorf("UpdatePlan: failed to update plan: %w", err)
+		return nil, fmt.Errorf("PlanService.UpdatePlan: atualizar plano: %w", err)
 	}
 
 	return plan, nil
@@ -150,14 +150,14 @@ func (s *PlanService) UpdatePlan(ctx context.Context, id uint, input UpdatePlanI
 func (s *PlanService) DeletePlan(ctx context.Context, id uint) error {
 	plan, err := s.planRepo.FindByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("DeletePlan: failed to get plan: %w", err)
+		return fmt.Errorf("PlanService.DeletePlan: buscar plano: %w", err)
 	}
 	if plan == nil {
 		return ErrPlanNotFound
 	}
 
 	if err := s.planRepo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("DeletePlan: failed to delete plan: %w", err)
+		return fmt.Errorf("PlanService.DeletePlan: deletar plano: %w", err)
 	}
 
 	return nil

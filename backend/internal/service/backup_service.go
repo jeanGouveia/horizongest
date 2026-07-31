@@ -40,7 +40,7 @@ type BackupResult struct {
 func (s *BackupService) CreateBackup(ctx context.Context) (*BackupResult, error) {
 	// Ensure backup directory exists
 	if err := os.MkdirAll(s.backupDir, 0755); err != nil {
-		return nil, fmt.Errorf("CreateBackup: failed to create backup directory: %w", err)
+		return nil, fmt.Errorf("BackupService.CreateBackup: criar diretório de backup: %w", err)
 	}
 
 	// Generate backup filename with timestamp
@@ -75,7 +75,7 @@ func (s *BackupService) CreateBackup(ctx context.Context) (*BackupResult, error)
 	// Create output file
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("CreateBackup: failed to create backup file: %w", err)
+		return nil, fmt.Errorf("BackupService.CreateBackup: criar arquivo de backup: %w", err)
 	}
 	defer file.Close()
 
@@ -84,13 +84,13 @@ func (s *BackupService) CreateBackup(ctx context.Context) (*BackupResult, error)
 	if err := cmd.Run(); err != nil {
 		// Clean up failed backup file
 		os.Remove(filePath)
-		return nil, fmt.Errorf("CreateBackup: mysqldump failed: %w", err)
+		return nil, fmt.Errorf("BackupService.CreateBackup: mysqldump falhou: %w", err)
 	}
 
 	// Get file size
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("CreateBackup: failed to get file info: %w", err)
+		return nil, fmt.Errorf("BackupService.CreateBackup: obter informações do arquivo: %w", err)
 	}
 
 	return &BackupResult{
@@ -107,7 +107,7 @@ func (s *BackupService) ListBackups(ctx context.Context) ([]BackupResult, error)
 		if os.IsNotExist(err) {
 			return []BackupResult{}, nil
 		}
-		return nil, fmt.Errorf("ListBackups: failed to read backup directory: %w", err)
+		return nil, fmt.Errorf("BackupService.ListBackups: ler diretório de backup: %w", err)
 	}
 
 	var backups []BackupResult
@@ -133,7 +133,7 @@ func (s *BackupService) ListBackups(ctx context.Context) ([]BackupResult, error)
 func (s *BackupService) DeleteBackup(ctx context.Context, fileName string) error {
 	filePath := fmt.Sprintf("%s/%s", s.backupDir, fileName)
 	if err := os.Remove(filePath); err != nil {
-		return fmt.Errorf("DeleteBackup: failed to delete backup: %w", err)
+		return fmt.Errorf("BackupService.DeleteBackup: deletar backup: %w", err)
 	}
 	return nil
 }

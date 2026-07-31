@@ -72,7 +72,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 	// Auto-fill CompanyID from tenant context
 	companyID, err := GetCompanyIDFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("CreateOrder: %w", err)
+		return nil, fmt.Errorf("OrderRepository.CreateOrder: %w", err)
 	}
 
 	var createdOrder *domain.Order
@@ -86,7 +86,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			Where("company_id = ?", companyID).
 			Select("COALESCE(MAX(order_number), 0) + 1").
 			Scan(&nextOrderNumber).Error; err != nil {
-			return fmt.Errorf("CreateOrder: gerar order_number: %w", err)
+			return fmt.Errorf("OrderRepository.CreateOrder: gerar order_number: %w", err)
 		}
 
 		// 2. Persiste o pedido
@@ -104,7 +104,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 				// Colisão de idempotency_key - retornar erro customizado para buscar fora da transação
 				return WrapDuplicateKeyError(err)
 			}
-			return fmt.Errorf("CreateOrder: criar pedido: %w", err)
+			return fmt.Errorf("OrderRepository.CreateOrder: criar pedido: %w", err)
 		}
 		order.ID = gOrder.ID
 		order.OrderNumber = gOrder.OrderNumber
@@ -127,7 +127,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 			item := &order.Items[i]
 			ingredients, ok := productIngredients[item.ProductID]
 			if !ok {
-				return fmt.Errorf("CreateOrder: ingredientes não pré-carregados para produto_id=%d", item.ProductID)
+				return fmt.Errorf("OrderRepository.CreateOrder: ingredientes não pré-carregados para produto_id=%d", item.ProductID)
 			}
 
 			for _, pi := range ingredients {
@@ -159,7 +159,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 		for _, ic := range ingredientList {
 			consumo := ic.totalQty
 			if err := r.productRepo.DecreaseIngredientStock(ctx, ic.ingredientID, consumo, tx, ic.name, ic.currentStock); err != nil {
-				return fmt.Errorf("CreateOrder: baixa estoque ingrediente_id=%d: %w", ic.ingredientID, err)
+				return fmt.Errorf("OrderRepository.CreateOrder: erro ao baixar estoque do ingrediente_id=%d: %w", ic.ingredientID, err)
 			}
 		}
 
@@ -185,7 +185,7 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 				ProductIsNew:          item.ProductIsNew,                                     // snapshot do selo novo
 			}
 			if err := tx.Create(&gItem).Error; err != nil {
-				return fmt.Errorf("CreateOrder: criar item produto_id=%d: %w", item.ProductID, err)
+				return fmt.Errorf("OrderRepository.CreateOrder: erro ao criar item do pedido (produto_id=%d): %w", item.ProductID, err)
 			}
 			item.ID = gItem.ID
 		}
@@ -200,13 +200,13 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 		if order.IdempotencyKey != nil {
 			existingOrder, findErr := r.FindByIdempotencyKey(ctx, companyID, *order.IdempotencyKey)
 			if findErr != nil {
-				return nil, fmt.Errorf("CreateOrder: buscar pedido após colisão: %w", findErr)
+				return nil, fmt.Errorf("OrderRepository.CreateOrder: buscar pedido após colisão: %w", findErr)
 			}
 			if existingOrder != nil {
 				// Carregar itens do pedido existente
 				orderWithItems, findErr := r.FindOrderByID(ctx, existingOrder.ID)
 				if findErr != nil {
-					return nil, fmt.Errorf("CreateOrder: carregar itens após colisão: %w", findErr)
+					return nil, fmt.Errorf("OrderRepository.CreateOrder: carregar itens após colisão: %w", findErr)
 				}
 				return orderWithItems, nil
 			}
@@ -232,7 +232,7 @@ func (r *GormOrderRepository) FindByIdempotencyKey(ctx context.Context, companyI
 		return nil, nil
 	}
 	if query.Error != nil {
-		return nil, fmt.Errorf("FindByIdempotencyKey: %w", query.Error)
+		return nil, fmt.Errorf("OrderRepository.FindByIdempotencyKey: %w", query.Error)
 	}
 
 	return orderToDomain(&gOrder), nil
@@ -246,7 +246,7 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("FindOrderByID: %w", err)
+		return nil, fmt.Errorf("OrderRepository.FindOrderByID: %w", err)
 	}
 
 	var gItems []GormOrderItem
@@ -254,7 +254,7 @@ func (r *GormOrderRepository) FindOrderByID(ctx context.Context, id uint) (*doma
 		Preload("Product").
 		Where("order_id = ? AND deleted_at IS NULL", id).
 		Find(&gItems).Error; err != nil {
-		return nil, fmt.Errorf("FindOrderByID items: %w", err)
+		return nil, fmt.Errorf("OrderRepository.FindOrderByID: carregar itens: %w", err)
 	}
 
 	order := orderToDomain(&gOrder)
@@ -293,7 +293,7 @@ func (r *GormOrderRepository) ListOrders(ctx context.Context) ([]domain.Order, e
 	var gOrders []GormOrder
 	query := ApplyTenantFilter(ctx, r.db)
 	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Order("created_at desc").Find(&gOrders).Error; err != nil {
-		return nil, fmt.Errorf("ListOrders: %w", err)
+		return nil, fmt.Errorf("OrderRepository.ListOrders: %w", err)
 	}
 	out := make([]domain.Order, len(gOrders))
 	for i, g := range gOrders {
@@ -308,7 +308,7 @@ func (r *GormOrderRepository) UpdateOrderStatus(
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
 		Where("deleted_at IS NULL").Update("status", string(status)).Error; err != nil {
-		return fmt.Errorf("UpdateOrderStatus: %w", err)
+		return fmt.Errorf("OrderRepository.UpdateOrderStatus: %w", err)
 	}
 	return nil
 }
@@ -330,7 +330,7 @@ func (r *GormOrderRepository) UpdateOrderStatusWithAdjustments(
 		query := ApplyTenantFilterWithID(ctx, tx, id)
 		if err := query.Model(&GormOrder{}).
 			Where("deleted_at IS NULL").Update("status", string(status)).Error; err != nil {
-			return fmt.Errorf("UpdateOrderStatusWithAdjustments: atualizar status: %w", err)
+			return fmt.Errorf("OrderRepository.UpdateOrderStatusWithAdjustments: atualizar status: %w", err)
 		}
 		log.Printf("[REPO] Status do pedido atualizado para %s", status)
 
@@ -385,7 +385,7 @@ func (r *GormOrderRepository) UpdateOrderStatusWithAdjustments(
 						log.Printf("[REPO] ===== ERRO NO INSERT =====")
 						log.Printf("[REPO] order_id=%d, ingredient_id=%d", id, pi.IngredientID)
 						log.Printf("[REPO] Erro: %v", err)
-						return fmt.Errorf("UpdateOrderStatusWithAdjustments: criar ajuste: %w", err)
+						return fmt.Errorf("OrderRepository.UpdateOrderStatusWithAdjustments: criar ajuste: %w", err)
 					}
 					log.Printf("[REPO] INSERT bem-sucedido: order_id=%d, ingredient_id=%d", id, pi.IngredientID)
 					ajustesCriados++
@@ -426,10 +426,10 @@ func (r *GormOrderRepository) ValidateStock(ctx context.Context, items []domain.
 		// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 		ingredient, err := r.productRepo.FindIngredientByID(ctx, ingredientID, nil)
 		if err != nil {
-			return nil, fmt.Errorf("ValidateStock: buscar ingrediente %d: %w", ingredientID, err)
+			return nil, fmt.Errorf("OrderRepository.ValidateStock: buscar ingrediente %d: %w", ingredientID, err)
 		}
 		if ingredient == nil {
-			return nil, fmt.Errorf("ValidateStock: ingrediente %d não encontrado", ingredientID)
+			return nil, fmt.Errorf("OrderRepository.ValidateStock: ingrediente %d não encontrado", ingredientID)
 		}
 
 		if ingredient.StockQuantity < requiredQty {
@@ -463,9 +463,9 @@ func (r *GormOrderRepository) UpdateOrder(
 		query := ApplyTenantFilterWithID(ctx, tx, id)
 		if err := query.Where("deleted_at IS NULL").First(&gOrder).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("pedido não encontrado")
+				return fmt.Errorf("OrderRepository.UpdateOrder: pedido não encontrado")
 			}
-			return fmt.Errorf("UpdateOrder: buscar pedido: %w", err)
+			return fmt.Errorf("OrderRepository.UpdateOrder: buscar pedido: %w", err)
 		}
 
 		// Get current items
@@ -475,7 +475,7 @@ func (r *GormOrderRepository) UpdateOrder(
 		// Isso garante que o pedido pertence ao tenant antes de buscar itens
 		var gItems []GormOrderItem
 		if err := tx.Where("order_id = ? AND deleted_at IS NULL", id).Find(&gItems).Error; err != nil {
-			return fmt.Errorf("UpdateOrder: buscar itens atuais: %w", err)
+			return fmt.Errorf("OrderRepository.UpdateOrder: buscar itens atuais: %w", err)
 		}
 
 		// Build map of current items for easy lookup
@@ -507,7 +507,7 @@ func (r *GormOrderRepository) UpdateOrder(
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * gi.Quantity
 						if err := r.productRepo.IncreaseIngredientStock(ctx, pi.IngredientID, consumo, tx); err != nil {
-							return fmt.Errorf("UpdateOrder: restaurar estoque item removido: %w", err)
+							return fmt.Errorf("OrderRepository.UpdateOrder: restaurar estoque item removido: %w", err)
 						}
 					}
 				}
@@ -519,7 +519,7 @@ func (r *GormOrderRepository) UpdateOrder(
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * difference
 						if err := r.productRepo.IncreaseIngredientStock(ctx, pi.IngredientID, consumo, tx); err != nil {
-							return fmt.Errorf("UpdateOrder: restaurar estoque redução: %w", err)
+							return fmt.Errorf("OrderRepository.UpdateOrder: restaurar estoque redução: %w", err)
 						}
 					}
 				}
@@ -546,7 +546,7 @@ func (r *GormOrderRepository) UpdateOrder(
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * item.Quantity
 						if err := r.productRepo.DecreaseIngredientStock(ctx, pi.IngredientID, consumo, tx, pi.Ingredient.Name, pi.Ingredient.StockQuantity); err != nil {
-							return fmt.Errorf("UpdateOrder: baixar estoque novo item: %w", err)
+							return fmt.Errorf("OrderRepository.UpdateOrder: baixar estoque novo item: %w", err)
 						}
 					}
 				}
@@ -558,7 +558,7 @@ func (r *GormOrderRepository) UpdateOrder(
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * difference
 						if err := r.productRepo.DecreaseIngredientStock(ctx, pi.IngredientID, consumo, tx, pi.Ingredient.Name, pi.Ingredient.StockQuantity); err != nil {
-							return fmt.Errorf("UpdateOrder: baixar estoque aumento: %w", err)
+							return fmt.Errorf("OrderRepository.UpdateOrder: baixar estoque aumento: %w", err)
 						}
 					}
 				}
@@ -570,7 +570,7 @@ func (r *GormOrderRepository) UpdateOrder(
 		// NÃO é IDOR pois o order_id já foi validado por ApplyTenantFilterWithID
 		// no início da transação. Só deleta itens do pedido validado.
 		if err := tx.Where("order_id = ?", id).Delete(&GormOrderItem{}).Error; err != nil {
-			return fmt.Errorf("UpdateOrder: deletar itens antigos: %w", err)
+			return fmt.Errorf("OrderRepository.UpdateOrder: deletar itens antigos: %w", err)
 		}
 
 		// Step 4: Insert new items
@@ -592,7 +592,7 @@ func (r *GormOrderRepository) UpdateOrder(
 				ProductIsNew:          item.ProductIsNew,
 			}
 			if err := tx.Create(&gItem).Error; err != nil {
-				return fmt.Errorf("UpdateOrder: criar novo item: %w", err)
+				return fmt.Errorf("OrderRepository.UpdateOrder: criar novo item: %w", err)
 			}
 			item.ID = gItem.ID
 		}
@@ -604,7 +604,7 @@ func (r *GormOrderRepository) UpdateOrder(
 				"total_price": total,
 				"notes":       notes,
 			}).Error; err != nil {
-			return fmt.Errorf("UpdateOrder: atualizar pedido: %w", err)
+			return fmt.Errorf("OrderRepository.UpdateOrder: atualizar pedido: %w", err)
 		}
 
 		return nil

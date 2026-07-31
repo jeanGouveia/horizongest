@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
@@ -41,7 +42,7 @@ func (s *PlatformBrandService) Get(ctx context.Context) (*domain.PlatformBrandCo
 func (s *PlatformBrandService) Update(ctx context.Context, brand *domain.PlatformBrandConfig, updatedBy uint) error {
 	// Validate configuration
 	if err := s.validateBrand(brand); err != nil {
-		return err
+		return fmt.Errorf("PlatformBrandService.Update: validar configuração: %w", err)
 	}
 
 	return s.brandRepo.Update(ctx, brand, updatedBy)

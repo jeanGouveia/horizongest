@@ -196,7 +196,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, in CreateProductInpu
 		SyncStatus:             in.SyncStatus,
 	}
 	if err := s.repo.CreateProduct(ctx, p); err != nil {
-		return nil, fmt.Errorf("ProductService.CreateProduct: %w", err)
+		return nil, fmt.Errorf("ProductService.CreateProduct: criar produto: %w", err)
 	}
 	return p, nil
 }
@@ -204,7 +204,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, in CreateProductInpu
 func (s *ProductService) ListProducts(ctx context.Context) ([]domain.Product, error) {
 	products, err := s.repo.ListProducts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.ListProducts: %w", err)
+		return nil, fmt.Errorf("ProductService.ListProducts: listar produtos: %w", err)
 	}
 	return products, nil
 }
@@ -212,7 +212,7 @@ func (s *ProductService) ListProducts(ctx context.Context) ([]domain.Product, er
 func (s *ProductService) ListActiveProducts(ctx context.Context) ([]domain.Product, error) {
 	products, err := s.repo.ListActiveProducts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.ListActiveProducts: %w", err)
+		return nil, fmt.Errorf("ProductService.ListActiveProducts: listar produtos ativos: %w", err)
 	}
 	return products, nil
 }
@@ -220,7 +220,7 @@ func (s *ProductService) ListActiveProducts(ctx context.Context) ([]domain.Produ
 func (s *ProductService) GetProduct(ctx context.Context, id uint) (*domain.Product, error) {
 	p, err := s.repo.FindProductByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.GetProduct: %w", err)
+		return nil, fmt.Errorf("ProductService.GetProduct: buscar produto: %w", err)
 	}
 	if p == nil {
 		return nil, ErrProductNotFound
@@ -228,7 +228,7 @@ func (s *ProductService) GetProduct(ctx context.Context, id uint) (*domain.Produ
 	// Enriquece com a ficha técnica
 	ingredients, err := s.repo.GetProductIngredients(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.GetProduct ingredients: %w", err)
+		return nil, fmt.Errorf("ProductService.GetProduct: buscar ingredientes: %w", err)
 	}
 	p.Ingredients = ingredients
 	return p, nil
@@ -237,7 +237,7 @@ func (s *ProductService) GetProduct(ctx context.Context, id uint) (*domain.Produ
 func (s *ProductService) DeleteProduct(ctx context.Context, id uint) error {
 	p, err := s.repo.FindProductByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("ProductService.DeleteProduct: %w", err)
+		return fmt.Errorf("ProductService.DeleteProduct: buscar produto: %w", err)
 	}
 	if p == nil {
 		return ErrProductNotFound
@@ -248,7 +248,7 @@ func (s *ProductService) DeleteProduct(ctx context.Context, id uint) error {
 func (s *ProductService) UpdateProduct(ctx context.Context, id uint, in UpdateProductInput) (*domain.Product, error) {
 	p, err := s.repo.FindProductByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.UpdateProduct: %w", err)
+		return nil, fmt.Errorf("ProductService.UpdateProduct: buscar produto: %w", err)
 	}
 	if p == nil {
 		return nil, ErrProductNotFound
@@ -296,7 +296,7 @@ func (s *ProductService) UpdateProduct(ctx context.Context, id uint, in UpdatePr
 	p.SyncStatus = in.SyncStatus
 
 	if err := s.repo.UpdateProduct(ctx, p); err != nil {
-		return nil, fmt.Errorf("ProductService.UpdateProduct: %w", err)
+		return nil, fmt.Errorf("ProductService.UpdateProduct: atualizar produto: %w", err)
 	}
 	return p, nil
 }
@@ -309,7 +309,7 @@ func (s *ProductService) CreateIngredient(ctx context.Context, in CreateIngredie
 		StockQuantity: in.StockQuantity, MinStock: in.MinStock,
 	}
 	if err := s.repo.CreateIngredient(ctx, i); err != nil {
-		return nil, fmt.Errorf("ProductService.CreateIngredient: %w", err)
+		return nil, fmt.Errorf("ProductService.CreateIngredient: criar ingrediente: %w", err)
 	}
 	return i, nil
 }
@@ -322,7 +322,7 @@ func (s *ProductService) GetIngredient(ctx context.Context, id uint) (*domain.In
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.GetIngredient: %w", err)
+		return nil, fmt.Errorf("ProductService.GetIngredient: buscar ingrediente: %w", err)
 	}
 	if i == nil {
 		return nil, ErrIngredientNotFound
@@ -334,7 +334,7 @@ func (s *ProductService) UpdateIngredientStock(ctx context.Context, id uint, in 
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: %w", err)
+		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: buscar ingrediente: %w", err)
 	}
 	if i == nil {
 		return nil, ErrIngredientNotFound
@@ -351,7 +351,7 @@ func (s *ProductService) UpdateIngredientStock(ctx context.Context, id uint, in 
 	}
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	if err := s.repo.UpdateIngredient(ctx, i, nil); err != nil {
-		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: %w", err)
+		return nil, fmt.Errorf("ProductService.UpdateIngredientStock: atualizar ingrediente: %w", err)
 	}
 	return i, nil
 }
@@ -360,7 +360,7 @@ func (s *ProductService) UpdateIngredient(ctx context.Context, id uint, in Updat
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
-		return nil, fmt.Errorf("ProductService.UpdateIngredient: %w", err)
+		return nil, fmt.Errorf("ProductService.UpdateIngredient: buscar ingrediente: %w", err)
 	}
 	if i == nil {
 		return nil, ErrIngredientNotFound
@@ -373,7 +373,7 @@ func (s *ProductService) UpdateIngredient(ctx context.Context, id uint, in Updat
 
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	if err := s.repo.UpdateIngredient(ctx, i, nil); err != nil {
-		return nil, fmt.Errorf("ProductService.UpdateIngredient: %w", err)
+		return nil, fmt.Errorf("ProductService.UpdateIngredient: atualizar ingrediente: %w", err)
 	}
 	return i, nil
 }
@@ -382,7 +382,7 @@ func (s *ProductService) DeleteIngredient(ctx context.Context, id uint) error {
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	i, err := s.repo.FindIngredientByID(ctx, id, nil)
 	if err != nil {
-		return fmt.Errorf("ProductService.DeleteIngredient: %w", err)
+		return fmt.Errorf("ProductService.DeleteIngredient: buscar ingrediente: %w", err)
 	}
 	if i == nil {
 		return ErrIngredientNotFound
@@ -397,7 +397,7 @@ func (s *ProductService) SetProductIngredients(
 ) error {
 	p, err := s.repo.FindProductByID(ctx, productID)
 	if err != nil {
-		return fmt.Errorf("ProductService.SetProductIngredients: %w", err)
+		return fmt.Errorf("ProductService.SetProductIngredients: buscar produto: %w", err)
 	}
 	if p == nil {
 		return ErrProductNotFound
@@ -409,10 +409,10 @@ func (s *ProductService) SetProductIngredients(
 		// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 		ing, err := s.repo.FindIngredientByID(ctx, item.IngredientID, nil)
 		if err != nil {
-			return fmt.Errorf("ProductService.SetProductIngredients: %w", err)
+			return fmt.Errorf("ProductService.SetProductIngredients: buscar ingrediente: %w", err)
 		}
 		if ing == nil {
-			return fmt.Errorf("ingrediente id=%d não encontrado", item.IngredientID)
+			return fmt.Errorf("ProductService.SetProductIngredients: ingrediente id=%d não encontrado", item.IngredientID)
 		}
 		items[i] = domain.ProductIngredient{
 			ProductID:    productID,
@@ -441,7 +441,7 @@ func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain
 		// Get the original product
 		original, err := s.repo.FindProductByID(ctx, id)
 		if err != nil {
-			return fmt.Errorf("ProductService.DuplicateProduct: %w", err)
+			return fmt.Errorf("ProductService.DuplicateProduct: buscar produto original: %w", err)
 		}
 		if original == nil {
 			return ErrProductNotFound
@@ -450,7 +450,7 @@ func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain
 		// Get original ingredients
 		ingredients, err := s.repo.GetProductIngredients(ctx, id)
 		if err != nil {
-			return fmt.Errorf("ProductService.DuplicateProduct: failed to get ingredients: %w", err)
+			return fmt.Errorf("ProductService.DuplicateProduct: buscar ingredientes: %w", err)
 		}
 
 		// Create duplicate with modified name
@@ -484,7 +484,7 @@ func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain
 		}
 
 		if err := s.repo.CreateProduct(ctx, duplicate); err != nil {
-			return fmt.Errorf("ProductService.DuplicateProduct: failed to create duplicate: %w", err)
+			return fmt.Errorf("ProductService.DuplicateProduct: criar duplicata: %w", err)
 		}
 
 		// Copy ingredients if it's a composite product
@@ -498,7 +498,7 @@ func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain
 				}
 			}
 			if err := s.repo.SetProductIngredients(ctx, duplicate.ID, duplicateIngredients); err != nil {
-				return fmt.Errorf("ProductService.DuplicateProduct: failed to copy ingredients: %w", err)
+				return fmt.Errorf("ProductService.DuplicateProduct: copiar ingredientes: %w", err)
 			}
 		}
 
@@ -516,7 +516,7 @@ func (s *ProductService) DuplicateProduct(ctx context.Context, id uint) (*domain
 func (s *ProductService) ArchiveProduct(ctx context.Context, id uint) error {
 	p, err := s.repo.FindProductByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("ProductService.ArchiveProduct: %w", err)
+		return fmt.Errorf("ProductService.ArchiveProduct: buscar produto: %w", err)
 	}
 	if p == nil {
 		return ErrProductNotFound
@@ -524,7 +524,7 @@ func (s *ProductService) ArchiveProduct(ctx context.Context, id uint) error {
 
 	p.Active = false
 	if err := s.repo.UpdateProduct(ctx, p); err != nil {
-		return fmt.Errorf("ProductService.ArchiveProduct: %w", err)
+		return fmt.Errorf("ProductService.ArchiveProduct: atualizar produto: %w", err)
 	}
 	return nil
 }

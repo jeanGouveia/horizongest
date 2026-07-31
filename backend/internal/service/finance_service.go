@@ -38,7 +38,7 @@ func (s *FinanceService) CreateTransactionCategory(ctx context.Context, companyI
 	}
 
 	if err := s.financeRepo.CreateTransactionCategory(ctx, category); err != nil {
-		return nil, fmt.Errorf("erro ao criar categoria: %w", err)
+		return nil, fmt.Errorf("FinanceService.CreateTransactionCategory: criar categoria: %w", err)
 	}
 
 	return category, nil
@@ -105,7 +105,7 @@ func (s *FinanceService) CreateTransaction(ctx context.Context, companyID, userI
 	}
 
 	if err := s.financeRepo.CreateTransaction(ctx, transaction); err != nil {
-		return nil, fmt.Errorf("erro ao criar transação: %w", err)
+		return nil, fmt.Errorf("FinanceService.CreateTransaction: criar transação: %w", err)
 	}
 
 	return transaction, nil

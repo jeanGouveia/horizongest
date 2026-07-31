@@ -63,7 +63,7 @@ func (s *StockMovementService) CreateStockMovement(ctx context.Context, companyI
 		// Sprint 4B.1 v2: Usa FindIngredientByIDForUpdate com Clauses(clause.Locking{Strength: "UPDATE"})
 		ingredient, err := s.productRepo.FindIngredientByIDForUpdate(ctx, input.IngredientID, tx)
 		if err != nil {
-			return fmt.Errorf("ingrediente não encontrado: %w", err)
+			return fmt.Errorf("StockMovementService.CreateMovement: buscar ingrediente: %w", err)
 		}
 		if ingredient == nil {
 			return errors.New("ingrediente não encontrado")
@@ -107,13 +107,13 @@ func (s *StockMovementService) CreateStockMovement(ctx context.Context, companyI
 		}
 
 		if err := s.stockMovementRepo.Create(ctx, movement, tx); err != nil {
-			return fmt.Errorf("erro ao criar movimentação: %w", err)
+			return fmt.Errorf("StockMovementService.CreateMovement: criar movimentação: %w", err)
 		}
 
 		// 4. Atualizar estoque do ingrediente DENTRO da transação (passando tx)
 		ingredient.StockQuantity = newStock
 		if err := s.productRepo.UpdateIngredient(ctx, ingredient, tx); err != nil {
-			return fmt.Errorf("erro ao atualizar estoque: %w", err)
+			return fmt.Errorf("StockMovementService.CreateMovement: atualizar estoque: %w", err)
 		}
 
 		return nil
@@ -155,7 +155,7 @@ func (s *StockMovementService) CreateInventory(ctx context.Context, companyID, u
 
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	if err := s.stockMovementRepo.CreateInventory(ctx, inventory, nil); err != nil {
-		return nil, fmt.Errorf("erro ao criar inventário: %w", err)
+		return nil, fmt.Errorf("StockMovementService.CreateInventory: criar inventário: %w", err)
 	}
 
 	return inventory, nil
@@ -200,7 +200,7 @@ func (s *StockMovementService) AddInventoryItem(ctx context.Context, inventoryID
 
 	// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 	if err := s.stockMovementRepo.CreateInventoryItem(ctx, item, nil); err != nil {
-		return nil, fmt.Errorf("erro ao criar item de inventário: %w", err)
+		return nil, fmt.Errorf("StockMovementService.CreateInventoryItem: criar item de inventário: %w", err)
 	}
 
 	return item, nil
@@ -229,7 +229,7 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 		// Sprint 4B.5: Não é necessário SELECT FOR UPDATE aqui pois o inventário já está travado
 		items, err := s.stockMovementRepo.ListInventoryItems(ctx, inventoryID, tx)
 		if err != nil {
-			return fmt.Errorf("erro ao buscar itens do inventário: %w", err)
+			return fmt.Errorf("StockMovementService.CompleteInventory: buscar itens do inventário: %w", err)
 		}
 
 		// Sprint 4B.1 v2: Ordenar itens por IngredientID para evitar deadlock
@@ -244,10 +244,10 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 				// Sprint 4B.1 v2: Buscar ingrediente com SELECT FOR UPDATE dentro da transação
 				ingredient, err := s.productRepo.FindIngredientByIDForUpdate(ctx, item.IngredientID, tx)
 				if err != nil {
-					return fmt.Errorf("ingrediente não encontrado: %w", err)
+					return fmt.Errorf("StockMovementService.CompleteInventory: buscar ingrediente: %w", err)
 				}
 				if ingredient == nil {
-					return fmt.Errorf("ingrediente id=%d não encontrado", item.IngredientID)
+					return fmt.Errorf("StockMovementService.CompleteInventory: ingrediente id=%d não encontrado", item.IngredientID)
 				}
 
 				// Validar company
@@ -267,7 +267,7 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 					quantity = item.Difference // já é negativo
 					newStock = previousStock + quantity
 					if newStock < 0 {
-						return fmt.Errorf("estoque não pode ser negativo para ingrediente %d", item.IngredientID)
+						return fmt.Errorf("StockMovementService.CompleteInventory: estoque não pode ser negativo para ingrediente %d", item.IngredientID)
 					}
 				}
 
@@ -287,13 +287,13 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 				}
 
 				if err := s.stockMovementRepo.Create(ctx, movement, tx); err != nil {
-					return fmt.Errorf("erro ao criar movimentação: %w", err)
+					return fmt.Errorf("StockMovementService.CompleteInventory: criar movimentação: %w", err)
 				}
 
 				// Atualizar estoque do ingrediente DENTRO da transação (passando tx)
 				ingredient.StockQuantity = newStock
 				if err := s.productRepo.UpdateIngredient(ctx, ingredient, tx); err != nil {
-					return fmt.Errorf("erro ao atualizar estoque: %w", err)
+					return fmt.Errorf("StockMovementService.CompleteInventory: atualizar estoque: %w", err)
 				}
 			}
 		}
@@ -302,7 +302,7 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 		// Isso garante que o inventário não foi modificado durante o processamento
 		currentInventory, err := s.stockMovementRepo.FindInventoryByIDForUpdate(ctx, inventoryID, tx)
 		if err != nil {
-			return fmt.Errorf("erro ao verificar status do inventário: %w", err)
+			return fmt.Errorf("StockMovementService.CompleteInventory: verificar status do inventário: %w", err)
 		}
 		if currentInventory.Status != "draft" {
 			return ErrStockInventoryCompleted
@@ -310,7 +310,7 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 
 		// 4. Atualizar status do inventário DENTRO da transação (passando tx)
 		if err := s.stockMovementRepo.UpdateInventoryStatus(ctx, inventoryID, "completed", tx); err != nil {
-			return fmt.Errorf("erro ao atualizar status do inventário: %w", err)
+			return fmt.Errorf("StockMovementService.CompleteInventory: atualizar status do inventário: %w", err)
 		}
 
 		return nil

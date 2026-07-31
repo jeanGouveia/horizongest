@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 )
@@ -39,7 +40,7 @@ func (s *GlobalConfigService) Get(ctx context.Context) (*domain.GlobalConfig, er
 func (s *GlobalConfigService) Update(ctx context.Context, config *domain.GlobalConfig, updatedBy uint) error {
 	// Validate configuration
 	if err := s.validateConfig(config); err != nil {
-		return err
+		return fmt.Errorf("GlobalConfigService.Update: validar configuração: %w", err)
 	}
 
 	return s.configRepo.Update(ctx, config, updatedBy)

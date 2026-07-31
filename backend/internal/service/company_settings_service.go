@@ -68,7 +68,7 @@ func (s *CompanySettingsService) GetSettings(ctx context.Context, userID uint) (
 	// Get user to find their company
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("GetSettings: failed to get user: %w", err)
+		return nil, fmt.Errorf("CompanySettingsService.GetSettings: buscar usuário: %w", err)
 	}
 
 	if user == nil {
@@ -88,7 +88,7 @@ func (s *CompanySettingsService) GetSettings(ctx context.Context, userID uint) (
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
-		return nil, fmt.Errorf("GetSettings: failed to get company: %w", err)
+		return nil, fmt.Errorf("CompanySettingsService.GetSettings: buscar empresa: %w", err)
 	}
 
 	if company == nil {
@@ -117,7 +117,7 @@ func (s *CompanySettingsService) UpdateSettings(ctx context.Context, userID uint
 	// Get user to find their company
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("UpdateSettings: failed to get user: %w", err)
+		return fmt.Errorf("CompanySettingsService.UpdateSettings: buscar usuário: %w", err)
 	}
 
 	if user == nil {
@@ -131,7 +131,7 @@ func (s *CompanySettingsService) UpdateSettings(ctx context.Context, userID uint
 	// Get current company
 	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
-		return fmt.Errorf("UpdateSettings: failed to get company: %w", err)
+		return fmt.Errorf("CompanySettingsService.UpdateSettings: buscar empresa: %w", err)
 	}
 
 	if company == nil {
@@ -169,7 +169,7 @@ func (s *CompanySettingsService) UpdateSettings(ctx context.Context, userID uint
 
 	// Update company
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("UpdateSettings: failed to update company: %w", err)
+		return fmt.Errorf("CompanySettingsService.UpdateSettings: atualizar empresa: %w", err)
 	}
 
 	return nil

@@ -71,16 +71,16 @@ func (s *MediaService) UploadMedia(
 	thumbDir := "uploads/products/thumbs"
 
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		return nil, fmt.Errorf("UploadMedia: criar diretório: %w", err)
+		return nil, fmt.Errorf("MediaService.UploadMedia: criar diretório: %w", err)
 	}
 	if err := os.MkdirAll(thumbDir, 0755); err != nil {
-		return nil, fmt.Errorf("UploadMedia: criar diretório thumbs: %w", err)
+		return nil, fmt.Errorf("MediaService.UploadMedia: criar diretório thumbs: %w", err)
 	}
 
 	// Salvar arquivo original
 	filePath := filepath.Join(uploadDir, fileName)
 	if err := os.WriteFile(filePath, fileData, 0644); err != nil {
-		return nil, fmt.Errorf("UploadMedia: salvar arquivo: %w", err)
+		return nil, fmt.Errorf("MediaService.UploadMedia: salvar arquivo: %w", err)
 	}
 
 	// Thumbnail generation to be implemented in future sprint
@@ -102,7 +102,7 @@ func (s *MediaService) UploadMedia(
 	if err := s.repo.CreateMedia(ctx, media); err != nil {
 		// Rollback: deletar arquivo se falhar no banco
 		os.Remove(filePath)
-		return nil, fmt.Errorf("UploadMedia: %w", err)
+		return nil, fmt.Errorf("MediaService.UploadMedia: criar mídia: %w", err)
 	}
 
 	return media, nil
@@ -111,7 +111,7 @@ func (s *MediaService) UploadMedia(
 func (s *MediaService) GetMedia(ctx context.Context, id uint) (*domain.Media, error) {
 	m, err := s.repo.FindMediaByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("MediaService.GetMedia: %w", err)
+		return nil, fmt.Errorf("MediaService.GetMedia: buscar mídia: %w", err)
 	}
 	if m == nil {
 		return nil, ErrMediaNotFound
@@ -122,7 +122,7 @@ func (s *MediaService) GetMedia(ctx context.Context, id uint) (*domain.Media, er
 func (s *MediaService) GetMediaByEntity(ctx context.Context, entityType string, entityID uint) ([]domain.Media, error) {
 	media, err := s.repo.FindMediaByEntity(ctx, entityType, entityID)
 	if err != nil {
-		return nil, fmt.Errorf("MediaService.GetMediaByEntity: %w", err)
+		return nil, fmt.Errorf("MediaService.GetMediaByEntity: buscar mídia por entidade: %w", err)
 	}
 	return media, nil
 }
@@ -130,7 +130,7 @@ func (s *MediaService) GetMediaByEntity(ctx context.Context, entityType string, 
 func (s *MediaService) DeleteMedia(ctx context.Context, id uint) error {
 	m, err := s.repo.FindMediaByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("MediaService.DeleteMedia: %w", err)
+		return fmt.Errorf("MediaService.DeleteMedia: buscar mídia: %w", err)
 	}
 	if m == nil {
 		return ErrMediaNotFound
@@ -151,7 +151,7 @@ func (s *MediaService) DeleteMedia(ctx context.Context, id uint) error {
 func (s *MediaService) DeleteMediaByEntity(ctx context.Context, entityType string, entityID uint) error {
 	media, err := s.repo.FindMediaByEntity(ctx, entityType, entityID)
 	if err != nil {
-		return fmt.Errorf("MediaService.DeleteMediaByEntity: %w", err)
+		return fmt.Errorf("MediaService.DeleteMediaByEntity: buscar mídia por entidade: %w", err)
 	}
 
 	// Deletar arquivos físicos

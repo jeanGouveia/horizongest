@@ -64,7 +64,7 @@ func (s *InvitationService) CreateInvitation(ctx context.Context, actorUserID ui
 	// RBAC Validation: Only Owner and Admin can create invitations
 	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
 	if err != nil {
-		return nil, fmt.Errorf("CreateInvitation: failed to check permissions: %w", err)
+		return nil, fmt.Errorf("InvitationService.CreateInvitation: verificar permissões: %w", err)
 	}
 	if !canManage {
 		return nil, ErrPermissionDenied
@@ -73,7 +73,7 @@ func (s *InvitationService) CreateInvitation(ctx context.Context, actorUserID ui
 	// Check if user already exists and belongs to this company
 	user, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return nil, fmt.Errorf("CreateInvitation: failed to check user: %w", err)
+		return nil, fmt.Errorf("InvitationService.CreateInvitation: verificar usuário: %w", err)
 	}
 	if user != nil {
 		if user.CompanyID == companyID {
@@ -87,7 +87,7 @@ func (s *InvitationService) CreateInvitation(ctx context.Context, actorUserID ui
 	// Check for duplicate pending invitation
 	existing, err := s.invitationRepo.FindByEmailAndCompanyID(ctx, email, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("CreateInvitation: failed to check existing invitation: %w", err)
+		return nil, fmt.Errorf("InvitationService.CreateInvitation: verificar convite existente: %w", err)
 	}
 	if existing != nil {
 		return nil, ErrDuplicateInvitation
@@ -96,7 +96,7 @@ func (s *InvitationService) CreateInvitation(ctx context.Context, actorUserID ui
 	// Generate token
 	token, err := domain.GenerateToken()
 	if err != nil {
-		return nil, fmt.Errorf("CreateInvitation: failed to generate token: %w", err)
+		return nil, fmt.Errorf("InvitationService.CreateInvitation: gerar token: %w", err)
 	}
 
 	// Create invitation
@@ -113,7 +113,7 @@ func (s *InvitationService) CreateInvitation(ctx context.Context, actorUserID ui
 	}
 
 	if err := s.invitationRepo.Create(ctx, invitation); err != nil {
-		return nil, fmt.Errorf("CreateInvitation: failed to create invitation: %w", err)
+		return nil, fmt.Errorf("InvitationService.CreateInvitation: criar convite: %w", err)
 	}
 
 	return s.toInvitationOutput(invitation), nil
@@ -123,7 +123,7 @@ func (s *InvitationService) CreateInvitation(ctx context.Context, actorUserID ui
 func (s *InvitationService) ListInvitations(ctx context.Context, companyID uint) ([]*InvitationOutput, error) {
 	invitations, err := s.invitationRepo.ListByCompanyID(ctx, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("ListInvitations: failed to list invitations: %w", err)
+		return nil, fmt.Errorf("InvitationService.ListInvitations: listar convites: %w", err)
 	}
 
 	output := make([]*InvitationOutput, len(invitations))
@@ -137,7 +137,7 @@ func (s *InvitationService) ListInvitations(ctx context.Context, companyID uint)
 func (s *InvitationService) GetInvitation(ctx context.Context, companyID uint, invitationID uint) (*InvitationOutput, error) {
 	invitation, err := s.invitationRepo.FindByID(ctx, invitationID)
 	if err != nil {
-		return nil, fmt.Errorf("GetInvitation: failed to get invitation: %w", err)
+		return nil, fmt.Errorf("InvitationService.GetInvitation: buscar convite: %w", err)
 	}
 	if invitation == nil {
 		return nil, ErrInvitationNotFound
@@ -156,7 +156,7 @@ func (s *InvitationService) RevokeInvitation(ctx context.Context, actorUserID ui
 	// RBAC Validation: Only Owner and Admin can revoke invitations
 	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
 	if err != nil {
-		return fmt.Errorf("RevokeInvitation: failed to check permissions: %w", err)
+		return fmt.Errorf("InvitationService.RevokeInvitation: verificar permissões: %w", err)
 	}
 	if !canManage {
 		return ErrPermissionDenied
@@ -164,7 +164,7 @@ func (s *InvitationService) RevokeInvitation(ctx context.Context, actorUserID ui
 
 	invitation, err := s.invitationRepo.FindByID(ctx, invitationID)
 	if err != nil {
-		return fmt.Errorf("RevokeInvitation: failed to get invitation: %w", err)
+		return fmt.Errorf("InvitationService.RevokeInvitation: buscar convite: %w", err)
 	}
 	if invitation == nil {
 		return ErrInvitationNotFound
@@ -185,7 +185,7 @@ func (s *InvitationService) RevokeInvitation(ctx context.Context, actorUserID ui
 	invitation.UpdatedAt = time.Now()
 
 	if err := s.invitationRepo.Update(ctx, invitation); err != nil {
-		return fmt.Errorf("RevokeInvitation: failed to update invitation: %w", err)
+		return fmt.Errorf("InvitationService.RevokeInvitation: atualizar convite: %w", err)
 	}
 
 	return nil
@@ -195,7 +195,7 @@ func (s *InvitationService) RevokeInvitation(ctx context.Context, actorUserID ui
 func (s *InvitationService) GetInvitationByToken(ctx context.Context, token string) (*InvitationOutput, error) {
 	invitation, err := s.invitationRepo.FindByToken(ctx, token)
 	if err != nil {
-		return nil, fmt.Errorf("GetInvitationByToken: failed to get invitation: %w", err)
+		return nil, fmt.Errorf("InvitationService.GetInvitationByToken: buscar convite: %w", err)
 	}
 	if invitation == nil {
 		return nil, ErrInvitationNotFound
@@ -217,7 +217,7 @@ func (s *InvitationService) GetInvitationByToken(ctx context.Context, token stri
 func (s *InvitationService) AcceptInvitation(ctx context.Context, token string, userEmail string) error {
 	invitation, err := s.invitationRepo.FindByToken(ctx, token)
 	if err != nil {
-		return fmt.Errorf("AcceptInvitation: failed to get invitation: %w", err)
+		return fmt.Errorf("InvitationService.AcceptInvitation: buscar convite: %w", err)
 	}
 	if invitation == nil {
 		return ErrInvitationNotFound
@@ -245,7 +245,7 @@ func (s *InvitationService) AcceptInvitation(ctx context.Context, token string, 
 	// Find user by email
 	user, err := s.userRepo.FindByEmail(ctx, invitation.Email)
 	if err != nil {
-		return fmt.Errorf("AcceptInvitation: failed to find user: %w", err)
+		return fmt.Errorf("InvitationService.AcceptInvitation: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return ErrUserNotFound
@@ -260,7 +260,7 @@ func (s *InvitationService) AcceptInvitation(ctx context.Context, token string, 
 	user.CompanyID = invitation.CompanyID
 	user.Role = invitation.Role
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("AcceptInvitation: failed to update user: %w", err)
+		return fmt.Errorf("InvitationService.AcceptInvitation: atualizar usuário: %w", err)
 	}
 
 	// Mark invitation as accepted
@@ -270,7 +270,7 @@ func (s *InvitationService) AcceptInvitation(ctx context.Context, token string, 
 	invitation.UpdatedAt = now
 
 	if err := s.invitationRepo.Update(ctx, invitation); err != nil {
-		return fmt.Errorf("AcceptInvitation: failed to update invitation: %w", err)
+		return fmt.Errorf("InvitationService.AcceptInvitation: atualizar convite: %w", err)
 	}
 
 	return nil

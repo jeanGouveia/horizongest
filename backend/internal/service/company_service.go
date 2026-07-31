@@ -59,7 +59,7 @@ func (s *CompanyService) CreateCompany(ctx context.Context, in CreateCompanyInpu
 	// Check if slug already exists
 	existing, err := s.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return nil, fmt.Errorf("CompanyService.CreateCompany: %w", err)
+		return nil, fmt.Errorf("CompanyService.CreateCompany: verificar slug: %w", err)
 	}
 	if existing != nil {
 		return nil, ErrSlugAlreadyExists
@@ -107,7 +107,7 @@ func (s *CompanyService) CreateCompany(ctx context.Context, in CreateCompanyInpu
 		Timezone:       timezone,
 	}
 	if err := s.repo.Create(ctx, c); err != nil {
-		return nil, fmt.Errorf("CompanyService.CreateCompany: %w", err)
+		return nil, fmt.Errorf("CompanyService.CreateCompany: criar empresa: %w", err)
 	}
 	return c, nil
 }
@@ -115,7 +115,7 @@ func (s *CompanyService) CreateCompany(ctx context.Context, in CreateCompanyInpu
 func (s *CompanyService) ListCompanies(ctx context.Context) ([]domain.Company, error) {
 	companies, err := s.repo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("CompanyService.ListCompanies: %w", err)
+		return nil, fmt.Errorf("CompanyService.ListCompanies: listar empresas: %w", err)
 	}
 	return companies, nil
 }
@@ -123,7 +123,7 @@ func (s *CompanyService) ListCompanies(ctx context.Context) ([]domain.Company, e
 func (s *CompanyService) GetCompany(ctx context.Context, id uint) (*domain.Company, error) {
 	c, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("CompanyService.GetCompany: %w", err)
+		return nil, fmt.Errorf("CompanyService.GetCompany: buscar empresa: %w", err)
 	}
 	if c == nil {
 		return nil, ErrCompanyNotFound
@@ -141,7 +141,7 @@ func (s *CompanyService) GetCurrentCompany(ctx context.Context, companyID uint) 
 
 	c, err := s.repo.FindByID(ctx, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("CompanyService.GetCurrentCompany: %w", err)
+		return nil, fmt.Errorf("CompanyService.GetCurrentCompany: buscar empresa: %w", err)
 	}
 	if c == nil {
 		return nil, ErrCompanyNotFound
@@ -152,7 +152,7 @@ func (s *CompanyService) GetCurrentCompany(ctx context.Context, companyID uint) 
 func (s *CompanyService) GetCompanyBySlug(ctx context.Context, slug string) (*domain.Company, error) {
 	c, err := s.repo.FindBySlug(ctx, strings.ToLower(slug))
 	if err != nil {
-		return nil, fmt.Errorf("CompanyService.GetCompanyBySlug: %w", err)
+		return nil, fmt.Errorf("CompanyService.GetCompanyBySlug: buscar empresa: %w", err)
 	}
 	if c == nil {
 		return nil, ErrCompanyNotFound
@@ -163,7 +163,7 @@ func (s *CompanyService) GetCompanyBySlug(ctx context.Context, slug string) (*do
 func (s *CompanyService) UpdateCompany(ctx context.Context, id uint, in UpdateCompanyInput) (*domain.Company, error) {
 	c, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("CompanyService.UpdateCompany: %w", err)
+		return nil, fmt.Errorf("CompanyService.UpdateCompany: buscar empresa: %w", err)
 	}
 	if c == nil {
 		return nil, ErrCompanyNotFound
@@ -174,7 +174,7 @@ func (s *CompanyService) UpdateCompany(ctx context.Context, id uint, in UpdateCo
 	if slug != c.Slug {
 		existing, err := s.repo.FindBySlug(ctx, slug)
 		if err != nil {
-			return nil, fmt.Errorf("CompanyService.UpdateCompany: %w", err)
+			return nil, fmt.Errorf("CompanyService.UpdateCompany: verificar slug: %w", err)
 		}
 		if existing != nil {
 			return nil, ErrSlugAlreadyExists
@@ -217,7 +217,7 @@ func (s *CompanyService) UpdateCompany(ctx context.Context, id uint, in UpdateCo
 	}
 
 	if err := s.repo.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("CompanyService.UpdateCompany: %w", err)
+		return nil, fmt.Errorf("CompanyService.UpdateCompany: atualizar empresa: %w", err)
 	}
 	return c, nil
 }
@@ -225,7 +225,7 @@ func (s *CompanyService) UpdateCompany(ctx context.Context, id uint, in UpdateCo
 func (s *CompanyService) DeleteCompany(ctx context.Context, id uint) error {
 	c, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("CompanyService.DeleteCompany: %w", err)
+		return fmt.Errorf("CompanyService.DeleteCompany: buscar empresa: %w", err)
 	}
 	if c == nil {
 		return ErrCompanyNotFound

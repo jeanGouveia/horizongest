@@ -42,7 +42,7 @@ func (s *CategoryService) CreateCategory(ctx context.Context, in CreateCategoryI
 		Active:       true,
 	}
 	if err := s.repo.CreateCategory(ctx, c); err != nil {
-		return nil, fmt.Errorf("CategoryService.CreateCategory: %w", err)
+		return nil, fmt.Errorf("CategoryService.CreateCategory: criar categoria: %w", err)
 	}
 	return c, nil
 }
@@ -50,7 +50,7 @@ func (s *CategoryService) CreateCategory(ctx context.Context, in CreateCategoryI
 func (s *CategoryService) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	categories, err := s.repo.ListCategories(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("CategoryService.ListCategories: %w", err)
+		return nil, fmt.Errorf("CategoryService.ListCategories: listar categorias: %w", err)
 	}
 	return categories, nil
 }
@@ -58,7 +58,7 @@ func (s *CategoryService) ListCategories(ctx context.Context) ([]domain.Category
 func (s *CategoryService) GetCategory(ctx context.Context, id uint) (*domain.Category, error) {
 	c, err := s.repo.FindCategoryByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("CategoryService.GetCategory: %w", err)
+		return nil, fmt.Errorf("CategoryService.GetCategory: buscar categoria: %w", err)
 	}
 	if c == nil {
 		return nil, ErrCategoryNotFound
@@ -69,7 +69,7 @@ func (s *CategoryService) GetCategory(ctx context.Context, id uint) (*domain.Cat
 func (s *CategoryService) UpdateCategory(ctx context.Context, id uint, in UpdateCategoryInput) (*domain.Category, error) {
 	c, err := s.repo.FindCategoryByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("CategoryService.UpdateCategory: %w", err)
+		return nil, fmt.Errorf("CategoryService.UpdateCategory: buscar categoria: %w", err)
 	}
 	if c == nil {
 		return nil, ErrCategoryNotFound
@@ -83,7 +83,7 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id uint, in Update
 	}
 
 	if err := s.repo.UpdateCategory(ctx, c); err != nil {
-		return nil, fmt.Errorf("CategoryService.UpdateCategory: %w", err)
+		return nil, fmt.Errorf("CategoryService.UpdateCategory: atualizar categoria: %w", err)
 	}
 	return c, nil
 }
@@ -91,7 +91,7 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id uint, in Update
 func (s *CategoryService) DeleteCategory(ctx context.Context, id uint) error {
 	c, err := s.repo.FindCategoryByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("CategoryService.DeleteCategory: %w", err)
+		return fmt.Errorf("CategoryService.DeleteCategory: buscar categoria: %w", err)
 	}
 	if c == nil {
 		return ErrCategoryNotFound

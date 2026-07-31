@@ -69,7 +69,7 @@ func (r *GormIdempotencyRepository) Check(ctx context.Context, companyID uint, k
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Check: %w", err)
+		return nil, fmt.Errorf("IdempotencyRepository.Check: %w", err)
 	}
 
 	// Chave existe - analisar estado
@@ -111,7 +111,7 @@ func (r *GormIdempotencyRepository) CreateOrGet(ctx context.Context, record *dom
 		`, gKey.Key, gKey.CompanyID, gKey.RequestHash, gKey.RequestParams, gKey.Status).Error
 
 	if err != nil && !pg.IsUniqueViolation(err) {
-		return nil, fmt.Errorf("CreateOrGet: %w", err)
+		return nil, fmt.Errorf("IdempotencyRepository.CreateOrGet: %w", err)
 	}
 
 	// Após INSERT, buscar o registro (pode ter sido criado por nós ou por outro request)
@@ -122,11 +122,11 @@ func (r *GormIdempotencyRepository) CreateOrGet(ctx context.Context, record *dom
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// Isso não deveria acontecer se INSERT sucedeu
-		return nil, fmt.Errorf("CreateOrGet: registro não encontrado após INSERT")
+		return nil, fmt.Errorf("IdempotencyRepository.CreateOrGet: registro não encontrado após INSERT")
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("CreateOrGet: buscar após INSERT: %w", err)
+		return nil, fmt.Errorf("IdempotencyRepository.CreateOrGet: buscar após INSERT: %w", err)
 	}
 
 	return gormToDomain(&existingKey), nil
@@ -136,7 +136,7 @@ func (r *GormIdempotencyRepository) CreateOrGet(ctx context.Context, record *dom
 func (r *GormIdempotencyRepository) UpdateSuccess(ctx context.Context, id uint, response *domain.IdempotencyResponse) error {
 	headersJSON, err := json.Marshal(response.Headers)
 	if err != nil {
-		return fmt.Errorf("UpdateSuccess: marshal headers: %w", err)
+		return fmt.Errorf("IdempotencyRepository.UpdateSuccess: marshal headers: %w", err)
 	}
 
 	updates := map[string]interface{}{
@@ -152,7 +152,7 @@ func (r *GormIdempotencyRepository) UpdateSuccess(ctx context.Context, id uint, 
 		Updates(updates).Error
 
 	if err != nil {
-		return fmt.Errorf("UpdateSuccess: %w", err)
+		return fmt.Errorf("IdempotencyRepository.UpdateSuccess: %w", err)
 	}
 
 	return nil
@@ -171,7 +171,7 @@ func (r *GormIdempotencyRepository) UpdateFailure(ctx context.Context, id uint, 
 		Updates(updates).Error
 
 	if err != nil {
-		return fmt.Errorf("UpdateFailure: %w", err)
+		return fmt.Errorf("IdempotencyRepository.UpdateFailure: %w", err)
 	}
 
 	return nil
@@ -184,7 +184,7 @@ func (r *GormIdempotencyRepository) DeleteExpired(ctx context.Context, cutoff ti
 		Delete(&GormIdempotencyKey{})
 
 	if result.Error != nil {
-		return 0, fmt.Errorf("DeleteExpired: %w", result.Error)
+		return 0, fmt.Errorf("IdempotencyRepository.DeleteExpired: %w", result.Error)
 	}
 
 	return result.RowsAffected, nil

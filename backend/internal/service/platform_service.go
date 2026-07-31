@@ -64,7 +64,7 @@ func (s *PlatformService) CreateCompany(ctx context.Context, platformUserID uint
 	// Verify platform user has permission (PlatformAdmin only)
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return nil, fmt.Errorf("CreateCompany: failed to get platform user: %w", err)
+		return nil, fmt.Errorf("PlatformService.CreateCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil {
 		return nil, ErrPermissionDenied
@@ -76,7 +76,7 @@ func (s *PlatformService) CreateCompany(ctx context.Context, platformUserID uint
 	// Check if company slug already exists
 	existing, err := s.companyRepo.FindBySlug(ctx, input.Slug)
 	if err != nil {
-		return nil, fmt.Errorf("CreateCompany: failed to check slug: %w", err)
+		return nil, fmt.Errorf("PlatformService.CreateCompany: verificar slug: %w", err)
 	}
 	if existing != nil {
 		return nil, ErrCompanyAlreadyExists
@@ -97,13 +97,13 @@ func (s *PlatformService) CreateCompany(ctx context.Context, platformUserID uint
 	}
 
 	if err := s.companyRepo.Create(ctx, company); err != nil {
-		return nil, fmt.Errorf("CreateCompany: failed to create company: %w", err)
+		return nil, fmt.Errorf("PlatformService.CreateCompany: criar empresa: %w", err)
 	}
 
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(ownerPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("CreateCompany: failed to hash password: %w", err)
+		return nil, fmt.Errorf("PlatformService.CreateCompany: gerar hash senha: %w", err)
 	}
 
 	// Create owner user
@@ -119,7 +119,7 @@ func (s *PlatformService) CreateCompany(ctx context.Context, platformUserID uint
 	}
 
 	if err := s.userRepo.Create(ctx, owner); err != nil {
-		return nil, fmt.Errorf("CreateCompany: failed to create owner: %w", err)
+		return nil, fmt.Errorf("PlatformService.CreateCompany: criar owner: %w", err)
 	}
 
 	// Log audit
@@ -144,7 +144,7 @@ func (s *PlatformService) ListCompanies(ctx context.Context, platformUserID uint
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return nil, fmt.Errorf("ListCompanies: failed to get platform user: %w", err)
+		return nil, fmt.Errorf("PlatformService.ListCompanies: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return nil, ErrPermissionDenied
@@ -152,7 +152,7 @@ func (s *PlatformService) ListCompanies(ctx context.Context, platformUserID uint
 
 	companies, err := s.companyRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ListCompanies: %w", err)
+		return nil, fmt.Errorf("PlatformService.ListCompanies: listar empresas: %w", err)
 	}
 
 	// Convert []domain.Company to []*domain.Company
@@ -169,7 +169,7 @@ func (s *PlatformService) GetCompany(ctx context.Context, platformUserID uint, c
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return nil, fmt.Errorf("GetCompany: failed to get platform user: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return nil, ErrPermissionDenied
@@ -177,7 +177,7 @@ func (s *PlatformService) GetCompany(ctx context.Context, platformUserID uint, c
 
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("GetCompany: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return nil, ErrCompanyNotFound
@@ -191,7 +191,7 @@ func (s *PlatformService) UpdateCompany(ctx context.Context, platformUserID uint
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("UpdateCompany: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.UpdateCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -200,7 +200,7 @@ func (s *PlatformService) UpdateCompany(ctx context.Context, platformUserID uint
 	// Get existing company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("UpdateCompany: %w", err)
+		return fmt.Errorf("PlatformService.UpdateCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -210,7 +210,7 @@ func (s *PlatformService) UpdateCompany(ctx context.Context, platformUserID uint
 	if input.Slug != company.Slug {
 		existing, err := s.companyRepo.FindBySlug(ctx, input.Slug)
 		if err != nil {
-			return fmt.Errorf("UpdateCompany: failed to check slug: %w", err)
+			return fmt.Errorf("PlatformService.UpdateCompany: verificar slug: %w", err)
 		}
 		if existing != nil && existing.ID != companyID {
 			return ErrCompanyAlreadyExists
@@ -228,7 +228,7 @@ func (s *PlatformService) UpdateCompany(ctx context.Context, platformUserID uint
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("UpdateCompany: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.UpdateCompany: atualizar empresa: %w", err)
 	}
 
 	// Log audit
@@ -245,7 +245,7 @@ func (s *PlatformService) DeactivateCompany(ctx context.Context, platformUserID 
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("DeactivateCompany: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.DeactivateCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -254,7 +254,7 @@ func (s *PlatformService) DeactivateCompany(ctx context.Context, platformUserID 
 	// Get existing company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("DeactivateCompany: %w", err)
+		return fmt.Errorf("PlatformService.DeactivateCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -265,7 +265,7 @@ func (s *PlatformService) DeactivateCompany(ctx context.Context, platformUserID 
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("DeactivateCompany: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.DeactivateCompany: atualizar empresa: %w", err)
 	}
 
 	// Log audit
@@ -279,7 +279,7 @@ func (s *PlatformService) ActivateCompany(ctx context.Context, platformUserID ui
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("ActivateCompany: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.ActivateCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -288,7 +288,7 @@ func (s *PlatformService) ActivateCompany(ctx context.Context, platformUserID ui
 	// Get existing company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("ActivateCompany: %w", err)
+		return fmt.Errorf("PlatformService.ActivateCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -299,7 +299,7 @@ func (s *PlatformService) ActivateCompany(ctx context.Context, platformUserID ui
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("ActivateCompany: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.ActivateCompany: atualizar empresa: %w", err)
 	}
 
 	// Log audit
@@ -350,12 +350,12 @@ type DashboardStats struct {
 func (s *PlatformService) GetDashboardStats(ctx context.Context) (*DashboardStats, error) {
 	companies, err := s.companyRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GetDashboardStats: failed to list companies: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetDashboardStats: listar empresas: %w", err)
 	}
 
 	users, err := s.userRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GetDashboardStats: failed to list users: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetDashboardStats: listar usuários: %w", err)
 	}
 
 	stats := &DashboardStats{
@@ -387,7 +387,7 @@ func (s *PlatformService) GetCompanyOwner(ctx context.Context, platformUserID ui
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return nil, fmt.Errorf("GetCompanyOwner: failed to get platform user: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetCompanyOwner: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return nil, ErrPermissionDenied
@@ -396,7 +396,7 @@ func (s *PlatformService) GetCompanyOwner(ctx context.Context, platformUserID ui
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("GetCompanyOwner: failed to get company: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetCompanyOwner: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return nil, ErrCompanyNotFound
@@ -405,7 +405,7 @@ func (s *PlatformService) GetCompanyOwner(ctx context.Context, platformUserID ui
 	// Find owner user for this company
 	users, err := s.userRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GetCompanyOwner: failed to list users: %w", err)
+		return nil, fmt.Errorf("PlatformService.GetCompanyOwner: listar usuários: %w", err)
 	}
 
 	for i := range users {
@@ -414,7 +414,7 @@ func (s *PlatformService) GetCompanyOwner(ctx context.Context, platformUserID ui
 		}
 	}
 
-	return nil, fmt.Errorf("GetCompanyOwner: owner not found")
+	return nil, fmt.Errorf("PlatformService.GetCompanyOwner: owner não encontrado")
 }
 
 // ResetOwnerPassword resets the password of a company owner
@@ -422,7 +422,7 @@ func (s *PlatformService) ResetOwnerPassword(ctx context.Context, platformUserID
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("ResetOwnerPassword: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.ResetOwnerPassword: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -431,7 +431,7 @@ func (s *PlatformService) ResetOwnerPassword(ctx context.Context, platformUserID
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("ResetOwnerPassword: failed to get company: %w", err)
+		return fmt.Errorf("PlatformService.ResetOwnerPassword: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -440,7 +440,7 @@ func (s *PlatformService) ResetOwnerPassword(ctx context.Context, platformUserID
 	// Find owner user
 	users, err := s.userRepo.List(ctx)
 	if err != nil {
-		return fmt.Errorf("ResetOwnerPassword: failed to list users: %w", err)
+		return fmt.Errorf("PlatformService.ResetOwnerPassword: listar usuários: %w", err)
 	}
 
 	var owner *domain.User
@@ -452,13 +452,13 @@ func (s *PlatformService) ResetOwnerPassword(ctx context.Context, platformUserID
 	}
 
 	if owner == nil {
-		return fmt.Errorf("ResetOwnerPassword: owner not found")
+		return fmt.Errorf("PlatformService.ResetOwnerPassword: owner não encontrado")
 	}
 
 	// Hash new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("ResetOwnerPassword: failed to hash password: %w", err)
+		return fmt.Errorf("PlatformService.ResetOwnerPassword: gerar hash senha: %w", err)
 	}
 
 	// Update password
@@ -466,7 +466,7 @@ func (s *PlatformService) ResetOwnerPassword(ctx context.Context, platformUserID
 	owner.UpdatedAt = time.Now()
 
 	if err := s.userRepo.Update(ctx, owner); err != nil {
-		return fmt.Errorf("ResetOwnerPassword: failed to update owner: %w", err)
+		return fmt.Errorf("PlatformService.ResetOwnerPassword: atualizar owner: %w", err)
 	}
 
 	// Log audit
@@ -482,7 +482,7 @@ func (s *PlatformService) BlockUser(ctx context.Context, platformUserID uint, us
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("BlockUser: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.BlockUser: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -491,10 +491,10 @@ func (s *PlatformService) BlockUser(ctx context.Context, platformUserID uint, us
 	// Get user
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("BlockUser: failed to get user: %w", err)
+		return fmt.Errorf("PlatformService.BlockUser: buscar usuário: %w", err)
 	}
 	if user == nil {
-		return fmt.Errorf("BlockUser: user not found")
+		return fmt.Errorf("PlatformService.BlockUser: usuário não encontrado")
 	}
 
 	// Block user
@@ -502,7 +502,7 @@ func (s *PlatformService) BlockUser(ctx context.Context, platformUserID uint, us
 	user.UpdatedAt = time.Now()
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("BlockUser: failed to update user: %w", err)
+		return fmt.Errorf("PlatformService.BlockUser: atualizar usuário: %w", err)
 	}
 
 	// Log audit
@@ -518,7 +518,7 @@ func (s *PlatformService) UnblockUser(ctx context.Context, platformUserID uint, 
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("UnblockUser: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.UnblockUser: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -527,10 +527,10 @@ func (s *PlatformService) UnblockUser(ctx context.Context, platformUserID uint, 
 	// Get user
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("UnblockUser: failed to get user: %w", err)
+		return fmt.Errorf("PlatformService.UnblockUser: buscar usuário: %w", err)
 	}
 	if user == nil {
-		return fmt.Errorf("UnblockUser: user not found")
+		return fmt.Errorf("PlatformService.UnblockUser: usuário não encontrado")
 	}
 
 	// Unblock user
@@ -538,7 +538,7 @@ func (s *PlatformService) UnblockUser(ctx context.Context, platformUserID uint, 
 	user.UpdatedAt = time.Now()
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("UnblockUser: failed to update user: %w", err)
+		return fmt.Errorf("PlatformService.UnblockUser: atualizar usuário: %w", err)
 	}
 
 	// Log audit
@@ -554,7 +554,7 @@ func (s *PlatformService) LoginAsCompany(ctx context.Context, platformUserID uin
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return "", fmt.Errorf("LoginAsCompany: failed to get platform user: %w", err)
+		return "", fmt.Errorf("PlatformService.LoginAsCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin && platformUser.Role != domain.PlatformRoleSupport {
 		return "", ErrPermissionDenied
@@ -563,7 +563,7 @@ func (s *PlatformService) LoginAsCompany(ctx context.Context, platformUserID uin
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return "", fmt.Errorf("LoginAsCompany: failed to get company: %w", err)
+		return "", fmt.Errorf("PlatformService.LoginAsCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return "", ErrCompanyNotFound
@@ -572,7 +572,7 @@ func (s *PlatformService) LoginAsCompany(ctx context.Context, platformUserID uin
 	// Find owner user for this company
 	users, err := s.userRepo.List(ctx)
 	if err != nil {
-		return "", fmt.Errorf("LoginAsCompany: failed to list users: %w", err)
+		return "", fmt.Errorf("PlatformService.LoginAsCompany: listar usuários: %w", err)
 	}
 
 	var owner *domain.User
@@ -584,7 +584,7 @@ func (s *PlatformService) LoginAsCompany(ctx context.Context, platformUserID uin
 	}
 
 	if owner == nil {
-		return "", fmt.Errorf("LoginAsCompany: owner not found")
+		return "", fmt.Errorf("PlatformService.LoginAsCompany: owner não encontrado")
 	}
 
 	// Generate a temporary JWT token for the company user
@@ -606,7 +606,7 @@ func (s *PlatformService) SetCompanyTrial(ctx context.Context, platformUserID ui
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("SetCompanyTrial: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.SetCompanyTrial: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -615,7 +615,7 @@ func (s *PlatformService) SetCompanyTrial(ctx context.Context, platformUserID ui
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("SetCompanyTrial: failed to get company: %w", err)
+		return fmt.Errorf("PlatformService.SetCompanyTrial: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -627,7 +627,7 @@ func (s *PlatformService) SetCompanyTrial(ctx context.Context, platformUserID ui
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("SetCompanyTrial: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.SetCompanyTrial: atualizar empresa: %w", err)
 	}
 
 	// Log audit
@@ -643,7 +643,7 @@ func (s *PlatformService) SuspendCompany(ctx context.Context, platformUserID uin
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("SuspendCompany: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.SuspendCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -652,7 +652,7 @@ func (s *PlatformService) SuspendCompany(ctx context.Context, platformUserID uin
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("SuspendCompany: failed to get company: %w", err)
+		return fmt.Errorf("PlatformService.SuspendCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -664,7 +664,7 @@ func (s *PlatformService) SuspendCompany(ctx context.Context, platformUserID uin
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("SuspendCompany: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.SuspendCompany: atualizar empresa: %w", err)
 	}
 
 	// Log audit
@@ -678,7 +678,7 @@ func (s *PlatformService) CancelCompany(ctx context.Context, platformUserID uint
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("CancelCompany: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.CancelCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -687,7 +687,7 @@ func (s *PlatformService) CancelCompany(ctx context.Context, platformUserID uint
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("CancelCompany: failed to get company: %w", err)
+		return fmt.Errorf("PlatformService.CancelCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -699,7 +699,7 @@ func (s *PlatformService) CancelCompany(ctx context.Context, platformUserID uint
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("CancelCompany: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.CancelCompany: atualizar empresa: %w", err)
 	}
 
 	// Log audit
@@ -713,7 +713,7 @@ func (s *PlatformService) ReactivateCompany(ctx context.Context, platformUserID 
 	// Verify platform user has permission
 	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
 	if err != nil {
-		return fmt.Errorf("ReactivateCompany: failed to get platform user: %w", err)
+		return fmt.Errorf("PlatformService.ReactivateCompany: buscar usuário plataforma: %w", err)
 	}
 	if platformUser == nil || platformUser.Role != domain.PlatformRoleAdmin {
 		return ErrPermissionDenied
@@ -722,7 +722,7 @@ func (s *PlatformService) ReactivateCompany(ctx context.Context, platformUserID 
 	// Get company
 	company, err := s.companyRepo.FindByID(ctx, companyID)
 	if err != nil {
-		return fmt.Errorf("ReactivateCompany: failed to get company: %w", err)
+		return fmt.Errorf("PlatformService.ReactivateCompany: buscar empresa: %w", err)
 	}
 	if company == nil {
 		return ErrCompanyNotFound
@@ -734,7 +734,7 @@ func (s *PlatformService) ReactivateCompany(ctx context.Context, platformUserID 
 	company.UpdatedAt = time.Now()
 
 	if err := s.companyRepo.Update(ctx, company); err != nil {
-		return fmt.Errorf("ReactivateCompany: failed to update company: %w", err)
+		return fmt.Errorf("PlatformService.ReactivateCompany: atualizar empresa: %w", err)
 	}
 
 	// Log audit

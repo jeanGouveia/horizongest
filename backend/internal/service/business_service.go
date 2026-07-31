@@ -26,7 +26,7 @@ func (s *BusinessService) GetBusinessProfile(ctx context.Context, userID uint) (
 	// Get user to find their company
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("BusinessService.GetBusinessProfile: failed to get user: %w", err)
+		return nil, fmt.Errorf("BusinessService.GetBusinessProfile: buscar usuário: %w", err)
 	}
 
 	if user == nil {
@@ -42,7 +42,7 @@ func (s *BusinessService) GetBusinessProfile(ctx context.Context, userID uint) (
 	// Get company to retrieve business profile
 	company, err := s.companyRepo.FindByID(ctx, user.CompanyID)
 	if err != nil {
-		return nil, fmt.Errorf("BusinessService.GetBusinessProfile: failed to get company: %w", err)
+		return nil, fmt.Errorf("BusinessService.GetBusinessProfile: buscar empresa: %w", err)
 	}
 
 	if company == nil {

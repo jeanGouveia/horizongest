@@ -56,7 +56,7 @@ func (s *PurchaseService) CreateSupplier(ctx context.Context, companyID uint, in
 	}
 
 	if err := s.purchaseRepo.CreateSupplier(ctx, supplier); err != nil {
-		return nil, fmt.Errorf("erro ao criar fornecedor: %w", err)
+		return nil, fmt.Errorf("PurchaseService.CreateSupplier: criar fornecedor: %w", err)
 	}
 
 	return supplier, nil
@@ -139,7 +139,7 @@ func (s *PurchaseService) CreatePurchaseOrder(ctx context.Context, companyID, us
 		}
 
 		if err := s.purchaseRepo.CreatePurchaseOrder(ctx, order); err != nil {
-			return fmt.Errorf("erro ao criar pedido de compra: %w", err)
+			return fmt.Errorf("PurchaseService.CreatePurchaseOrder: criar pedido de compra: %w", err)
 		}
 
 		// Criar itens
@@ -154,7 +154,7 @@ func (s *PurchaseService) CreatePurchaseOrder(ctx context.Context, companyID, us
 			}
 
 			if err := s.purchaseRepo.CreatePurchaseOrderItem(ctx, poItem); err != nil {
-				return fmt.Errorf("erro ao criar item do pedido: %w", err)
+				return fmt.Errorf("PurchaseService.CreatePurchaseOrder: criar item do pedido: %w", err)
 			}
 		}
 
@@ -234,7 +234,7 @@ func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseO
 		}
 
 		if err := s.purchaseRepo.CreatePurchaseReceiving(ctx, receiving); err != nil {
-			return fmt.Errorf("erro ao criar recebimento: %w", err)
+			return fmt.Errorf("PurchaseService.ReceivePurchaseOrder: criar recebimento: %w", err)
 		}
 
 		// Criar itens de recebimento
@@ -250,7 +250,7 @@ func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseO
 			}
 
 			if err := s.purchaseRepo.CreatePurchaseReceivingItem(ctx, receivingItem); err != nil {
-				return fmt.Errorf("erro ao criar item de recebimento: %w", err)
+				return fmt.Errorf("PurchaseService.ReceivePurchaseOrder: criar item de recebimento: %w", err)
 			}
 
 			// TODO: Atualizar estoque do ingrediente via stock movements
@@ -261,7 +261,7 @@ func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseO
 		now := time.Now()
 		order.ReceivedDate = &now
 		if err := s.purchaseRepo.UpdatePurchaseOrderStatus(ctx, purchaseOrderID, domain.PurchaseOrderReceived); err != nil {
-			return fmt.Errorf("erro ao atualizar status do pedido: %w", err)
+			return fmt.Errorf("PurchaseService.CreatePurchaseReceiving: atualizar status do pedido: %w", err)
 		}
 
 		return nil

@@ -102,7 +102,10 @@ func (r *GormImpersonationAuditRepository) FindActiveByPlatformUserID(ctx contex
 
 func (r *GormImpersonationAuditRepository) Update(ctx context.Context, audit *domain.ImpersonationAudit) error {
 	gormAudit := r.toGorm(audit)
-	return fmt.Errorf("ImpersonationAuditRepository.Update: %w", r.db.WithContext(ctx).Save(gormAudit).Error)
+	if err := r.db.WithContext(ctx).Save(gormAudit).Error; err != nil {
+		return fmt.Errorf("ImpersonationAuditRepository.Update: %w", err)
+	}
+	return nil
 }
 
 func (r *GormImpersonationAuditRepository) toGorm(audit *domain.ImpersonationAudit) *GormImpersonationAudit {

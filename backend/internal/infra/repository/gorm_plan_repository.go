@@ -18,7 +18,10 @@ func NewGormPlanRepository(db *gorm.DB) ports.PlanRepository {
 }
 
 func (r *GormPlanRepository) Create(ctx context.Context, plan *domain.Plan) error {
-	return fmt.Errorf("PlanRepository.Create: %w", r.db.WithContext(ctx).Create(plan).Error)
+	if err := r.db.WithContext(ctx).Create(plan).Error; err != nil {
+		return fmt.Errorf("PlanRepository.Create: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlanRepository) FindByID(ctx context.Context, id uint) (*domain.Plan, error) {
@@ -40,11 +43,17 @@ func (r *GormPlanRepository) FindBySlug(ctx context.Context, slug string) (*doma
 }
 
 func (r *GormPlanRepository) Update(ctx context.Context, plan *domain.Plan) error {
-	return fmt.Errorf("PlanRepository.Update: %w", r.db.WithContext(ctx).Save(plan).Error)
+	if err := r.db.WithContext(ctx).Save(plan).Error; err != nil {
+		return fmt.Errorf("PlanRepository.Update: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlanRepository) Delete(ctx context.Context, id uint) error {
-	return fmt.Errorf("PlanRepository.Delete: %w", r.db.WithContext(ctx).Delete(&domain.Plan{}, id).Error)
+	if err := r.db.WithContext(ctx).Delete(&domain.Plan{}, id).Error; err != nil {
+		return fmt.Errorf("PlanRepository.Delete: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlanRepository) List(ctx context.Context) ([]*domain.Plan, error) {

@@ -186,5 +186,8 @@ func (r *GormGlobalConfigRepository) InvalidateCache() {
 func (r *GormGlobalConfigRepository) ReloadCache(ctx context.Context) error {
 	r.InvalidateCache()
 	_, err := r.Get(ctx)
-	return fmt.Errorf("GlobalConfigRepository.ReloadCache: %w", err)
+	if err != nil {
+		return fmt.Errorf("GlobalConfigRepository.ReloadCache: %w", err)
+	}
+	return nil
 }

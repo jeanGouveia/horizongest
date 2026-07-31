@@ -89,11 +89,11 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 		// Obter companyID do contexto
 		tenantCtxValue := ctx.Value("tenant")
 		if tenantCtxValue == nil {
-			return nil, fmt.Errorf("OrderService.CreateOrder: tenant context not found")
+			return nil, fmt.Errorf("OrderService.CreateOrder: contexto de tenant não encontrado")
 		}
 		tenantCtx, ok := tenantCtxValue.(*domain.TenantContext)
 		if !ok {
-			return nil, fmt.Errorf("OrderService.CreateOrder: invalid tenant context type")
+			return nil, fmt.Errorf("OrderService.CreateOrder: tipo de contexto de tenant inválido")
 		}
 		companyID := tenantCtx.CompanyID
 
@@ -132,7 +132,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 			return nil, fmt.Errorf("OrderService.CreateOrder: buscar produto: %w", err)
 		}
 		if p == nil || !p.Active {
-			return nil, fmt.Errorf("produto id=%d não encontrado ou inativo", itemIn.ProductID)
+			return nil, fmt.Errorf("OrderService.CreateOrder: produto id=%d não encontrado ou inativo", itemIn.ProductID)
 		}
 		productData[itemIn.ProductID] = p
 
@@ -183,7 +183,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 	createdOrder, err := s.orderRepo.CreateOrder(ctx, order, productIngredients)
 	if err != nil {
 		log.Printf("Service - Erro ao criar pedido no repository: %v", err)
-		return nil, fmt.Errorf("OrderService.CreateOrder: %w", err)
+		return nil, fmt.Errorf("OrderService.CreateOrder: criar pedido: %w", err)
 	}
 
 	log.Printf("Service - Pedido criado com sucesso: ID=%d", createdOrder.ID)
@@ -245,7 +245,7 @@ func (s *OrderService) validateStock(ctx context.Context, items []OrderItemInput
 func (s *OrderService) ListOrders(ctx context.Context) ([]domain.Order, error) {
 	orders, err := s.orderRepo.ListOrders(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("OrderService.ListOrders: %w", err)
+		return nil, fmt.Errorf("OrderService.ListOrders: listar pedidos: %w", err)
 	}
 	return orders, nil
 }
@@ -253,7 +253,7 @@ func (s *OrderService) ListOrders(ctx context.Context) ([]domain.Order, error) {
 func (s *OrderService) GetOrder(ctx context.Context, id uint) (*domain.Order, error) {
 	order, err := s.orderRepo.FindOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("OrderService.GetOrder: %w", err)
+		return nil, fmt.Errorf("OrderService.GetOrder: buscar pedido: %w", err)
 	}
 	if order == nil {
 		return nil, ErrOrderNotFound
@@ -266,7 +266,7 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 
 	order, err := s.orderRepo.FindOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("OrderService.UpdateOrderStatus: %w", err)
+		return nil, fmt.Errorf("OrderService.UpdateOrderStatus: buscar pedido: %w", err)
 	}
 	if order == nil {
 		return nil, ErrOrderNotFound
@@ -275,7 +275,7 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 	// Validar transição de status
 	newStatus := domain.OrderStatus(in.Status)
 	if !isValidTransition(order.Status, newStatus) {
-		return nil, fmt.Errorf("transição inválida: %s → %s", order.Status, newStatus)
+		return nil, fmt.Errorf("OrderService.UpdateOrderStatus: transição inválida: %s → %s", order.Status, newStatus)
 	}
 
 	log.Printf("[SERVICE] Status atual=%s, novo status=%s", order.Status, newStatus)
@@ -309,13 +309,13 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, id uint, in Update
 			order.Items,
 		); err != nil {
 			log.Printf("[SERVICE] Erro em UpdateOrderStatusWithAdjustments: %v", err)
-			return nil, fmt.Errorf("OrderService.UpdateOrderStatus: %w", err)
+			return nil, fmt.Errorf("OrderService.UpdateOrderStatus: atualizar status com ajustes: %w", err)
 		}
 		log.Printf("[SERVICE] UpdateOrderStatusWithAdjustments concluído com sucesso")
 	} else {
 		// Para outros status, apenas atualizar o status
 		if err := s.orderRepo.UpdateOrderStatus(ctx, id, newStatus); err != nil {
-			return nil, fmt.Errorf("OrderService.UpdateOrderStatus: %w", err)
+			return nil, fmt.Errorf("OrderService.UpdateOrderStatus: atualizar status: %w", err)
 		}
 	}
 
@@ -330,7 +330,7 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, in UpdateOrderI
 
 	order, err := s.orderRepo.FindOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("OrderService.UpdateOrder: %w", err)
+		return nil, fmt.Errorf("OrderService.UpdateOrder: buscar pedido: %w", err)
 	}
 	if order == nil {
 		return nil, ErrOrderNotFound
@@ -351,7 +351,7 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, in UpdateOrderI
 			return nil, fmt.Errorf("OrderService.UpdateOrder: buscar produto: %w", err)
 		}
 		if p == nil || !p.Active {
-			return nil, fmt.Errorf("produto id=%d não encontrado ou inativo", itemIn.ProductID)
+			return nil, fmt.Errorf("OrderService.UpdateOrder: produto id=%d não encontrado ou inativo", itemIn.ProductID)
 		}
 		productData[itemIn.ProductID] = p
 
@@ -391,13 +391,13 @@ func (s *OrderService) UpdateOrder(ctx context.Context, id uint, in UpdateOrderI
 
 	// Update order with transaction to handle stock adjustments
 	if err := s.orderRepo.UpdateOrder(ctx, id, items, total, in.Notes, productIngredients); err != nil {
-		return nil, fmt.Errorf("OrderService.UpdateOrder: %w", err)
+		return nil, fmt.Errorf("OrderService.UpdateOrder: atualizar pedido: %w", err)
 	}
 
 	// Reload order to return updated state
 	updatedOrder, err := s.orderRepo.FindOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("OrderService.UpdateOrder: reload order: %w", err)
+		return nil, fmt.Errorf("OrderService.UpdateOrder: recarregar pedido: %w", err)
 	}
 
 	return updatedOrder, nil

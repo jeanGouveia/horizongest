@@ -52,15 +52,24 @@ func (r *GormPlatformSessionRepository) FindByToken(ctx context.Context, token s
 }
 
 func (r *GormPlatformSessionRepository) DeleteByToken(ctx context.Context, token string) error {
-	return fmt.Errorf("PlatformSessionRepository.DeleteByToken: %w", r.db.WithContext(ctx).Where("token = ?", token).Delete(&GormPlatformSession{}).Error)
+	if err := r.db.WithContext(ctx).Where("token = ?", token).Delete(&GormPlatformSession{}).Error; err != nil {
+		return fmt.Errorf("PlatformSessionRepository.DeleteByToken: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlatformSessionRepository) DeleteByPlatformUserID(ctx context.Context, platformUserID uint) error {
-	return fmt.Errorf("PlatformSessionRepository.DeleteByPlatformUserID: %w", r.db.WithContext(ctx).Where("platform_user_id = ?", platformUserID).Delete(&GormPlatformSession{}).Error)
+	if err := r.db.WithContext(ctx).Where("platform_user_id = ?", platformUserID).Delete(&GormPlatformSession{}).Error; err != nil {
+		return fmt.Errorf("PlatformSessionRepository.DeleteByPlatformUserID: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlatformSessionRepository) DeleteExpired(ctx context.Context) error {
-	return fmt.Errorf("PlatformSessionRepository.DeleteExpired: %w", r.db.WithContext(ctx).Where("expires_at < ?", time.Now().Unix()).Delete(&GormPlatformSession{}).Error)
+	if err := r.db.WithContext(ctx).Where("expires_at < ?", time.Now().Unix()).Delete(&GormPlatformSession{}).Error; err != nil {
+		return fmt.Errorf("PlatformSessionRepository.DeleteExpired: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlatformSessionRepository) toGorm(session *domain.PlatformSession) *GormPlatformSession {

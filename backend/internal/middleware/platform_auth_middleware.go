@@ -29,8 +29,6 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 		log.Println("===================================================")
 		log.Println("TENANT AUTH MIDDLEWARE")
 		log.Println("REQUEST:", r.Method, r.URL.Path)
-		log.Println("RAW COOKIE HEADER:")
-		log.Println(r.Header.Get("Cookie"))
 		log.Println("===================================================")
 
 		// Check auth_token
@@ -40,14 +38,6 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 		} else {
 			log.Println("auth_token ENCONTRADO")
 			log.Println("tamanho:", len(authTokenCookie.Value))
-
-			// Parse JWT without validation
-			if token, _, e := jwt.NewParser().ParseUnverified(authTokenCookie.Value, jwt.MapClaims{}); e == nil {
-				if claims, ok := token.Claims.(jwt.MapClaims); ok {
-					log.Println("JWT RECEBIDO (auth_token)")
-					logJWTClaims(claims)
-				}
-			}
 		}
 
 		// Check platform_auth_token
@@ -57,20 +47,10 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 		} else {
 			log.Println("platform_auth_token ENCONTRADO")
 			log.Println("tamanho:", len(platformTokenCookie.Value))
-
-			// Parse JWT without validation
-			if token, _, e := jwt.NewParser().ParseUnverified(platformTokenCookie.Value, jwt.MapClaims{}); e == nil {
-				if claims, ok := token.Claims.(jwt.MapClaims); ok {
-					log.Println("JWT RECEBIDO (platform_auth_token)")
-					logJWTClaims(claims)
-				}
-			}
 		}
 
 		// FORENSIC: Log authentication attempt
 		log.Printf("[FORENSIC MIDDLEWARE] AUTH_ATTEMPT - URL: %s %s", r.Method, r.URL.Path)
-		log.Printf("[FORENSIC MIDDLEWARE] AUTHORIZATION - Header: %s", r.Header.Get("Authorization"))
-		log.Printf("[FORENSIC MIDDLEWARE] COOKIE - Cookies: %v", r.Cookies())
 
 		// Get token from Authorization header
 		authHeader := r.Header.Get("Authorization")

@@ -53,10 +53,10 @@ func (s *StockAdjustmentService) RegisterStockAdjustmentForOrder(
 	// Validar se já existem ajustes pendentes para este pedido (prevenção de duplicatas)
 	existing, err := s.stockAdjustmentRepo.FindPendingByOrderID(ctx, orderID)
 	if err != nil {
-		return fmt.Errorf("verificar ajustes existentes: %w", err)
+		return fmt.Errorf("StockAdjustmentService.RegisterStockAdjustmentForOrder: verificar ajustes existentes: %w", err)
 	}
 	if len(existing) > 0 {
-		return fmt.Errorf("já existem %d ajustes pendentes para o pedido %d", len(existing), orderID)
+		return fmt.Errorf("StockAdjustmentService.RegisterStockAdjustmentForOrder: já existem %d ajustes pendentes para o pedido %d", len(existing), orderID)
 	}
 
 	// Para cada item do pedido
@@ -76,10 +76,10 @@ func (s *StockAdjustmentService) RegisterStockAdjustmentForOrder(
 			// Sprint 4B.1 v2: Passar nil para tx (fora de transação)
 			ingredient, err := s.productRepo.FindIngredientByID(ctx, pi.IngredientID, nil)
 			if err != nil {
-				return fmt.Errorf("RegisterStockAdjustmentForOrder: buscar ingrediente_id=%d: %w", pi.IngredientID, err)
+				return fmt.Errorf("StockAdjustmentService.RegisterStockAdjustmentForOrder: buscar ingrediente_id=%d: %w", pi.IngredientID, err)
 			}
 			if ingredient == nil {
-				return fmt.Errorf("ingrediente id=%d não encontrado", pi.IngredientID)
+				return fmt.Errorf("StockAdjustmentService.RegisterStockAdjustmentForOrder: ingrediente id=%d não encontrado", pi.IngredientID)
 			}
 
 			// Registrar ajuste pendente com snapshot dos dados do ingrediente
@@ -94,7 +94,7 @@ func (s *StockAdjustmentService) RegisterStockAdjustmentForOrder(
 			}
 
 			if err := s.stockAdjustmentRepo.CreateStockAdjustmentPending(ctx, adjustment); err != nil {
-				return fmt.Errorf("RegisterStockAdjustmentForOrder: %w", err)
+				return fmt.Errorf("StockAdjustmentService.RegisterStockAdjustmentForOrder: criar ajuste: %w", err)
 			}
 		}
 	}
@@ -108,7 +108,7 @@ func (s *StockAdjustmentService) ListPendingAdjustments(
 ) ([]domain.StockAdjustmentPending, error) {
 	adjustments, err := s.stockAdjustmentRepo.ListPending(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ListPendingAdjustments: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentService.ListPendingAdjustments: listar ajustes pendentes: %w", err)
 	}
 	return adjustments, nil
 }
@@ -130,7 +130,7 @@ func (s *StockAdjustmentService) ListPendingAdjustmentsWithFilters(
 		// Aplicar filtros no nível de aplicação (simplificado para MVP)
 		adjustments, err = s.stockAdjustmentRepo.ListPending(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("ListPendingAdjustmentsWithFilters: %w", err)
+			return nil, fmt.Errorf("StockAdjustmentService.ListPendingAdjustmentsWithFilters: listar ajustes pendentes: %w", err)
 		}
 
 		// Filtrar em memória (para MVP, pode ser otimizado com query SQL no futuro)
@@ -151,7 +151,7 @@ func (s *StockAdjustmentService) ListPendingAdjustmentsWithFilters(
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("ListPendingAdjustmentsWithFilters: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentService.ListPendingAdjustmentsWithFilters: filtrar ajustes: %w", err)
 	}
 	return adjustments, nil
 }
@@ -167,7 +167,7 @@ func (s *StockAdjustmentService) GetAdjustmentsByOrder(
 ) ([]domain.StockAdjustmentPending, error) {
 	adjustments, err := s.stockAdjustmentRepo.FindByOrderID(ctx, orderID)
 	if err != nil {
-		return nil, fmt.Errorf("GetAdjustmentsByOrder: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentService.GetAdjustmentsByOrder: buscar ajustes por pedido: %w", err)
 	}
 	return adjustments, nil
 }
@@ -178,7 +178,7 @@ func (s *StockAdjustmentService) GetPendingAdjustmentsByOrder(
 ) ([]domain.StockAdjustmentPending, error) {
 	adjustments, err := s.stockAdjustmentRepo.FindPendingByOrderID(ctx, orderID)
 	if err != nil {
-		return nil, fmt.Errorf("GetPendingAdjustmentsByOrder: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentService.GetPendingAdjustmentsByOrder: buscar ajustes pendentes por pedido: %w", err)
 	}
 	return adjustments, nil
 }
@@ -189,7 +189,7 @@ func (s *StockAdjustmentService) GetPendingAdjustmentsByIngredient(
 ) ([]domain.StockAdjustmentPending, error) {
 	adjustments, err := s.stockAdjustmentRepo.FindPendingByIngredientID(ctx, ingredientID)
 	if err != nil {
-		return nil, fmt.Errorf("GetPendingAdjustmentsByIngredient: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentService.GetPendingAdjustmentsByIngredient: buscar ajustes pendentes por ingrediente: %w", err)
 	}
 	return adjustments, nil
 }
@@ -200,7 +200,7 @@ func (s *StockAdjustmentService) GetAdjustmentByID(
 ) (*domain.StockAdjustmentPending, error) {
 	adjustment, err := s.stockAdjustmentRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("GetAdjustmentByID: %w", err)
+		return nil, fmt.Errorf("StockAdjustmentService.GetAdjustmentByID: buscar ajuste: %w", err)
 	}
 	if adjustment == nil {
 		return nil, ErrStockAdjustmentNotFound
@@ -215,7 +215,7 @@ func (s *StockAdjustmentService) ApproveAdjustment(
 	// Verificar se o ajuste existe e está pendente
 	adjustment, err := s.stockAdjustmentRepo.FindByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("ApproveAdjustment: %w", err)
+		return fmt.Errorf("StockAdjustmentService.ApproveAdjustment: buscar ajuste: %w", err)
 	}
 	if adjustment == nil {
 		return ErrStockAdjustmentNotFound
@@ -223,12 +223,12 @@ func (s *StockAdjustmentService) ApproveAdjustment(
 
 	// Validar status
 	if adjustment.Status != domain.StockAdjustmentStatusPending {
-		return fmt.Errorf("ajuste já processado (status: %s)", adjustment.Status)
+		return fmt.Errorf("StockAdjustmentService.ApproveAdjustment: ajuste já processado (status: %s)", adjustment.Status)
 	}
 
 	// Aprovar e repor estoque em transação atômica
 	if err := s.stockAdjustmentRepo.ApproveAndRestoreStock(ctx, id, processedBy, notes); err != nil {
-		return fmt.Errorf("ApproveAdjustment: %w", err)
+		return fmt.Errorf("StockAdjustmentService.ApproveAdjustment: aprovar ajuste: %w", err)
 	}
 
 	return nil
@@ -242,7 +242,7 @@ func (s *StockAdjustmentService) RejectAdjustment(
 	// Verificar se o ajuste existe e está pendente
 	adjustment, err := s.stockAdjustmentRepo.FindByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("RejectAdjustment: %w", err)
+		return fmt.Errorf("StockAdjustmentService.RejectAdjustment: buscar ajuste: %w", err)
 	}
 	if adjustment == nil {
 		return ErrStockAdjustmentNotFound
@@ -250,12 +250,12 @@ func (s *StockAdjustmentService) RejectAdjustment(
 
 	// Validar status
 	if adjustment.Status != domain.StockAdjustmentStatusPending {
-		return fmt.Errorf("ajuste já processado (status: %s)", adjustment.Status)
+		return fmt.Errorf("StockAdjustmentService.RejectAdjustment: ajuste já processado (status: %s)", adjustment.Status)
 	}
 
 	// Rejeitar no repository
 	if err := s.stockAdjustmentRepo.Reject(ctx, id, processedBy, notes); err != nil {
-		return fmt.Errorf("RejectAdjustment: %w", err)
+		return fmt.Errorf("StockAdjustmentService.RejectAdjustment: rejeitar ajuste: %w", err)
 	}
 
 	return nil

@@ -63,7 +63,7 @@ func (s *IdempotencyService) CheckAndCreate(
 	// Serializar parâmetros da requisição
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return nil, 0, fmt.Errorf("serializar request params: %w", err)
+		return nil, 0, fmt.Errorf("IdempotencyService.CheckOrInit: serializar parâmetros: %w", err)
 	}
 
 	// Criar registro ou obter existente (Stripe approach: INSERT ON CONFLICT)
@@ -77,7 +77,7 @@ func (s *IdempotencyService) CheckAndCreate(
 
 	existingRecord, err := s.idempotencyRepo.CreateOrGet(ctx, record)
 	if err != nil {
-		return nil, 0, fmt.Errorf("criar/obter registro idempotência: %w", err)
+		return nil, 0, fmt.Errorf("IdempotencyService.CheckOrInit: criar/obter registro: %w", err)
 	}
 
 	// Verificar payload mismatch
@@ -150,7 +150,7 @@ func (s *IdempotencyService) RecordSuccess(
 	}
 
 	if err := s.idempotencyRepo.UpdateSuccess(ctx, recordID, response); err != nil {
-		return fmt.Errorf("registrar sucesso idempotência: %w", err)
+		return fmt.Errorf("IdempotencyService.RecordSuccess: registrar sucesso: %w", err)
 	}
 
 	log.Printf("[Idempotency] Success recorded: record_id=%d, status=%d", recordID, statusCode)
@@ -160,7 +160,7 @@ func (s *IdempotencyService) RecordSuccess(
 // RecordFailure registra falha da operação
 func (s *IdempotencyService) RecordFailure(ctx context.Context, recordID uint, errorMessage string) error {
 	if err := s.idempotencyRepo.UpdateFailure(ctx, recordID, errorMessage); err != nil {
-		return fmt.Errorf("registrar falha idempotência: %w", err)
+		return fmt.Errorf("IdempotencyService.RecordFailure: registrar falha: %w", err)
 	}
 
 	log.Printf("[Idempotency] Failure recorded: record_id=%d, error=%s", recordID, errorMessage)

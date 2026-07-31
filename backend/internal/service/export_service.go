@@ -45,12 +45,12 @@ func (s *ExportService) ExportCompanies(ctx context.Context, format ExportFormat
 	// Get all companies
 	companies, err := s.companyRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ExportCompanies: failed to list companies: %w", err)
+		return nil, fmt.Errorf("ExportService.ExportCompanies: listar empresas: %w", err)
 	}
 
 	// Ensure export directory exists
 	if err := os.MkdirAll(s.exportDir, 0755); err != nil {
-		return nil, fmt.Errorf("ExportCompanies: failed to create export directory: %w", err)
+		return nil, fmt.Errorf("ExportService.ExportCompanies: criar diretório de exportação: %w", err)
 	}
 
 	// Generate filename
@@ -71,13 +71,13 @@ func (s *ExportService) ExportCompanies(ctx context.Context, format ExportFormat
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unsupported format: %s", format)
+		return nil, fmt.Errorf("ExportService.ExportCompanies: formato não suportado: %s", format)
 	}
 
 	// Get file size
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("ExportCompanies: failed to get file info: %w", err)
+		return nil, fmt.Errorf("ExportService.ExportCompanies: obter informações do arquivo: %w", err)
 	}
 
 	return &ExportResult{
@@ -92,7 +92,7 @@ func (s *ExportService) ExportCompanies(ctx context.Context, format ExportFormat
 func (s *ExportService) exportCompaniesToCSV(companies []domain.Company, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to create CSV file: %w", err)
+		return fmt.Errorf("ExportService.exportCompaniesToCSV: criar arquivo CSV: %w", err)
 	}
 	defer file.Close()
 
@@ -102,7 +102,7 @@ func (s *ExportService) exportCompaniesToCSV(companies []domain.Company, filePat
 	// Write header
 	header := []string{"ID", "Name", "Slug", "Description", "BusinessType", "Locale", "Currency", "Timezone", "Active", "Status", "CreatedAt", "UpdatedAt"}
 	if err := writer.Write(header); err != nil {
-		return fmt.Errorf("failed to write CSV header: %w", err)
+		return fmt.Errorf("ExportService.exportCompaniesToCSV: escrever cabeçalho CSV: %w", err)
 	}
 
 	// Write data
@@ -122,7 +122,7 @@ func (s *ExportService) exportCompaniesToCSV(companies []domain.Company, filePat
 			company.UpdatedAt.Format(time.RFC3339),
 		}
 		if err := writer.Write(row); err != nil {
-			return fmt.Errorf("failed to write CSV row: %w", err)
+			return fmt.Errorf("ExportService.exportCompaniesToCSV: escrever linha CSV: %w", err)
 		}
 	}
 
@@ -132,7 +132,7 @@ func (s *ExportService) exportCompaniesToCSV(companies []domain.Company, filePat
 func (s *ExportService) exportCompaniesToJSON(companies []domain.Company, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to create JSON file: %w", err)
+		return fmt.Errorf("ExportService.exportCompaniesToJSON: criar arquivo JSON: %w", err)
 	}
 	defer file.Close()
 
@@ -140,7 +140,7 @@ func (s *ExportService) exportCompaniesToJSON(companies []domain.Company, filePa
 	encoder.SetIndent("", "  ")
 
 	if err := encoder.Encode(companies); err != nil {
-		return fmt.Errorf("failed to encode JSON: %w", err)
+		return fmt.Errorf("ExportService.exportCompaniesToJSON: codificar JSON: %w", err)
 	}
 
 	return nil
@@ -150,12 +150,12 @@ func (s *ExportService) ExportUsers(ctx context.Context, format ExportFormat) (*
 	// Get all users
 	users, err := s.userRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ExportUsers: failed to list users: %w", err)
+		return nil, fmt.Errorf("ExportService.ExportUsers: listar usuários: %w", err)
 	}
 
 	// Ensure export directory exists
 	if err := os.MkdirAll(s.exportDir, 0755); err != nil {
-		return nil, fmt.Errorf("ExportUsers: failed to create export directory: %w", err)
+		return nil, fmt.Errorf("ExportService.ExportUsers: criar diretório de exportação: %w", err)
 	}
 
 	// Generate filename
@@ -176,13 +176,13 @@ func (s *ExportService) ExportUsers(ctx context.Context, format ExportFormat) (*
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unsupported format: %s", format)
+		return nil, fmt.Errorf("ExportService.ExportUsers: formato não suportado: %s", format)
 	}
 
 	// Get file size
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("ExportUsers: failed to get file info: %w", err)
+		return nil, fmt.Errorf("ExportService.ExportUsers: obter informações do arquivo: %w", err)
 	}
 
 	return &ExportResult{
@@ -197,7 +197,7 @@ func (s *ExportService) ExportUsers(ctx context.Context, format ExportFormat) (*
 func (s *ExportService) exportUsersToCSV(users []*domain.User, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to create CSV file: %w", err)
+		return fmt.Errorf("ExportService.exportUsersToCSV: criar arquivo CSV: %w", err)
 	}
 	defer file.Close()
 
@@ -207,7 +207,7 @@ func (s *ExportService) exportUsersToCSV(users []*domain.User, filePath string) 
 	// Write header
 	header := []string{"ID", "Name", "Email", "CompanyID", "Role", "Active", "CreatedAt", "UpdatedAt"}
 	if err := writer.Write(header); err != nil {
-		return fmt.Errorf("failed to write CSV header: %w", err)
+		return fmt.Errorf("ExportService.exportUsersToCSV: escrever cabeçalho CSV: %w", err)
 	}
 
 	// Write data
@@ -223,7 +223,7 @@ func (s *ExportService) exportUsersToCSV(users []*domain.User, filePath string) 
 			user.UpdatedAt.Format(time.RFC3339),
 		}
 		if err := writer.Write(row); err != nil {
-			return fmt.Errorf("failed to write CSV row: %w", err)
+			return fmt.Errorf("ExportService.exportUsersToCSV: escrever linha CSV: %w", err)
 		}
 	}
 
@@ -233,7 +233,7 @@ func (s *ExportService) exportUsersToCSV(users []*domain.User, filePath string) 
 func (s *ExportService) exportUsersToJSON(users []*domain.User, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to create JSON file: %w", err)
+		return fmt.Errorf("ExportService.exportUsersToJSON: criar arquivo JSON: %w", err)
 	}
 	defer file.Close()
 
@@ -241,7 +241,7 @@ func (s *ExportService) exportUsersToJSON(users []*domain.User, filePath string)
 	encoder.SetIndent("", "  ")
 
 	if err := encoder.Encode(users); err != nil {
-		return fmt.Errorf("failed to encode JSON: %w", err)
+		return fmt.Errorf("ExportService.exportUsersToJSON: codificar JSON: %w", err)
 	}
 
 	return nil

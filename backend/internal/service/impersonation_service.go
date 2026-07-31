@@ -72,7 +72,7 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 		// This makes the endpoint idempotent and allows free company switching
 		activeImpersonation.End()
 		if err := s.impersonationAuditRepo.Update(ctx, activeImpersonation); err != nil {
-			return nil, fmt.Errorf("StartImpersonation: failed to end previous impersonation: %w", err)
+			return nil, fmt.Errorf("ImpersonationService.StartImpersonation: encerrar impersonation anterior: %w", err)
 		}
 	}
 
@@ -82,10 +82,10 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 	// Find the company
 	company, err := s.companyRepo.FindByID(ctx, input.CompanyID)
 	if err != nil {
-		return nil, fmt.Errorf("StartImpersonation: %w", err)
+		return nil, fmt.Errorf("ImpersonationService.StartImpersonation: buscar empresa: %w", err)
 	}
 	if company == nil {
-		return nil, fmt.Errorf("company not found")
+		return nil, fmt.Errorf("ImpersonationService.StartImpersonation: empresa não encontrada")
 	}
 
 	// FORENSIC: Log after finding company
@@ -94,7 +94,7 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 	// Find the company owner (user with Role = Owner in this company)
 	owner, err := s.findCompanyOwner(ctx, input.CompanyID)
 	if err != nil {
-		return nil, fmt.Errorf("StartImpersonation: %w", err)
+		return nil, fmt.Errorf("ImpersonationService.StartImpersonation: buscar owner: %w", err)
 	}
 	if owner == nil {
 		return nil, ErrCompanyOwnerNotFound
@@ -106,7 +106,7 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 	// Create impersonation token with impersonation claims
 	token, err := s.authService.generateJWTWithImpersonation(owner, true, input.PlatformUserID)
 	if err != nil {
-		return nil, fmt.Errorf("StartImpersonation: %w", err)
+		return nil, fmt.Errorf("ImpersonationService.StartImpersonation: gerar token: %w", err)
 	}
 
 	// FORENSIC: Log JWT generated
@@ -128,7 +128,7 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 	}
 
 	if err := s.impersonationAuditRepo.Create(ctx, audit); err != nil {
-		return nil, fmt.Errorf("StartImpersonation: failed to create audit record: %w", err)
+		return nil, fmt.Errorf("ImpersonationService.StartImpersonation: criar registro de auditoria: %w", err)
 	}
 
 	return &StartImpersonationOutput{
@@ -145,7 +145,7 @@ func (s *ImpersonationService) EndImpersonation(ctx context.Context, input EndIm
 	// Find active impersonation session
 	activeImpersonation, err := s.impersonationAuditRepo.FindActiveByPlatformUserID(ctx, input.PlatformUserID)
 	if err != nil {
-		return fmt.Errorf("EndImpersonation: %w", err)
+		return fmt.Errorf("ImpersonationService.EndImpersonation: buscar impersonation ativa: %w", err)
 	}
 	if activeImpersonation == nil {
 		// Not currently impersonating, but this is not an error
@@ -159,7 +159,7 @@ func (s *ImpersonationService) EndImpersonation(ctx context.Context, input EndIm
 	activeImpersonation.UserAgent = input.UserAgent
 
 	if err := s.impersonationAuditRepo.Update(ctx, activeImpersonation); err != nil {
-		return fmt.Errorf("EndImpersonation: %w", err)
+		return fmt.Errorf("ImpersonationService.EndImpersonation: atualizar registro: %w", err)
 	}
 
 	return nil

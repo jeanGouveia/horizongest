@@ -137,7 +137,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 	// Auto-fill CompanyID from tenant context
 	companyID, err := GetCompanyIDFromContext(ctx)
 	if err != nil {
-		return fmt.Errorf("CreateProduct: %w", err)
+		return fmt.Errorf("ProductRepository.CreateProduct: %w", err)
 	}
 
 	// Check for slug collision
@@ -145,10 +145,10 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 		var existing GormProduct
 		err := r.db.WithContext(ctx).Where("slug = ?", p.Slug).First(&existing).Error
 		if err == nil {
-			return fmt.Errorf("CreateProduct: slug '%s' já está em uso", p.Slug)
+			return fmt.Errorf("ProductRepository.CreateProduct: slug '%s' já está em uso", p.Slug)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("CreateProduct: verificar slug: %w", err)
+			return fmt.Errorf("ProductRepository.CreateProduct: verificar slug: %w", err)
 		}
 	}
 
@@ -185,7 +185,7 @@ func (r *GormProductRepository) CreateProduct(ctx context.Context, p *domain.Pro
 		m.PromotionEnd = &pe
 	}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-		return fmt.Errorf("CreateProduct: %w", err)
+		return fmt.Errorf("ProductRepository.CreateProduct: %w", err)
 	}
 	p.ID = m.ID
 	p.CompanyID = m.CompanyID
@@ -202,7 +202,7 @@ func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("FindProductByID: %w", err)
+		return nil, fmt.Errorf("ProductRepository.FindProductByID: %w", err)
 	}
 	return productToDomain(&m), nil
 }
@@ -211,7 +211,7 @@ func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Prod
 	var ms []GormProduct
 	query := ApplyTenantFilter(ctx, r.db)
 	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
-		return nil, fmt.Errorf("ListProducts: %w", err)
+		return nil, fmt.Errorf("ProductRepository.ListProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
 	for i, m := range ms {
@@ -224,7 +224,7 @@ func (r *GormProductRepository) ListActiveProducts(ctx context.Context) ([]domai
 	var ms []GormProduct
 	query := ApplyTenantFilter(ctx, r.db)
 	if err := query.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
-		return nil, fmt.Errorf("ListActiveProducts: %w", err)
+		return nil, fmt.Errorf("ProductRepository.ListActiveProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
 	for i, m := range ms {
@@ -239,9 +239,9 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 	query := ApplyTenantFilterWithID(ctx, r.db, p.ID)
 	if err := query.Where("deleted_at IS NULL").First(&existing).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("UpdateProduct: product not found or access denied")
+			return fmt.Errorf("ProductRepository.UpdateProduct: produto não encontrado ou acesso negado")
 		}
-		return fmt.Errorf("UpdateProduct: %w", err)
+		return fmt.Errorf("ProductRepository.UpdateProduct: %w", err)
 	}
 
 	// Check for slug collision (excluding current product)
@@ -249,10 +249,10 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 		var slugConflict GormProduct
 		err := r.db.WithContext(ctx).Where("slug = ? AND id != ?", p.Slug, p.ID).First(&slugConflict).Error
 		if err == nil {
-			return fmt.Errorf("UpdateProduct: slug '%s' já está em uso", p.Slug)
+			return fmt.Errorf("ProductRepository.UpdateProduct: slug '%s' já está em uso", p.Slug)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("UpdateProduct: verificar slug: %w", err)
+			return fmt.Errorf("ProductRepository.UpdateProduct: verificar slug: %w", err)
 		}
 	}
 
@@ -290,7 +290,7 @@ func (r *GormProductRepository) UpdateProduct(ctx context.Context, p *domain.Pro
 		m.PromotionEnd = &pe
 	}
 	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
-		return fmt.Errorf("UpdateProduct: %w", err)
+		return fmt.Errorf("ProductRepository.UpdateProduct: %w", err)
 	}
 	return nil
 }
@@ -301,7 +301,7 @@ func (r *GormProductRepository) DeleteProduct(ctx context.Context, id uint) erro
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	if err := query.WithContext(ctx).Model(&GormProduct{}).
 		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
-		return fmt.Errorf("DeleteProduct: %w", err)
+		return fmt.Errorf("ProductRepository.DeleteProduct: %w", err)
 	}
 	return nil
 }
@@ -321,7 +321,7 @@ func (r *GormProductRepository) CanDeleteProduct(ctx context.Context, id uint) (
 		Joins("JOIN orders ON order_items.order_id = orders.id").
 		Where("order_items.product_id = ? AND orders.deleted_at IS NULL", id).
 		Find(&orders).Error; err != nil {
-		return nil, fmt.Errorf("CanDeleteProduct: verificar pedidos: %w", err)
+		return nil, fmt.Errorf("ProductRepository.CanDeleteProduct: verificar pedidos: %w", err)
 	}
 
 	for _, order := range orders {
@@ -339,7 +339,7 @@ func (r *GormProductRepository) CanDeleteProduct(ctx context.Context, id uint) (
 	if err := r.db.WithContext(ctx).Model(&GormProductIngredient{}).
 		Where("ingredient_id = ? AND deleted_at IS NULL", id).
 		Count(&recipeCount).Error; err != nil {
-		return nil, fmt.Errorf("CanDeleteProduct: verificar fichas técnicas: %w", err)
+		return nil, fmt.Errorf("ProductRepository.CanDeleteProduct: verificar fichas técnicas: %w", err)
 	}
 
 	if recipeCount > 0 {
@@ -361,7 +361,7 @@ func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.
 	// Auto-fill CompanyID from tenant context
 	companyID, err := GetCompanyIDFromContext(ctx)
 	if err != nil {
-		return fmt.Errorf("CreateIngredient: %w", err)
+		return fmt.Errorf("ProductRepository.CreateIngredient: %w", err)
 	}
 
 	m := GormIngredient{
@@ -371,7 +371,7 @@ func (r *GormProductRepository) CreateIngredient(ctx context.Context, i *domain.
 		CompanyID: companyID, // Auto-filled from context
 	}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-		return fmt.Errorf("CreateIngredient: %w", err)
+		return fmt.Errorf("ProductRepository.CreateIngredient: %w", err)
 	}
 	i.ID = m.ID
 	i.CompanyID = m.CompanyID
@@ -386,10 +386,10 @@ func (r *GormProductRepository) FindIngredientByID(ctx context.Context, id uint,
 	query := ApplyTenantFilterWithID(ctx, r.getDB(ctx, tx), id)
 	err := query.Where("deleted_at IS NULL").First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("ingredient not found or access denied")
+		return nil, fmt.Errorf("ProductRepository.FindIngredientByID: ingrediente não encontrado ou acesso negado")
 	}
 	if err != nil {
-		return nil, fmt.Errorf("FindIngredientByID: %w", err)
+		return nil, fmt.Errorf("ProductRepository.FindIngredientByID: %w", err)
 	}
 	return ingredientToDomain(&m), nil
 }
@@ -406,7 +406,7 @@ func (r *GormProductRepository) FindIngredientByIDForUpdate(ctx context.Context,
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("FindIngredientByIDForUpdate: %w", err)
+		return nil, fmt.Errorf("ProductRepository.FindIngredientByIDForUpdate: %w", err)
 	}
 	return ingredientToDomain(&m), nil
 }
@@ -415,7 +415,7 @@ func (r *GormProductRepository) ListIngredients(ctx context.Context) ([]domain.I
 	var ms []GormIngredient
 	query := ApplyTenantFilter(ctx, r.db)
 	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
-		return nil, fmt.Errorf("ListIngredients: %w", err)
+		return nil, fmt.Errorf("ProductRepository.ListIngredients: %w", err)
 	}
 	out := make([]domain.Ingredient, len(ms))
 	for i, m := range ms {
@@ -434,9 +434,9 @@ func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.
 		Where("deleted_at IS NULL").
 		First(&existing).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("UpdateIngredient: ingredient not found or access denied")
+			return fmt.Errorf("ProductRepository.UpdateIngredient: ingrediente não encontrado ou acesso negado")
 		}
-		return fmt.Errorf("UpdateIngredient: %w", err)
+		return fmt.Errorf("ProductRepository.UpdateIngredient: erro ao atualizar ingrediente: %w", err)
 	}
 
 	// Sprint 4B.4: Usar Updates() em vez de Save() para evitar atualizar timestamps desnecessários
@@ -450,7 +450,7 @@ func (r *GormProductRepository) UpdateIngredient(ctx context.Context, i *domain.
 			"min_stock":      i.MinStock,
 			"active":         i.Active,
 		}).Error; err != nil {
-		return fmt.Errorf("UpdateIngredient: %w", err)
+		return fmt.Errorf("ProductRepository.UpdateIngredient: %w", err)
 	}
 	return nil
 }
@@ -461,7 +461,7 @@ func (r *GormProductRepository) DeleteIngredient(ctx context.Context, id uint) e
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {
-		return fmt.Errorf("DeleteIngredient: %w", err)
+		return fmt.Errorf("ProductRepository.DeleteIngredient: %w", err)
 	}
 	return nil
 }
@@ -480,7 +480,7 @@ func (r *GormProductRepository) CanDeleteIngredient(ctx context.Context, id uint
 		Joins("JOIN products ON product_ingredients.product_id = products.id").
 		Where("product_ingredients.ingredient_id = ? AND product_ingredients.deleted_at IS NULL AND products.deleted_at IS NULL", id).
 		Find(&products).Error; err != nil {
-		return nil, fmt.Errorf("CanDeleteIngredient: verificar fichas técnicas: %w", err)
+		return nil, fmt.Errorf("ProductRepository.CanDeleteIngredient: verificar fichas técnicas: %w", err)
 	}
 
 	for _, product := range products {
@@ -505,7 +505,7 @@ func (r *GormProductRepository) SetProductIngredients(
 		// Apaga ficha anterior e recria (upsert simples)
 		if err := tx.Where("product_id = ? AND deleted_at IS NULL", productID).
 			Delete(&GormProductIngredient{}).Error; err != nil {
-			return fmt.Errorf("SetProductIngredients delete: %w", err)
+			return fmt.Errorf("ProductRepository.SetProductIngredients: deletar ingredientes anteriores: %w", err)
 		}
 		for _, item := range items {
 			m := GormProductIngredient{
@@ -518,7 +518,7 @@ func (r *GormProductRepository) SetProductIngredients(
 				TotalCost:    int64(item.TotalCost),
 			}
 			if err := tx.Create(&m).Error; err != nil {
-				return fmt.Errorf("SetProductIngredients insert: %w", err)
+				return fmt.Errorf("ProductRepository.SetProductIngredients: inserir ingrediente: %w", err)
 			}
 		}
 		return nil
@@ -532,7 +532,7 @@ func (r *GormProductRepository) GetProductIngredients(
 	if err := r.db.WithContext(ctx).
 		Preload("Ingredient").
 		Where("product_id = ? AND deleted_at IS NULL", productID).Find(&ms).Error; err != nil {
-		return nil, fmt.Errorf("GetProductIngredients: %w", err)
+		return nil, fmt.Errorf("ProductRepository.GetProductIngredients: %w", err)
 	}
 	out := make([]domain.ProductIngredient, len(ms))
 	for i, m := range ms {
@@ -578,15 +578,14 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 		Where(whereClause, whereArgs...).
 		First(&ingredient).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("ingrediente não encontrado")
+			return fmt.Errorf("ProductRepository.DecreaseIngredientStock: ingrediente não encontrado")
 		}
-		return fmt.Errorf("DecreaseIngredientStock: lock ingrediente: %w", err)
+		return fmt.Errorf("ProductRepository.DecreaseIngredientStock: lock ingrediente: %w", err)
 	}
 
 	// Verificar estoque suficiente antes do UPDATE (validação adicional)
 	if ingredient.StockQuantity < qty {
-		return fmt.Errorf(
-			"estoque insuficiente para '%s': disponível=%.4f necessário=%.4f",
+		return fmt.Errorf("ProductRepository.DecreaseIngredientStock: estoque insuficiente para '%s': disponível=%.4f necessário=%.4f",
 			ingredientName, ingredient.StockQuantity, qty,
 		)
 	}
@@ -599,10 +598,10 @@ func (r *GormProductRepository) DecreaseIngredientStock(
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity - ?", qty))
 
 	if result.Error != nil {
-		return fmt.Errorf("DecreaseIngredientStock id=%d: %w", ingredientID, result.Error)
+		return fmt.Errorf("ProductRepository.DecreaseIngredientStock: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("estoque insuficiente (concorrência)")
+		return fmt.Errorf("ProductRepository.DecreaseIngredientStock: estoque insuficiente (concorrência)")
 	}
 	return nil
 }
@@ -629,9 +628,9 @@ func (r *GormProductRepository) IncreaseIngredientStock(
 		Where(whereClause, whereArgs...).
 		First(&ingredient).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("ingrediente não encontrado")
+			return fmt.Errorf("ProductRepository.IncreaseIngredientStock: ingrediente não encontrado")
 		}
-		return fmt.Errorf("IncreaseIngredientStock: lock ingrediente: %w", err)
+		return fmt.Errorf("ProductRepository.IncreaseIngredientStock: lock ingrediente: %w", err)
 	}
 
 	result := db.Model(&GormIngredient{}).
@@ -639,10 +638,10 @@ func (r *GormProductRepository) IncreaseIngredientStock(
 		UpdateColumn("stock_quantity", gorm.Expr("stock_quantity + ?", qty))
 
 	if result.Error != nil {
-		return fmt.Errorf("IncreaseIngredientStock id=%d: %w", ingredientID, result.Error)
+		return fmt.Errorf("ProductRepository.IncreaseIngredientStock: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("ingrediente id=%d não encontrado", ingredientID)
+		return fmt.Errorf("ProductRepository.IncreaseIngredientStock: ingrediente id=%d não encontrado", ingredientID)
 	}
 	return nil
 }

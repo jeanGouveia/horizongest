@@ -83,7 +83,7 @@ func (s *PlatformAuthService) Login(ctx context.Context, input PlatformLoginInpu
 	// Find user by email
 	user, err := s.platformUserRepo.FindByEmail(ctx, input.Email)
 	if err != nil {
-		return nil, fmt.Errorf("PlatformAuthService.Login: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.Login: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return nil, ErrPlatformInvalidCredentials
@@ -102,7 +102,7 @@ func (s *PlatformAuthService) Login(ctx context.Context, input PlatformLoginInpu
 	// Generate JWT token
 	token, expiresAt, err := s.generateToken(user.ID, user.Role)
 	if err != nil {
-		return nil, fmt.Errorf("PlatformAuthService.Login: failed to generate token: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.Login: gerar token: %w", err)
 	}
 
 	// Create session
@@ -113,7 +113,7 @@ func (s *PlatformAuthService) Login(ctx context.Context, input PlatformLoginInpu
 		CreatedAt:      time.Now(),
 	}
 	if err := s.platformSessionRepo.Create(ctx, session); err != nil {
-		return nil, fmt.Errorf("PlatformAuthService.Login: failed to create session: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.Login: criar sessão: %w", err)
 	}
 
 	return &PlatformLoginOutput{
@@ -131,7 +131,7 @@ func (s *PlatformAuthService) Login(ctx context.Context, input PlatformLoginInpu
 // Logout invalidates a platform user's session
 func (s *PlatformAuthService) Logout(ctx context.Context, token string) error {
 	if err := s.platformSessionRepo.DeleteByToken(ctx, token); err != nil {
-		return fmt.Errorf("PlatformAuthService.Logout: %w", err)
+		return fmt.Errorf("PlatformAuthService.Logout: deletar sessão: %w", err)
 	}
 	return nil
 }
@@ -145,7 +145,7 @@ func (s *PlatformAuthService) ValidateToken(token string) (uint, domain.Platform
 	})
 
 	if err != nil {
-		return 0, domain.PlatformRoleSupport, fmt.Errorf("PlatformAuthService.ValidateToken: %w", err)
+		return 0, domain.PlatformRoleSupport, fmt.Errorf("PlatformAuthService.ValidateToken: validar token: %w", err)
 	}
 
 	// Extract user ID and role
@@ -199,7 +199,7 @@ func (s *PlatformAuthService) CreatePlatformUser(ctx context.Context, name, emai
 	// Check if email already exists
 	existing, err := s.platformUserRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return nil, fmt.Errorf("CreatePlatformUser: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.CreatePlatformUser: verificar usuário existente: %w", err)
 	}
 	if existing != nil {
 		return nil, ErrPlatformEmailAlreadyExists
@@ -208,7 +208,7 @@ func (s *PlatformAuthService) CreatePlatformUser(ctx context.Context, name, emai
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
 	if err != nil {
-		return nil, fmt.Errorf("CreatePlatformUser: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.CreatePlatformUser: gerar hash: %w", err)
 	}
 
 	// Create user
@@ -223,7 +223,7 @@ func (s *PlatformAuthService) CreatePlatformUser(ctx context.Context, name, emai
 	}
 
 	if err := s.platformUserRepo.Create(ctx, user); err != nil {
-		return nil, fmt.Errorf("CreatePlatformUser: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.CreatePlatformUser: criar usuário: %w", err)
 	}
 
 	return user, nil
@@ -233,7 +233,7 @@ func (s *PlatformAuthService) CreatePlatformUser(ctx context.Context, name, emai
 func (s *PlatformAuthService) GetPlatformUser(ctx context.Context, userID uint) (*PlatformUserOutput, error) {
 	user, err := s.platformUserRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("GetPlatformUser: %w", err)
+		return nil, fmt.Errorf("PlatformAuthService.GetPlatformUser: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return nil, ErrPlatformUserNotFound

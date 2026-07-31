@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -32,17 +33,21 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 
 	// Total de pedidos
 	var totalOrders int64
-	query.WithContext(ctx).Model(&GormOrder{}).
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
 		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
-		Count(&totalOrders)
+		Count(&totalOrders).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
+	}
 	report.TotalOrders = int(totalOrders)
 
 	// Receita total
 	var totalRevenue float64
-	query.WithContext(ctx).Model(&GormOrder{}).
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
 		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
-		Scan(&totalRevenue)
+		Scan(&totalRevenue).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
+	}
 	report.TotalRevenue = totalRevenue
 
 	// Ticket médio
@@ -52,18 +57,22 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 
 	// Produtos vendidos
 	var productsSold int64
-	query.WithContext(ctx).Model(&GormOrderItem{}).
+	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
 		Where("DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
-		Scan(&productsSold)
+		Scan(&productsSold).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
+	}
 	report.ProductsSold = int(productsSold)
 
 	// Pedidos cancelados
 	var cancelledOrders int64
-	query.WithContext(ctx).Model(&GormOrder{}).
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
 		Where("status = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", "cancelled", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
-		Count(&cancelledOrders)
+		Count(&cancelledOrders).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
+	}
 	report.CancelledOrders = int(cancelledOrders)
 
 	// Top produtos (simplificado - retorna até 10)
@@ -74,7 +83,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 		Total    int64  `gorm:"column:total"`
 	}
 	var topProducts []ProductResult
-	query.WithContext(ctx).Model(&GormOrderItem{}).
+	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Select("products.id, products.name, SUM(order_items.quantity) as quantity, SUM(order_items.quantity * order_items.unit_price) as total").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
@@ -82,7 +91,9 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 		Group("products.id, products.name").
 		Order("quantity DESC").
 		Limit(10).
-		Scan(&topProducts)
+		Scan(&topProducts).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
+	}
 
 	report.TopProducts = make([]domain.TopItem, len(topProducts))
 	for i, p := range topProducts {
@@ -109,16 +120,20 @@ func (r *GormReportRepository) GetProductsReport(ctx context.Context, companyID 
 
 	// Total de produtos
 	var totalProducts int64
-	query.WithContext(ctx).Model(&GormProduct{}).
+	if err := query.WithContext(ctx).Model(&GormProduct{}).
 		Where("deleted_at IS NULL").
-		Count(&totalProducts)
+		Count(&totalProducts).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetProductsReport: %w", err)
+	}
 	report.TotalProducts = int(totalProducts)
 
 	// Produtos ativos
 	var activeProducts int64
-	query.WithContext(ctx).Model(&GormProduct{}).
+	if err := query.WithContext(ctx).Model(&GormProduct{}).
 		Where("active = ? AND deleted_at IS NULL", true).
-		Count(&activeProducts)
+		Count(&activeProducts).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetProductsReport: %w", err)
+	}
 	report.ActiveProducts = int(activeProducts)
 
 	// Produtos arquivados
@@ -143,10 +158,12 @@ func (r *GormReportRepository) GetCMVReport(ctx context.Context, companyID uint,
 
 	// Receita total (reutilizando lógica de vendas)
 	var totalRevenue float64
-	query.WithContext(ctx).Model(&GormOrder{}).
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
 		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
-		Scan(&totalRevenue)
+		Scan(&totalRevenue).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetCMVReport: %w", err)
+	}
 	report.TotalRevenue = totalRevenue
 
 	// CMV simplificado (30% fixo - placeholder)
@@ -177,18 +194,22 @@ func (r *GormReportRepository) GetProfitReport(ctx context.Context, companyID ui
 
 	// Receita total
 	var totalRevenue float64
-	query.WithContext(ctx).Model(&GormOrder{}).
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
 		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
-		Scan(&totalRevenue)
+		Scan(&totalRevenue).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetProfitReport: %w", err)
+	}
 	report.TotalRevenue = totalRevenue
 
 	// Despesa total (do módulo financeiro)
 	var totalExpense float64
-	query.WithContext(ctx).Model(&GormTransaction{}).
+	if err := query.WithContext(ctx).Model(&GormTransaction{}).
 		Where("type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
-		Scan(&totalExpense)
+		Scan(&totalExpense).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetProfitReport: %w", err)
+	}
 	report.TotalExpense = totalExpense
 
 	// Lucro líquido
@@ -214,23 +235,29 @@ func (r *GormReportRepository) GetStockReport(ctx context.Context, companyID uin
 
 	// Total de ingredientes
 	var totalIngredients int64
-	query.WithContext(ctx).Model(&GormIngredient{}).
+	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("deleted_at IS NULL").
-		Count(&totalIngredients)
+		Count(&totalIngredients).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetStockReport: %w", err)
+	}
 	report.TotalIngredients = int(totalIngredients)
 
 	// Estoque baixo
 	var lowStockCount int64
-	query.WithContext(ctx).Model(&GormIngredient{}).
+	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("stock_quantity < min_stock AND stock_quantity > 0 AND deleted_at IS NULL").
-		Count(&lowStockCount)
+		Count(&lowStockCount).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetStockReport: %w", err)
+	}
 	report.LowStockCount = int(lowStockCount)
 
 	// Estoque zerado
 	var zeroStockCount int64
-	query.WithContext(ctx).Model(&GormIngredient{}).
+	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("stock_quantity = 0 AND deleted_at IS NULL").
-		Count(&zeroStockCount)
+		Count(&zeroStockCount).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetStockReport: %w", err)
+	}
 	report.ZeroStockCount = int(zeroStockCount)
 
 	// Valor total do estoque (simplificado - assume custo unitário de 0)
@@ -245,11 +272,13 @@ func (r *GormReportRepository) GetStockReport(ctx context.Context, companyID uin
 		Unit          string  `gorm:"column:unit"`
 	}
 	var lowStockItems []IngredientResult
-	query.WithContext(ctx).Model(&GormIngredient{}).
+	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("stock_quantity < min_stock AND stock_quantity > 0 AND deleted_at IS NULL").
 		Order("stock_quantity ASC").
 		Limit(10).
-		Find(&lowStockItems)
+		Find(&lowStockItems).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetStockReport: %w", err)
+	}
 
 	report.LowStockItems = make([]domain.LowStockItem, len(lowStockItems))
 	for i, item := range lowStockItems {
@@ -264,11 +293,13 @@ func (r *GormReportRepository) GetStockReport(ctx context.Context, companyID uin
 
 	// Itens com estoque zerado
 	var zeroStockItems []IngredientResult
-	query.WithContext(ctx).Model(&GormIngredient{}).
+	if err := query.WithContext(ctx).Model(&GormIngredient{}).
 		Where("stock_quantity = 0 AND deleted_at IS NULL").
 		Order("name ASC").
 		Limit(10).
-		Find(&zeroStockItems)
+		Find(&zeroStockItems).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetStockReport: %w", err)
+	}
 
 	report.ZeroStockItems = make([]domain.LowStockItem, len(zeroStockItems))
 	for i, item := range zeroStockItems {
@@ -320,18 +351,22 @@ func (r *GormReportRepository) GetFinancialReport(ctx context.Context, companyID
 
 	// Receita total
 	var totalIncome float64
-	query.WithContext(ctx).Model(&GormTransaction{}).
+	if err := query.WithContext(ctx).Model(&GormTransaction{}).
 		Where("type = 'income' AND date >= ? AND date <= ? AND deleted_at IS NULL", startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
-		Scan(&totalIncome)
+		Scan(&totalIncome).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetFinancialReport: %w", err)
+	}
 	report.TotalIncome = totalIncome
 
 	// Despesa total
 	var totalExpense float64
-	query.WithContext(ctx).Model(&GormTransaction{}).
+	if err := query.WithContext(ctx).Model(&GormTransaction{}).
 		Where("type = 'expense' AND date >= ? AND date <= ? AND deleted_at IS NULL", startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
-		Scan(&totalExpense)
+		Scan(&totalExpense).Error; err != nil {
+		return nil, fmt.Errorf("ReportRepository.GetFinancialReport: %w", err)
+	}
 	report.TotalExpense = totalExpense
 
 	// Saldo líquido
@@ -361,10 +396,12 @@ func (r *GormReportRepository) getSalesByDayForReport(ctx context.Context, compa
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
 		dateStr := currentDate.Format("2006-01-02")
 		var total int64
-		query.WithContext(ctx).Model(&GormOrder{}).
+		if err := query.WithContext(ctx).Model(&GormOrder{}).
 			Where("DATE(FROM_UNIXTIME(created_at)) = ? AND deleted_at IS NULL", dateStr).
 			Select("COALESCE(SUM(total_price), 0)").
-			Scan(&total)
+			Scan(&total).Error; err != nil {
+			return []domain.ChartPoint{}
+		}
 		results = append(results, DayResult{Date: dateStr, Total: total})
 		currentDate = currentDate.AddDate(0, 0, 1)
 	}

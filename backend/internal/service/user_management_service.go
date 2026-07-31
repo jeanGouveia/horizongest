@@ -49,7 +49,7 @@ func (s *UserManagementService) ListUsers(ctx context.Context, companyID uint) (
 	// Get all users (repository should filter by companyID)
 	users, err := s.userRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ListUsers: failed to list users: %w", err)
+		return nil, fmt.Errorf("UserManagementService.ListUsers: listar usuários: %w", err)
 	}
 
 	var result []UserOutput
@@ -75,7 +75,7 @@ func (s *UserManagementService) ListUsers(ctx context.Context, companyID uint) (
 func (s *UserManagementService) GetUser(ctx context.Context, companyID uint, userID uint) (*UserOutput, error) {
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("GetUser: failed to get user: %w", err)
+		return nil, fmt.Errorf("UserManagementService.GetUser: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return nil, ErrUserNotFound
@@ -103,7 +103,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	// Get actor user
 	actor, err := s.userRepo.FindByID(ctx, actorUserID)
 	if err != nil {
-		return fmt.Errorf("ChangeRole: failed to get actor: %w", err)
+		return fmt.Errorf("UserManagementService.ChangeRole: buscar ator: %w", err)
 	}
 	if actor == nil {
 		return ErrPermissionDenied
@@ -112,7 +112,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	// Get target user
 	target, err := s.userRepo.FindByID(ctx, targetUserID)
 	if err != nil {
-		return fmt.Errorf("ChangeRole: failed to get target: %w", err)
+		return fmt.Errorf("UserManagementService.ChangeRole: buscar alvo: %w", err)
 	}
 	if target == nil {
 		return ErrUserNotFound
@@ -127,7 +127,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	if target.Role == domain.RoleOwner {
 		canAlter, err := s.rbacService.CanAlterOwnerRole(ctx, actorUserID)
 		if err != nil {
-			return err
+			return fmt.Errorf("UserManagementService.UpdateUserRole: verificar permissão owner: %w", err)
 		}
 		if !canAlter {
 			return ErrCannotAlterOwner
@@ -138,7 +138,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	if target.Role == domain.RoleAdmin {
 		canAlter, err := s.rbacService.CanAlterAdminRole(ctx, actorUserID)
 		if err != nil {
-			return err
+			return fmt.Errorf("UserManagementService.UpdateUserRole: verificar permissão admin: %w", err)
 		}
 		if !canAlter {
 			return ErrCannotAlterAdmin
@@ -148,7 +148,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	// RBAC Validation: Only Owner and Admin can change roles
 	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
 	if err != nil {
-		return err
+		return fmt.Errorf("UserManagementService.UpdateUserRole: verificar permissão gerenciar usuários: %w", err)
 	}
 	if !canManage {
 		return ErrPermissionDenied
@@ -157,7 +157,7 @@ func (s *UserManagementService) ChangeRole(ctx context.Context, actorUserID uint
 	// Update target user's role
 	target.Role = newRole
 	if err := s.userRepo.Update(ctx, target); err != nil {
-		return fmt.Errorf("ChangeRole: failed to update user: %w", err)
+		return fmt.Errorf("UserManagementService.UpdateUserRole: atualizar usuário: %w", err)
 	}
 
 	return nil
@@ -168,7 +168,7 @@ func (s *UserManagementService) RemoveFromCompany(ctx context.Context, actorUser
 	// Get actor user
 	actor, err := s.userRepo.FindByID(ctx, actorUserID)
 	if err != nil {
-		return fmt.Errorf("RemoveFromCompany: failed to get actor: %w", err)
+		return fmt.Errorf("UserManagementService.RemoveFromCompany: buscar ator: %w", err)
 	}
 	if actor == nil {
 		return ErrPermissionDenied
@@ -177,7 +177,7 @@ func (s *UserManagementService) RemoveFromCompany(ctx context.Context, actorUser
 	// Get target user
 	target, err := s.userRepo.FindByID(ctx, targetUserID)
 	if err != nil {
-		return fmt.Errorf("RemoveFromCompany: failed to get target: %w", err)
+		return fmt.Errorf("UserManagementService.RemoveFromCompany: buscar alvo: %w", err)
 	}
 	if target == nil {
 		return ErrUserNotFound
@@ -196,7 +196,7 @@ func (s *UserManagementService) RemoveFromCompany(ctx context.Context, actorUser
 	// RBAC Validation: Only Owner and Admin can remove users
 	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
 	if err != nil {
-		return err
+		return fmt.Errorf("UserManagementService.RemoveUser: verificar permissão: %w", err)
 	}
 	if !canManage {
 		return ErrPermissionDenied
@@ -212,7 +212,7 @@ func (s *UserManagementService) AddExistingUser(ctx context.Context, actorUserID
 	// Get actor user
 	actor, err := s.userRepo.FindByID(ctx, actorUserID)
 	if err != nil {
-		return nil, fmt.Errorf("AddExistingUser: failed to get actor: %w", err)
+		return nil, fmt.Errorf("UserManagementService.AddExistingUser: buscar ator: %w", err)
 	}
 	if actor == nil {
 		return nil, ErrPermissionDenied
@@ -221,7 +221,7 @@ func (s *UserManagementService) AddExistingUser(ctx context.Context, actorUserID
 	// RBAC Validation: Only Owner and Admin can add users
 	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("UserManagementService.AddExistingUser: verificar permissão: %w", err)
 	}
 	if !canManage {
 		return nil, ErrPermissionDenied
@@ -230,7 +230,7 @@ func (s *UserManagementService) AddExistingUser(ctx context.Context, actorUserID
 	// Find user by email
 	target, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return nil, fmt.Errorf("AddExistingUser: failed to find user: %w", err)
+		return nil, fmt.Errorf("UserManagementService.AddExistingUser: buscar usuário: %w", err)
 	}
 	if target == nil {
 		return nil, ErrUserNotFound
@@ -252,7 +252,7 @@ func (s *UserManagementService) AddExistingUser(ctx context.Context, actorUserID
 	target.Role = defaultRole
 
 	if err := s.userRepo.Update(ctx, target); err != nil {
-		return nil, fmt.Errorf("AddExistingUser: failed to update user: %w", err)
+		return nil, fmt.Errorf("UserManagementService.AddExistingUser: atualizar usuário: %w", err)
 	}
 
 	role := target.Role.String()
@@ -272,7 +272,7 @@ func (s *UserManagementService) SetUserActive(ctx context.Context, actorUserID u
 	// Get actor user
 	actor, err := s.userRepo.FindByID(ctx, actorUserID)
 	if err != nil {
-		return fmt.Errorf("SetUserActive: failed to get actor: %w", err)
+		return fmt.Errorf("UserManagementService.SetUserActive: buscar ator: %w", err)
 	}
 	if actor == nil {
 		return ErrPermissionDenied
@@ -286,7 +286,7 @@ func (s *UserManagementService) SetUserActive(ctx context.Context, actorUserID u
 	// Get target user
 	target, err := s.userRepo.FindByID(ctx, targetUserID)
 	if err != nil {
-		return fmt.Errorf("SetUserActive: failed to get target: %w", err)
+		return fmt.Errorf("UserManagementService.SetUserActive: buscar alvo: %w", err)
 	}
 	if target == nil {
 		return ErrUserNotFound
@@ -305,7 +305,7 @@ func (s *UserManagementService) SetUserActive(ctx context.Context, actorUserID u
 	// RBAC Validation: Only Owner and Admin can activate/deactivate users
 	canManage, err := s.rbacService.CanManageUsers(ctx, actorUserID)
 	if err != nil {
-		return err
+		return fmt.Errorf("UserManagementService.DeactivateUser: verificar permissão: %w", err)
 	}
 	if !canManage {
 		return ErrPermissionDenied
@@ -314,7 +314,7 @@ func (s *UserManagementService) SetUserActive(ctx context.Context, actorUserID u
 	// Update target user's active status
 	target.Active = active
 	if err := s.userRepo.Update(ctx, target); err != nil {
-		return fmt.Errorf("SetUserActive: failed to update user: %w", err)
+		return fmt.Errorf("UserManagementService.DeactivateUser: atualizar usuário: %w", err)
 	}
 
 	return nil

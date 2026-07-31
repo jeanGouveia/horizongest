@@ -81,7 +81,7 @@ type LoginResult struct {
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult, error) {
 	user, err := s.userRepo.FindByEmail(ctx, input.Email)
 	if err != nil {
-		return nil, fmt.Errorf("Login: %w", err)
+		return nil, fmt.Errorf("AuthService.Login: buscar usuário: %w", err)
 	}
 	// Mesmo erro para e-mail inexistente e senha errada (evita user enumeration)
 	if user == nil {
@@ -98,7 +98,7 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*LoginResult
 
 	token, err := s.generateJWT(user)
 	if err != nil {
-		return nil, fmt.Errorf("Login: %w", err)
+		return nil, fmt.Errorf("AuthService.Login: gerar token: %w", err)
 	}
 	return &LoginResult{Token: token, User: user}, nil
 }
@@ -114,7 +114,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input Upda
 	// Verificar se o e-mail já está em uso por outro usuário
 	existing, err := s.userRepo.FindByEmail(ctx, input.Email)
 	if err != nil {
-		return nil, fmt.Errorf("UpdateProfile: %w", err)
+		return nil, fmt.Errorf("AuthService.UpdateProfile: verificar e-mail existente: %w", err)
 	}
 	if existing != nil && existing.ID != userID {
 		return nil, ErrEmailAlreadyExists
@@ -123,7 +123,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input Upda
 	// Buscar usuário atual
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("UpdateProfile: %w", err)
+		return nil, fmt.Errorf("AuthService.UpdateProfile: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return nil, errors.New("usuário não encontrado")
@@ -135,7 +135,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, input Upda
 	// CompanyID não pode ser alterado pelo próprio usuário - apenas via convite ou endpoints administrativos
 
 	if err = s.userRepo.Update(ctx, user); err != nil {
-		return nil, fmt.Errorf("UpdateProfile: %w", err)
+		return nil, fmt.Errorf("AuthService.UpdateProfile: atualizar usuário: %w", err)
 	}
 	return user, nil
 }
@@ -151,7 +151,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input Cha
 	// Buscar usuário
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("ChangePassword: %w", err)
+		return fmt.Errorf("AuthService.ChangePassword: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return errors.New("usuário não encontrado")
@@ -165,13 +165,13 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, input Cha
 	// Hash da nova senha
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), s.bcryptCost)
 	if err != nil {
-		return fmt.Errorf("ChangePassword: hash: %w", err)
+		return fmt.Errorf("AuthService.ChangePassword: gerar hash: %w", err)
 	}
 
 	// Atualizar senha
 	user.PasswordHash = string(hash)
 	if err = s.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("ChangePassword: %w", err)
+		return fmt.Errorf("AuthService.ChangePassword: atualizar usuário: %w", err)
 	}
 	return nil
 }
@@ -186,7 +186,7 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 	// Check if token is blacklisted no banco
 	blacklisted, err := s.tokenBlacklist.IsBlacklisted(ctx, tokenStr)
 	if err != nil {
-		return nil, fmt.Errorf("ValidateToken: %w", err)
+		return nil, fmt.Errorf("AuthService.ValidateToken: verificar blacklist: %w", err)
 	}
 	if blacklisted {
 		return nil, errors.New("token was revoked")
@@ -197,7 +197,7 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 		&JWTClaims{},
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("algoritmo inesperado: %v", t.Header["alg"])
+				return nil, fmt.Errorf("AuthService.ValidateToken: algoritmo inesperado: %v", t.Header["alg"])
 			}
 			return s.secret, nil
 		},
@@ -205,12 +205,12 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 		jwt.WithIssuedAt(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ValidateToken: %w", err)
+		return nil, fmt.Errorf("AuthService.ValidateToken: validar token: %w", err)
 	}
 
 	claims, ok := token.Claims.(*JWTClaims)
 	if !ok || !token.Valid {
-		return nil, fmt.Errorf("ValidateToken: claims inválidos")
+		return nil, fmt.Errorf("AuthService.ValidateToken: claims inválidos")
 	}
 
 	// Sprint 4A: Remover log de claims sensíveis por segurança
@@ -226,7 +226,7 @@ func (s *AuthService) Logout(ctx context.Context, tokenStr string) error {
 	// Extrair expiration do token para saber quando expira
 	claims, err := s.parseTokenClaims(tokenStr)
 	if err != nil {
-		return fmt.Errorf("Logout: %w", err)
+		return fmt.Errorf("AuthService.Logout: extrair claims: %w", err)
 	}
 
 	// Persistir no banco
@@ -237,7 +237,7 @@ func (s *AuthService) Logout(ctx context.Context, tokenStr string) error {
 	}
 
 	if err := s.tokenBlacklist.Add(ctx, entry); err != nil {
-		return fmt.Errorf("Logout: %w", err)
+		return fmt.Errorf("AuthService.Logout: adicionar à blacklist: %w", err)
 	}
 
 	return nil
@@ -250,19 +250,19 @@ func (s *AuthService) parseTokenClaims(tokenStr string) (*JWTClaims, error) {
 		&JWTClaims{},
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("algoritmo inesperado: %v", t.Header["alg"])
+				return nil, fmt.Errorf("AuthService.parseTokenClaims: algoritmo inesperado: %v", t.Header["alg"])
 			}
 			return s.secret, nil
 		},
 		jwt.WithoutClaimsValidation(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("parseTokenClaims: %w", err)
+		return nil, fmt.Errorf("AuthService.parseTokenClaims: analisar token: %w", err)
 	}
 
 	claims, ok := token.Claims.(*JWTClaims)
 	if !ok || !token.Valid {
-		return nil, fmt.Errorf("parseTokenClaims: claims inválidos")
+		return nil, fmt.Errorf("AuthService.parseTokenClaims: claims inválidos")
 	}
 	return claims, nil
 }
@@ -304,7 +304,7 @@ func (s *AuthService) generateJWTWithImpersonation(user *domain.User, isImperson
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(s.secret)
 	if err != nil {
-		return "", fmt.Errorf("generateJWTWithImpersonation: %w", err)
+		return "", fmt.Errorf("AuthService.generateJWTWithImpersonation: assinar token: %w", err)
 	}
 	return signed, nil
 }
@@ -319,7 +319,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, input RequestPas
 	// Find user by email
 	user, err := s.userRepo.FindByEmail(ctx, input.Email)
 	if err != nil {
-		return fmt.Errorf("RequestPasswordReset: %w", err)
+		return fmt.Errorf("AuthService.RequestPasswordReset: buscar usuário: %w", err)
 	}
 	if user == nil {
 		// Don't reveal if email exists or not (security)
@@ -329,7 +329,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, input RequestPas
 	// Generate secure token using time and random string
 	tokenBytes := make([]byte, 16)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		return fmt.Errorf("RequestPasswordReset: generate token: %w", err)
+		return fmt.Errorf("AuthService.RequestPasswordReset: gerar token: %w", err)
 	}
 	token := hex.EncodeToString(tokenBytes)
 
@@ -342,7 +342,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, input RequestPas
 	}
 
 	if err := s.passwordResetRepo.Create(ctx, resetToken); err != nil {
-		return fmt.Errorf("RequestPasswordReset: %w", err)
+		return fmt.Errorf("AuthService.RequestPasswordReset: criar token: %w", err)
 	}
 
 	// Email is sent via EmailService
@@ -361,7 +361,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInpu
 	// Find reset token
 	resetToken, err := s.passwordResetRepo.FindByToken(ctx, input.Token)
 	if err != nil {
-		return fmt.Errorf("ResetPassword: %w", err)
+		return fmt.Errorf("AuthService.ResetPassword: buscar token: %w", err)
 	}
 	if resetToken == nil {
 		return ErrInvalidResetToken
@@ -380,7 +380,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInpu
 	// Get user
 	user, err := s.userRepo.FindByID(ctx, resetToken.UserID)
 	if err != nil {
-		return fmt.Errorf("ResetPassword: %w", err)
+		return fmt.Errorf("AuthService.ResetPassword: buscar usuário: %w", err)
 	}
 	if user == nil {
 		return ErrInvalidResetToken
@@ -389,19 +389,19 @@ func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInpu
 	// Hash new password
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), s.bcryptCost)
 	if err != nil {
-		return fmt.Errorf("ResetPassword: hash: %w", err)
+		return fmt.Errorf("AuthService.ResetPassword: gerar hash: %w", err)
 	}
 
 	// Update user password
 	user.PasswordHash = string(hash)
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return fmt.Errorf("ResetPassword: %w", err)
+		return fmt.Errorf("AuthService.ResetPassword: atualizar usuário: %w", err)
 	}
 
 	// Mark token as used
 	resetToken.Used = true
 	if err := s.passwordResetRepo.MarkAsUsed(ctx, resetToken); err != nil {
-		return fmt.Errorf("ResetPassword: %w", err)
+		return fmt.Errorf("AuthService.ResetPassword: marcar token como usado: %w", err)
 	}
 
 	return nil

@@ -70,7 +70,10 @@ func (r *GormPlatformUserRepository) FindByID(ctx context.Context, id uint) (*do
 
 func (r *GormPlatformUserRepository) Update(ctx context.Context, user *domain.PlatformUser) error {
 	gormUser := r.toGorm(user)
-	return fmt.Errorf("PlatformUserRepository.Update: %w", r.db.WithContext(ctx).Save(gormUser).Error)
+	if err := r.db.WithContext(ctx).Save(gormUser).Error; err != nil {
+		return fmt.Errorf("PlatformUserRepository.Update: %w", err)
+	}
+	return nil
 }
 
 func (r *GormPlatformUserRepository) toGorm(user *domain.PlatformUser) *GormPlatformUser {
