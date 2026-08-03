@@ -18,16 +18,18 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
 		// Content Security Policy
-		// Sprint 4A: unsafe-inline e unsafe-eval mantidos por enquanto
-		// Precisa ser avaliado com testes de frontend antes de remover
+		// FASE A.2: B9 - Remove unsafe-inline and unsafe-eval for secure CSP
+		// Since this is an API backend, we can use a restrictive CSP
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; "+
-				"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
-				"style-src 'self' 'unsafe-inline'; "+
+			"default-src 'none'; "+
+				"script-src 'self'; "+
+				"style-src 'self'; "+
 				"img-src 'self' data: https:; "+
 				"font-src 'self' data:; "+
 				"connect-src 'self'; "+
-				"frame-ancestors 'none';")
+				"frame-ancestors 'none'; "+
+				"base-uri 'self'; "+
+				"form-action 'self';")
 
 		// Permissions Policy (formerly Feature Policy)
 		// Disable unnecessary browser features

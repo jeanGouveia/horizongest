@@ -38,6 +38,7 @@ type UploadMediaInput struct {
 	AltText      string
 	EntityType   string
 	EntityID     *uint
+	CompanyID    uint // FASE A.2: B7 - CompanyID for tenant validation
 }
 
 type ResizeConfig struct {

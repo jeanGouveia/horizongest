@@ -25,6 +25,12 @@ func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) erro
 	return nil
 }
 
+func (m *MockUserRepository) CreateBootstrapOwner(ctx context.Context, user *domain.User, companyID uint) error {
+	user.CompanyID = companyID
+	m.users[user.ID] = user
+	return nil
+}
+
 func (m *MockUserRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
 	return m.users[id], nil
 }
@@ -150,6 +156,10 @@ func (m *MockPasswordResetRepository) Create(ctx context.Context, token *domain.
 }
 
 func (m *MockPasswordResetRepository) FindByToken(ctx context.Context, token string) (*domain.PasswordResetToken, error) {
+	return m.tokens[token], nil
+}
+
+func (m *MockPasswordResetRepository) FindByTokenForUpdate(ctx context.Context, token string) (*domain.PasswordResetToken, error) {
 	return m.tokens[token], nil
 }
 

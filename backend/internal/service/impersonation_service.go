@@ -9,6 +9,7 @@ import (
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
+	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
 
 var (
@@ -100,8 +101,9 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 		return nil, ErrCompanyOwnerNotFound
 	}
 
-	// FORENSIC: Log owner found
-	log.Printf("[FORENSIC] StartImpersonation - Owner encontrado - ID: %d, Name: %s, Email: %s, CompanyID: %d", owner.ID, owner.Name, owner.Email, owner.CompanyID)
+	// FASE A: Mask email in logs
+	emailMask := util.MaskEmail(owner.Email)
+	log.Printf("[FORENSIC] StartImpersonation - Owner encontrado - ID: %d, Name: %s, Email: %s, CompanyID: %d", owner.ID, owner.Name, emailMask, owner.CompanyID)
 
 	// Create impersonation token with impersonation claims
 	token, err := s.authService.generateJWTWithImpersonation(owner, true, input.PlatformUserID)
@@ -109,8 +111,12 @@ func (s *ImpersonationService) StartImpersonation(ctx context.Context, input Sta
 		return nil, fmt.Errorf("ImpersonationService.StartImpersonation: gerar token: %w", err)
 	}
 
-	// FORENSIC: Log JWT generated
-	log.Printf("[FORENSIC] StartImpersonation - JWT gerado: %s", token)
+	// FASE A: Remove sensitive JWT from logs - log only hash prefix
+	tokenHash := "..."
+	if len(token) > 8 {
+		tokenHash = token[:8] + "..."
+	}
+	log.Printf("[FORENSIC] StartImpersonation - JWT gerado (prefix): %s", tokenHash)
 
 	// Calculate expiration (24 hours from now)
 	expiresAt := time.Now().Add(24 * time.Hour).Unix()

@@ -71,7 +71,7 @@ func (m *PlatformAuthMiddleware) Auth(next http.Handler) http.Handler {
 		log.Printf("[FORENSIC MIDDLEWARE] JWT_FOUND - SIM")
 
 		// Validate token
-		userID, role, err := m.platformAuthService.ValidateToken(token)
+		userID, role, err := m.platformAuthService.ValidateToken(r.Context(), token)
 		if err != nil {
 			log.Println("MOTIVO DO 401: invalid token -", err.Error())
 			log.Printf("[FORENSIC MIDDLEWARE] JWT_VALID - NÃO - Error: %v", err)

@@ -3,6 +3,8 @@ package service
 import (
 	"fmt"
 	"log"
+
+	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
 
 // EmailService handles sending emails
@@ -24,7 +26,9 @@ func NewEmailService(enabled bool, from, platformName string) *EmailService {
 // SendWelcomeEmail sends a welcome email to a new company owner with their temporary password
 func (s *EmailService) SendWelcomeEmail(to, name, companyName, tempPassword string) error {
 	if !s.enabled {
-		log.Printf("[EMAIL] Email sending disabled. Would send welcome email to %s for company %s", to, companyName)
+		// FASE A: Mask email address in logs
+		emailMask := util.MaskEmail(to)
+		log.Printf("[EMAIL] Email sending disabled. Would send welcome email to %s for company %s", emailMask, companyName)
 		return nil
 	}
 
@@ -51,7 +55,9 @@ Equipe %s`, name, companyName, platformName, to, tempPassword, platformName)
 	// Email sending is not implemented in this version (Sprint 3.4)
 	// SMTP implementation is deferred to future sprint
 	// Email content is logged for debugging purposes only
-	log.Printf("[EMAIL] To: %s, Subject: %s", to, subject)
+	// FASE A: Mask email in logs
+	emailMask := util.MaskEmail(to)
+	log.Printf("[EMAIL] To: %s, Subject: %s", emailMask, subject)
 
 	return nil
 }
@@ -59,7 +65,9 @@ Equipe %s`, name, companyName, platformName, to, tempPassword, platformName)
 // SendPasswordResetEmail sends a password reset email
 func (s *EmailService) SendPasswordResetEmail(to, name, resetLink string) error {
 	if !s.enabled {
-		log.Printf("[EMAIL] Email sending disabled. Would send password reset email to %s", to)
+		// FASE A: Mask email address in logs
+		emailMask := util.MaskEmail(to)
+		log.Printf("[EMAIL] Email sending disabled. Would send password reset email to %s", emailMask)
 		return nil
 	}
 
@@ -70,7 +78,7 @@ func (s *EmailService) SendPasswordResetEmail(to, name, resetLink string) error 
 	}
 
 	subject := fmt.Sprintf("Redefinição de Senha - %s", platformName)
-	body := fmt.Sprintf(`Olá %s,
+	_ = fmt.Sprintf(`Olá %s,
 
 Recebemos uma solicitação para redefinir sua senha no %s.
 
@@ -82,7 +90,9 @@ Se você não solicitou esta redefinição, ignore este email.
 Atenciosamente,
 Equipe %s`, name, platformName, resetLink, platformName)
 
-	log.Printf("[EMAIL] To: %s, Subject: %s, Body: %s", to, subject, body)
+	// FASE A: Mask email in logs
+	emailMask := util.MaskEmail(to)
+	log.Printf("[EMAIL] To: %s, Subject: %s", emailMask, subject)
 
 	return nil
 }

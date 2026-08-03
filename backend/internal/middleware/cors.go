@@ -8,12 +8,22 @@ import (
 
 // CORS middleware para permitir requisições de origens diferentes
 // Sprint 4A: Implementa whitelist de origens por ambiente, nunca reflete Origin
+// FASE A.2: B15 - Enhanced CORS security with fail-fast configuration
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
 		// Obter whitelist de origens permitidas do ambiente
 		allowedOrigins := getAllowedOrigins()
+
+		// FASE A.2: B15 - Fail-fast: if no origins allowed in production, reject
+		if len(allowedOrigins) == 0 && origin != "" {
+			// In production, reject requests with Origin header if no whitelist configured
+			if os.Getenv("ENVIRONMENT") == "production" {
+				http.Error(w, "Origin not allowed", http.StatusForbidden)
+				return
+			}
+		}
 
 		// Verificar se a origem está na whitelist
 		allowed := false
@@ -42,6 +52,7 @@ func CORS(next http.Handler) http.Handler {
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)

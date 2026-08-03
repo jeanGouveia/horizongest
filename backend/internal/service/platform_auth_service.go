@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
+	"github.com/jeanGouveia/horizongest/backend/internal/security"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 type PlatformAuthService struct {
 	platformUserRepo    PlatformUserRepository
 	platformSessionRepo PlatformSessionRepository
-	jwtSecret           string
+	keyStore            *security.JWTKeyStore // FASE A: JWT key store for rotation
 	sessionDuration     time.Duration
 	bcryptCost          int
 }
@@ -51,10 +52,15 @@ func NewPlatformAuthService(
 	if jwtSecret == "" {
 		panic("JWT_PLATFORM_SECRET environment variable is required but not set")
 	}
+	// FASE A: Initialize JWT key store for rotation
+	keyStore, err := security.NewJWTKeyStore(jwtSecret, 24*time.Hour, 30*24*time.Hour)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize JWT key store: %v", err))
+	}
 	return &PlatformAuthService{
 		platformUserRepo:    platformUserRepo,
 		platformSessionRepo: platformSessionRepo,
-		jwtSecret:           jwtSecret,
+		keyStore:            keyStore,
 		sessionDuration:     sessionDuration,
 		bcryptCost:          bcryptCost,
 	}
@@ -137,11 +143,26 @@ func (s *PlatformAuthService) Logout(ctx context.Context, token string) error {
 }
 
 // ValidateToken validates a JWT token and returns the platform user ID and role
-func (s *PlatformAuthService) ValidateToken(token string) (uint, domain.PlatformRole, error) {
+func (s *PlatformAuthService) ValidateToken(ctx context.Context, token string) (uint, domain.PlatformRole, error) {
 	claims := jwt.MapClaims{}
 
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(s.jwtSecret), nil
+	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("PlatformAuthService.ValidateToken: algoritmo inesperado: %v", t.Header["alg"])
+		}
+		// FASE A: Extract kid from header and resolve key
+		kid, ok := t.Header["kid"].(string)
+		if !ok {
+			// Fallback to active key for backward compatibility
+			activeKey := s.keyStore.GetActiveKey()
+			return []byte(activeKey.Secret), nil
+		}
+		// Resolve key by kid
+		key, found := s.keyStore.GetKeyByID(kid)
+		if !found {
+			return nil, fmt.Errorf("PlatformAuthService.ValidateToken: chave não encontrada ou expirada: %s", kid)
+		}
+		return []byte(key.Secret), nil
 	})
 
 	if err != nil {
@@ -166,9 +187,22 @@ func (s *PlatformAuthService) ValidateToken(token string) (uint, domain.Platform
 		return 0, domain.PlatformRoleSupport, errors.New("invalid token: invalid role")
 	}
 
-	// Check if session exists and is valid
-	// Note: This would require passing context, but for simplicity we skip here
-	// In production, you should validate the session in the database
+	// FASE A: Check if session exists and is valid
+	session, err := s.platformSessionRepo.FindByToken(ctx, token)
+	if err != nil {
+		return 0, domain.PlatformRoleSupport, fmt.Errorf("PlatformAuthService.ValidateToken: verificar sessão: %w", err)
+	}
+	if session == nil {
+		return 0, domain.PlatformRoleSupport, errors.New("session not found or revoked")
+	}
+	// Verify session belongs to the same user
+	if session.PlatformUserID != userID {
+		return 0, domain.PlatformRoleSupport, errors.New("session user mismatch")
+	}
+	// Check if session is expired
+	if time.Now().After(session.ExpiresAt) {
+		return 0, domain.PlatformRoleSupport, errors.New("session expired")
+	}
 
 	return userID, role, nil
 }
@@ -185,8 +219,11 @@ func (s *PlatformAuthService) generateToken(userID uint, role domain.PlatformRol
 		"type": "platform",
 	}
 
+	// FASE A: Get active key and add kid header
+	activeKey := s.keyStore.GetActiveKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(s.jwtSecret))
+	token.Header["kid"] = activeKey.ID
+	tokenString, err := token.SignedString([]byte(activeKey.Secret))
 	if err != nil {
 		return "", 0, err
 	}

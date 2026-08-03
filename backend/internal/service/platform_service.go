@@ -9,6 +9,7 @@ import (
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 var (
@@ -17,6 +18,7 @@ var (
 )
 
 type PlatformService struct {
+	db                *gorm.DB
 	companyRepo       ports.CompanyRepository
 	userRepo          ports.UserRepository
 	platformUserRepo  PlatformUserRepository
@@ -29,6 +31,7 @@ type PlatformAuditRepository interface {
 }
 
 func NewPlatformService(
+	db *gorm.DB,
 	companyRepo ports.CompanyRepository,
 	userRepo ports.UserRepository,
 	platformUserRepo PlatformUserRepository,
@@ -36,6 +39,7 @@ func NewPlatformService(
 	emailService *EmailService,
 ) *PlatformService {
 	return &PlatformService{
+		db:                db,
 		companyRepo:       companyRepo,
 		userRepo:          userRepo,
 		platformUserRepo:  platformUserRepo,
@@ -60,83 +64,117 @@ type CreateCompanyOutput struct {
 }
 
 // CreateCompany creates a new company and assigns an initial owner
+// Wrapped in a GORM transaction to ensure atomicity
 func (s *PlatformService) CreateCompany(ctx context.Context, platformUserID uint, input PlatformCreateCompanyInput, ownerEmail, ownerPassword, ownerName string) (*CreateCompanyOutput, error) {
-	// Verify platform user has permission (PlatformAdmin only)
-	platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
-	if err != nil {
-		return nil, fmt.Errorf("PlatformService.CreateCompany: buscar usuário plataforma: %w", err)
-	}
-	if platformUser == nil {
-		return nil, ErrPermissionDenied
-	}
-	if platformUser.Role != domain.PlatformRoleAdmin {
-		return nil, ErrPermissionDenied
-	}
+	var output *CreateCompanyOutput
 
-	// Check if company slug already exists
-	existing, err := s.companyRepo.FindBySlug(ctx, input.Slug)
-	if err != nil {
-		return nil, fmt.Errorf("PlatformService.CreateCompany: verificar slug: %w", err)
-	}
-	if existing != nil {
-		return nil, ErrCompanyAlreadyExists
-	}
+	// Execute entire operation in a single transaction
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Verify platform user has permission (PlatformAdmin only)
+		platformUser, err := s.platformUserRepo.FindByID(ctx, platformUserID)
+		if err != nil {
+			return fmt.Errorf("PlatformService.CreateCompany: buscar usuário plataforma: %w", err)
+		}
+		if platformUser == nil {
+			return ErrPermissionDenied
+		}
+		if platformUser.Role != domain.PlatformRoleAdmin {
+			return ErrPermissionDenied
+		}
 
-	// Create company
-	company := &domain.Company{
-		Name:         input.Name,
-		Slug:         input.Slug,
-		Description:  input.Description,
-		BusinessType: domain.BusinessType(input.BusinessType),
-		Active:       true,
-		Locale:       input.Locale,
-		Currency:     input.Currency,
-		Timezone:     input.Timezone,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
+		// Check if company slug already exists
+		existing, err := s.companyRepo.FindBySlug(ctx, input.Slug)
+		if err != nil {
+			return fmt.Errorf("PlatformService.CreateCompany: verificar slug: %w", err)
+		}
+		if existing != nil {
+			return ErrCompanyAlreadyExists
+		}
 
-	if err := s.companyRepo.Create(ctx, company); err != nil {
-		return nil, fmt.Errorf("PlatformService.CreateCompany: criar empresa: %w", err)
-	}
+		// Create company using transaction
+		company := &domain.Company{
+			Name:         input.Name,
+			Slug:         input.Slug,
+			Description:  input.Description,
+			BusinessType: domain.BusinessType(input.BusinessType),
+			Active:       true,
+			Locale:       input.Locale,
+			Currency:     input.Currency,
+			Timezone:     input.Timezone,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
 
-	// Hash the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(ownerPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("PlatformService.CreateCompany: gerar hash senha: %w", err)
-	}
+		// Try to use transaction if repository supports it
+		var createErr error
+		if companyRepo, ok := s.companyRepo.(interface {
+			CreateWithTx(context.Context, *domain.Company, *gorm.DB) error
+		}); ok {
+			createErr = companyRepo.CreateWithTx(ctx, company, tx)
+		} else {
+			// Fallback to non-transactional create (for tests/mocks)
+			createErr = s.companyRepo.Create(ctx, company)
+		}
+		if createErr != nil {
+			return fmt.Errorf("PlatformService.CreateCompany: criar empresa: %w", createErr)
+		}
 
-	// Create owner user
-	owner := &domain.User{
-		Name:         ownerName,
-		Email:        ownerEmail,
-		PasswordHash: string(hashedPassword),
-		CompanyID:    company.ID,
-		Role:         domain.RoleOwner,
-		Active:       true,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
+		// Hash the password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(ownerPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("PlatformService.CreateCompany: gerar hash senha: %w", err)
+		}
 
-	if err := s.userRepo.Create(ctx, owner); err != nil {
-		return nil, fmt.Errorf("PlatformService.CreateCompany: criar owner: %w", err)
-	}
+		// Create owner user using CreateBootstrapOwner with transaction (no tenant context required)
+		owner := &domain.User{
+			Name:         ownerName,
+			Email:        ownerEmail,
+			PasswordHash: string(hashedPassword),
+			Role:         domain.RoleOwner,
+			Active:       true,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
 
-	// Log audit
-	s.logAudit(ctx, platformUserID, "create_company", "company", company.ID, map[string]interface{}{
-		"name": company.Name,
-		"slug": company.Slug,
+		// Try to use transaction if repository supports it
+		var createOwnerErr error
+		if userRepo, ok := s.userRepo.(interface {
+			CreateBootstrapOwnerWithTx(context.Context, *domain.User, uint, *gorm.DB) error
+		}); ok {
+			createOwnerErr = userRepo.CreateBootstrapOwnerWithTx(ctx, owner, company.ID, tx)
+		} else {
+			// Fallback to non-transactional create (for tests/mocks)
+			createOwnerErr = s.userRepo.CreateBootstrapOwner(ctx, owner, company.ID)
+		}
+		if createOwnerErr != nil {
+			return fmt.Errorf("PlatformService.CreateCompany: criar owner: %w", createOwnerErr)
+		}
+
+		// Log audit
+		s.logAudit(ctx, platformUserID, "create_company", "company", company.ID, map[string]interface{}{
+			"name": company.Name,
+			"slug": company.Slug,
+		})
+
+		// Send welcome email with temporary password (non-blocking)
+		if s.emailService != nil {
+			_ = s.emailService.SendWelcomeEmail(ownerEmail, ownerName, company.Name, ownerPassword)
+		}
+
+		// Set output for return after transaction commits
+		output = &CreateCompanyOutput{
+			CompanyID: company.ID,
+			UserID:    owner.ID,
+		}
+
+		return nil // Transaction commits if return nil
 	})
 
-	// Send welcome email with temporary password
-	if s.emailService != nil {
-		_ = s.emailService.SendWelcomeEmail(ownerEmail, ownerName, company.Name, ownerPassword)
+	if err != nil {
+		return nil, err // Transaction rolled back automatically
 	}
 
-	return &CreateCompanyOutput{
-		CompanyID: company.ID,
-		UserID:    owner.ID,
-	}, nil
+	return output, nil
 }
 
 // ListCompanies returns all companies (platform admin only)

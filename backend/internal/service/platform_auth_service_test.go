@@ -261,12 +261,23 @@ func TestPlatformAuthService_ValidateToken(t *testing.T) {
 		ID:   1,
 		Role: domain.PlatformRoleAdmin,
 	}
-	token, _, err := svc.generateToken(user.ID, user.Role)
+	token, sessionID, err := svc.generateToken(user.ID, user.Role)
 	if err != nil {
 		t.Fatalf("generateToken failed: %v", err)
 	}
 
-	userID, role, err := svc.ValidateToken(token)
+	// FASE A: Create a session in the mock repository (B4 - Platform Session Validation)
+	session := &domain.PlatformSession{
+		ID:             uint(sessionID),
+		PlatformUserID: user.ID,
+		ExpiresAt:      time.Now().Add(time.Hour),
+		Token:          token,
+	}
+	if err := sessionRepo.Create(context.Background(), session); err != nil {
+		t.Fatalf("sessionRepo.Create failed: %v", err)
+	}
+
+	userID, role, err := svc.ValidateToken(context.Background(), token)
 	if err != nil {
 		t.Fatalf("ValidateToken failed: %v", err)
 	}
@@ -284,7 +295,7 @@ func TestPlatformAuthService_ValidateToken_Invalid(t *testing.T) {
 
 	svc := NewPlatformAuthService(userRepo, sessionRepo, "test-secret", time.Hour, bcrypt.DefaultCost)
 
-	_, _, err := svc.ValidateToken("invalid-token")
+	_, _, err := svc.ValidateToken(context.Background(), "invalid-token")
 	if err == nil {
 		t.Error("expected error for invalid token, got nil")
 	}

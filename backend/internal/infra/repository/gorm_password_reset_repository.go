@@ -61,6 +61,19 @@ func (r *GormPasswordResetRepository) FindByToken(ctx context.Context, tokenStr 
 	return toDomainPasswordResetToken(&model), nil
 }
 
+// FindByTokenForUpdate finds a token with SELECT FOR UPDATE for race condition prevention
+func (r *GormPasswordResetRepository) FindByTokenForUpdate(ctx context.Context, tokenStr string) (*domain.PasswordResetToken, error) {
+	var model GormPasswordResetTokenModel
+	err := r.db.WithContext(ctx).Raw("SELECT * FROM password_reset_tokens WHERE token = ? FOR UPDATE", tokenStr).First(&model).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("PasswordResetRepository.FindByTokenForUpdate: %w", err)
+	}
+	return toDomainPasswordResetToken(&model), nil
+}
+
 func (r *GormPasswordResetRepository) FindByUserID(ctx context.Context, userID uint) ([]*domain.PasswordResetToken, error) {
 	var models []GormPasswordResetTokenModel
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Find(&models).Error

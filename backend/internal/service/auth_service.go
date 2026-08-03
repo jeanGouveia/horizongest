@@ -14,6 +14,8 @@ import (
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
+	"github.com/jeanGouveia/horizongest/backend/internal/security"
+	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
 
 var (
@@ -40,7 +42,7 @@ type AuthService struct {
 	companyRepo       ports.CompanyRepository
 	tokenBlacklist    ports.TokenBlacklistRepository
 	passwordResetRepo ports.PasswordResetRepository
-	secret            []byte
+	keyStore          *security.JWTKeyStore // FASE A: JWT key store for rotation
 	expiry            time.Duration
 	bcryptCost        int
 	issuer            string // JWT issuer (platform name) - Sprint 3.6
@@ -50,12 +52,17 @@ func NewAuthService(userRepo ports.UserRepository, companyRepo ports.CompanyRepo
 	if jwtSecret == "" {
 		panic("JWT_TENANT_SECRET environment variable is required but not set")
 	}
+	// FASE A: Initialize JWT key store for rotation
+	keyStore, err := security.NewJWTKeyStore(jwtSecret, 24*time.Hour, 30*24*time.Hour)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize JWT key store: %v", err))
+	}
 	return &AuthService{
 		userRepo:          userRepo,
 		companyRepo:       companyRepo,
 		tokenBlacklist:    tokenBlacklist,
 		passwordResetRepo: passwordResetRepo,
-		secret:            []byte(jwtSecret),
+		keyStore:          keyStore,
 		expiry:            24 * time.Hour,
 		bcryptCost:        bcrypt.DefaultCost,
 		issuer:            issuer, // JWT issuer from platform brand (Sprint 3.6)
@@ -199,7 +206,19 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*JWTC
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("AuthService.ValidateToken: algoritmo inesperado: %v", t.Header["alg"])
 			}
-			return s.secret, nil
+			// FASE A: Extract kid from header and resolve key
+			kid, ok := t.Header["kid"].(string)
+			if !ok {
+				// Fallback to active key for backward compatibility
+				activeKey := s.keyStore.GetActiveKey()
+				return []byte(activeKey.Secret), nil
+			}
+			// Resolve key by kid
+			key, found := s.keyStore.GetKeyByID(kid)
+			if !found {
+				return nil, fmt.Errorf("AuthService.ValidateToken: chave não encontrada ou expirada: %s", kid)
+			}
+			return []byte(key.Secret), nil
 		},
 		jwt.WithExpirationRequired(),
 		jwt.WithIssuedAt(),
@@ -252,7 +271,19 @@ func (s *AuthService) parseTokenClaims(tokenStr string) (*JWTClaims, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("AuthService.parseTokenClaims: algoritmo inesperado: %v", t.Header["alg"])
 			}
-			return s.secret, nil
+			// FASE A: Extract kid from header and resolve key
+			kid, ok := t.Header["kid"].(string)
+			if !ok {
+				// Fallback to active key for backward compatibility
+				activeKey := s.keyStore.GetActiveKey()
+				return []byte(activeKey.Secret), nil
+			}
+			// Resolve key by kid
+			key, found := s.keyStore.GetKeyByID(kid)
+			if !found {
+				return nil, fmt.Errorf("AuthService.parseTokenClaims: chave não encontrada ou expirada: %s", kid)
+			}
+			return []byte(key.Secret), nil
 		},
 		jwt.WithoutClaimsValidation(),
 	)
@@ -297,12 +328,16 @@ func (s *AuthService) generateJWTWithImpersonation(user *domain.User, isImperson
 		},
 	}
 
-	// DEBUG: Log JWT claims before generating
+	// FASE A: Mask email in logs
+	emailMask := util.MaskEmail(claims.Email)
 	log.Printf("[DEBUG] generateJWTWithImpersonation - Claims: UserID=%d, CompanyID=%d, Email=%s, Name=%s, IsImpersonating=%v, OriginalPlatformUserID=%d",
-		claims.UserID, claims.CompanyID, claims.Email, claims.Name, claims.IsImpersonating, claims.OriginalPlatformUserID)
+		claims.UserID, claims.CompanyID, emailMask, claims.Name, claims.IsImpersonating, claims.OriginalPlatformUserID)
 
+	// FASE A: Get active key and add kid header
+	activeKey := s.keyStore.GetActiveKey()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(s.secret)
+	token.Header["kid"] = activeKey.ID
+	signed, err := token.SignedString([]byte(activeKey.Secret))
 	if err != nil {
 		return "", fmt.Errorf("AuthService.generateJWTWithImpersonation: assinar token: %w", err)
 	}
@@ -358,8 +393,8 @@ type ResetPasswordInput struct {
 }
 
 func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInput) error {
-	// Find reset token
-	resetToken, err := s.passwordResetRepo.FindByToken(ctx, input.Token)
+	// FASE A: Use FindByTokenForUpdate with SELECT FOR UPDATE to prevent race condition
+	resetToken, err := s.passwordResetRepo.FindByTokenForUpdate(ctx, input.Token)
 	if err != nil {
 		return fmt.Errorf("AuthService.ResetPassword: buscar token: %w", err)
 	}
@@ -372,7 +407,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInpu
 		return ErrInvalidResetToken
 	}
 
-	// Check if token was already used
+	// Check if token was already used (double-check after lock)
 	if resetToken.Used {
 		return ErrResetTokenAlreadyUsed
 	}

@@ -37,6 +37,12 @@ func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) erro
 	return nil
 }
 
+func (m *MockUserRepository) CreateBootstrapOwner(ctx context.Context, user *domain.User, companyID uint) error {
+	user.CompanyID = companyID
+	m.Users[user.ID] = user
+	return nil
+}
+
 func (m *MockUserRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
 	return m.Users[id], nil
 }
