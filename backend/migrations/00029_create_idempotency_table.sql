@@ -8,13 +8,13 @@
 -- TTL implementado via job de limpeza (DELETE WHERE created_at < expiry)
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     
     -- Chave de idempotência (gerada pelo cliente, UUID v4 recomendado)
     key VARCHAR(255) NOT NULL,
     
     -- Escopo da chave (company_id para isolamento multi-tenant)
-    company_id INTEGER NOT NULL,
+    company_id BIGINT NOT NULL,
     
     -- Hash do payload request para detectar reutilização com payload diferente
     -- SHA-256 do body JSON normalizado (chaves ordenadas, sem whitespace)
@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
     error_message TEXT,
     
     -- Timestamps
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     -- Unique constraint: uma chave só pode ser usada uma vez por company
     UNIQUE (company_id, key)

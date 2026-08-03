@@ -5,8 +5,8 @@
 
 -- Suppliers Table
 CREATE TABLE IF NOT EXISTS suppliers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
     cnpj VARCHAR(20),
     email VARCHAR(255),
@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS suppliers (
     state VARCHAR(2),
     zip_code VARCHAR(10),
     notes VARCHAR(1000),
-    active BOOLEAN NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (company_id) REFERENCES companies(id)
 );
@@ -30,23 +30,23 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_deleted_at ON suppliers(deleted_at);
 
 -- Purchase Orders Table
 CREATE TABLE IF NOT EXISTS purchase_orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
-    supplier_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    supplier_id BIGINT NOT NULL,
     order_number VARCHAR(50) NOT NULL UNIQUE,
     status VARCHAR(20) NOT NULL DEFAULT 'draft',
-    order_date DATETIME NOT NULL,
-    expected_date DATETIME,
-    received_date DATETIME,
-    subtotal REAL NOT NULL DEFAULT 0.0,
-    tax REAL NOT NULL DEFAULT 0.0,
-    discount REAL NOT NULL DEFAULT 0.0,
-    total REAL NOT NULL DEFAULT 0.0,
+    order_date TIMESTAMP NOT NULL,
+    expected_date TIMESTAMP,
+    received_date TIMESTAMP,
+    subtotal NUMERIC(10,2) NOT NULL DEFAULT 0.0,
+    tax NUMERIC(10,2) NOT NULL DEFAULT 0.0,
+    discount NUMERIC(10,2) NOT NULL DEFAULT 0.0,
+    total NUMERIC(10,2) NOT NULL DEFAULT 0.0,
     notes VARCHAR(1000),
-    created_by INTEGER NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    created_by BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (company_id) REFERENCES companies(id),
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
@@ -61,18 +61,18 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_deleted_at ON purchase_orders(del
 
 -- Purchase Order Items Table
 CREATE TABLE IF NOT EXISTS purchase_order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    purchase_order_id INTEGER NOT NULL,
-    ingredient_id INTEGER NOT NULL,
-    quantity REAL NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    purchase_order_id BIGINT NOT NULL,
+    ingredient_id BIGINT NOT NULL,
+    quantity NUMERIC(10,2) NOT NULL,
     unit VARCHAR(20) NOT NULL,
-    unit_price REAL NOT NULL,
-    subtotal REAL NOT NULL DEFAULT 0.0,
-    received_qty REAL NOT NULL DEFAULT 0.0,
+    unit_price NUMERIC(10,2) NOT NULL,
+    subtotal NUMERIC(10,2) NOT NULL DEFAULT 0.0,
+    received_qty NUMERIC(10,2) NOT NULL DEFAULT 0.0,
     notes VARCHAR(500),
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
     FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
@@ -84,14 +84,14 @@ CREATE INDEX IF NOT EXISTS idx_purchase_order_items_deleted_at ON purchase_order
 
 -- Purchase Receivings Table
 CREATE TABLE IF NOT EXISTS purchase_receivings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    purchase_order_id INTEGER NOT NULL,
-    received_date DATETIME NOT NULL,
-    received_by INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    purchase_order_id BIGINT NOT NULL,
+    received_date TIMESTAMP NOT NULL,
+    received_by BIGINT NOT NULL,
     notes VARCHAR(1000),
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
     FOREIGN KEY (received_by) REFERENCES users(id)
@@ -103,18 +103,18 @@ CREATE INDEX IF NOT EXISTS idx_purchase_receivings_deleted_at ON purchase_receiv
 
 -- Purchase Receiving Items Table
 CREATE TABLE IF NOT EXISTS purchase_receiving_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    purchase_receiving_id INTEGER NOT NULL,
-    purchase_order_item_id INTEGER NOT NULL,
-    ingredient_id INTEGER NOT NULL,
-    quantity REAL NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    purchase_receiving_id BIGINT NOT NULL,
+    purchase_order_item_id BIGINT NOT NULL,
+    ingredient_id BIGINT NOT NULL,
+    quantity NUMERIC(10,2) NOT NULL,
     unit VARCHAR(20) NOT NULL,
-    unit_price REAL NOT NULL,
-    subtotal REAL NOT NULL DEFAULT 0.0,
+    unit_price NUMERIC(10,2) NOT NULL,
+    subtotal NUMERIC(10,2) NOT NULL DEFAULT 0.0,
     notes VARCHAR(500),
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (purchase_receiving_id) REFERENCES purchase_receivings(id),
     FOREIGN KEY (purchase_order_item_id) REFERENCES purchase_order_items(id),

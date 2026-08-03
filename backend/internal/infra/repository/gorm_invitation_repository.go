@@ -50,7 +50,8 @@ func (r *GormInvitationRepository) Create(ctx context.Context, invitation *domai
 
 func (r *GormInvitationRepository) FindByID(ctx context.Context, id uint) (*domain.Invitation, error) {
 	var model GormInvitationModel
-	if err := r.db.WithContext(ctx).First(&model, id).Error; err != nil {
+	query := ApplyTenantFilterWithID(ctx, r.db, id)
+	if err := query.First(&model).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -61,11 +62,33 @@ func (r *GormInvitationRepository) FindByID(ctx context.Context, id uint) (*doma
 
 func (r *GormInvitationRepository) FindByToken(ctx context.Context, token string) (*domain.Invitation, error) {
 	var model GormInvitationModel
-	if err := r.db.WithContext(ctx).Where("token = ?", token).First(&model).Error; err != nil {
+	query := ApplyTenantFilter(ctx, r.db)
+	if err := query.Where("token = ?", token).First(&model).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("InvitationRepository.FindByToken: %w", err)
+	}
+	return toDomainInvitation(&model), nil
+}
+
+// FindByTokenForUpdate finds an invitation with SELECT FOR UPDATE for race condition prevention
+func (r *GormInvitationRepository) FindByTokenForUpdate(ctx context.Context, token string) (*domain.Invitation, error) {
+	var model GormInvitationModel
+	// Get tenant context to filter by company ID
+	tenantCtx, ok := domain.GetTenantContextFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("tenant context required")
+	}
+
+	err := r.db.WithContext(ctx).
+		Raw("SELECT * FROM invitations WHERE token = ? AND company_id = ? FOR UPDATE", token, tenantCtx.GetCompanyID()).
+		First(&model).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("InvitationRepository.FindByTokenForUpdate: %w", err)
 	}
 	return toDomainInvitation(&model), nil
 }

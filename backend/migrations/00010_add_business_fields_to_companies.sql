@@ -6,16 +6,16 @@
 -- Description: Adds business_type, locale, currency, and timezone fields to support Business Engine
 
 -- Add business_type field (nullable for backward compatibility)
-ALTER TABLE companies ADD COLUMN business_type TEXT;
+ALTER TABLE companies ADD COLUMN business_type VARCHAR(50);
 
 -- Add locale field (nullable for backward compatibility, defaults to 'pt-BR')
-ALTER TABLE companies ADD COLUMN locale TEXT DEFAULT 'pt-BR';
+ALTER TABLE companies ADD COLUMN locale VARCHAR(10) DEFAULT 'pt-BR';
 
 -- Add currency field (nullable for backward compatibility, defaults to 'BRL')
-ALTER TABLE companies ADD COLUMN currency TEXT DEFAULT 'BRL';
+ALTER TABLE companies ADD COLUMN currency VARCHAR(10) DEFAULT 'BRL';
 
 -- Add timezone field (nullable for backward compatibility, defaults to 'America/Sao_Paulo')
-ALTER TABLE companies ADD COLUMN timezone TEXT DEFAULT 'America/Sao_Paulo';
+ALTER TABLE companies ADD COLUMN timezone VARCHAR(50) DEFAULT 'America/Sao_Paulo';
 
 -- Update existing companies with default values
 UPDATE companies

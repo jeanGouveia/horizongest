@@ -111,7 +111,7 @@ func (r *GormCategoryRepository) UpdateCategory(ctx context.Context, c *domain.C
 }
 
 func (r *GormCategoryRepository) DeleteCategory(ctx context.Context, id uint) error {
-	now := time.Now().Unix()
+	now := time.Now()
 	query := ApplyTenantFilterWithID(ctx, r.db, id)
 	if err := query.WithContext(ctx).Model(&GormCategory{}).
 		Where("deleted_at IS NULL").Update("deleted_at", now).Error; err != nil {

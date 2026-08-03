@@ -9,6 +9,7 @@ import (
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
 
 type CompanySettingsHandler struct {
@@ -41,10 +42,11 @@ func (h *CompanySettingsHandler) GetSettings(w http.ResponseWriter, r *http.Requ
 		log.Printf("[FORENSIC] CompanySettingsHandler - TenantContext NÃO encontrado no contexto")
 	}
 
-	// FORENSIC: Log Claims
+	// FASE A: Mask email in logs
 	claims, ok := middleware.GetClaimsFromContext(r.Context())
 	if ok {
-		log.Printf("[FORENSIC] CompanySettingsHandler - Claims - UserID: %d, CompanyID: %d, Email: %s, Name: %s", claims.UserID, claims.CompanyID, claims.Email, claims.Name)
+		emailMask := util.MaskEmail(claims.Email)
+		log.Printf("[FORENSIC] CompanySettingsHandler - Claims - UserID: %d, CompanyID: %d, Email: %s, Name: %s", claims.UserID, claims.CompanyID, emailMask, claims.Name)
 	}
 
 	settings, err := h.companySettingsService.GetSettings(r.Context(), userID)

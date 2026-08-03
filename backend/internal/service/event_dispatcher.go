@@ -98,7 +98,8 @@ func (d *EventDispatcher) run() {
 
 // processBatch processa um batch de eventos pendentes
 func (d *EventDispatcher) processBatch() {
-	ctx := d.shutdownCtx
+	ctx, cancel := context.WithTimeout(d.shutdownCtx, 30*time.Second)
+	defer cancel()
 
 	// Buscar tenant ID do contexto (para multi-tenancy)
 	// Por enquanto, processamos todos os tenants em loop

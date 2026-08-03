@@ -4,14 +4,14 @@
 -- Tabela para registrar ajustes de estoque pendentes de aprovação
 -- Usada para estornos de estoque por cancelamento de pedidos
 CREATE TABLE IF NOT EXISTS stock_adjustments_pending (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id      INTEGER NOT NULL,
-    ingredient_id INTEGER NOT NULL,
-    quantity      REAL NOT NULL,
-    order_status  TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'pending',
-    created_at    DATETIME NOT NULL DEFAULT (datetime('now')),
-    processed_at  DATETIME
+    id            BIGSERIAL PRIMARY KEY,
+    order_id      BIGINT NOT NULL,
+    ingredient_id BIGINT NOT NULL,
+    quantity      NUMERIC(10,2) NOT NULL,
+    order_status  VARCHAR(50) NOT NULL,
+    status        VARCHAR(50) NOT NULL DEFAULT 'pending',
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at  TIMESTAMP
 );
 
 -- Índices para consultas frequentes

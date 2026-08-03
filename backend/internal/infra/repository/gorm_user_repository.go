@@ -60,6 +60,39 @@ func (r *GormUserRepository) Create(ctx context.Context, user *domain.User) erro
 	return nil
 }
 
+// CreateBootstrapOwner creates an owner user without requiring tenant context
+// Used for platform bootstrap when creating the first company
+func (r *GormUserRepository) CreateBootstrapOwner(ctx context.Context, user *domain.User, companyID uint) error {
+	return r.CreateBootstrapOwnerWithTx(ctx, user, companyID, nil)
+}
+
+// CreateBootstrapOwnerWithTx creates an owner user with optional transaction
+func (r *GormUserRepository) CreateBootstrapOwnerWithTx(ctx context.Context, user *domain.User, companyID uint, tx *gorm.DB) error {
+	role := user.Role.String()
+	model := GormUserModel{
+		Name:         user.Name,
+		Email:        user.Email,
+		PasswordHash: user.PasswordHash,
+		Active:       user.Active,
+		CompanyID:    companyID, // Fornecido explicitamente como parâmetro
+		Role:         role,
+	}
+
+	db := r.db.WithContext(ctx)
+	if tx != nil {
+		db = tx.WithContext(ctx)
+	}
+
+	if err := db.Create(&model).Error; err != nil {
+		return fmt.Errorf("UserRepository.CreateBootstrapOwner: %w", err)
+	}
+	user.ID = model.ID
+	user.CompanyID = companyID
+	user.CreatedAt = model.CreatedAt
+	user.UpdatedAt = model.UpdatedAt
+	return nil
+}
+
 func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var model GormUserModel
 	query := ApplyTenantFilter(ctx, r.db)

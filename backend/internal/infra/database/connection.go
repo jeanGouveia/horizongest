@@ -44,8 +44,11 @@ func Connect(cfg DBConfig) (*gorm.DB, error) {
 	}
 
 	// Connection pool settings for PostgreSQL
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(5)
+	// Sprint 5D.3 - Performance Hardening: Optimized for production
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxIdleConns(20)
+	sqlDB.SetConnMaxLifetime(1 * time.Hour)    // Recycle connections after 1 hour
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute) // Close idle connections after 10 minutes
 
 	return db, nil
 }

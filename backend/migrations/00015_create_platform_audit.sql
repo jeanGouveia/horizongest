@@ -2,15 +2,15 @@
 -- +goose StatementBegin
 
 CREATE TABLE IF NOT EXISTS platform_audit (
-    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-    platform_user_id INTEGER,
-    action        TEXT     NOT NULL,
-    entity_type   TEXT     NOT NULL,
-    entity_id     INTEGER,
+    id            BIGSERIAL PRIMARY KEY,
+    platform_user_id BIGINT,
+    action        VARCHAR(50) NOT NULL,
+    entity_type   VARCHAR(50) NOT NULL,
+    entity_id     BIGINT,
     changes       TEXT,    -- JSON string of changes
-    ip_address    TEXT,
+    ip_address    VARCHAR(50),
     user_agent    TEXT,
-    created_at    INTEGER  NOT NULL DEFAULT (strftime('%s', 'now'))
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_platform_audit_platform_user_id ON platform_audit(platform_user_id);

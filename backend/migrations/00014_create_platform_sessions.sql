@@ -2,11 +2,11 @@
 -- +goose StatementBegin
 
 CREATE TABLE IF NOT EXISTS platform_sessions (
-    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-    platform_user_id INTEGER NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
-    token         TEXT     NOT NULL UNIQUE,
-    expires_at    INTEGER  NOT NULL,
-    created_at    INTEGER  NOT NULL DEFAULT (strftime('%s', 'now'))
+    id            BIGSERIAL PRIMARY KEY,
+    platform_user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+    token         VARCHAR(255) NOT NULL UNIQUE,
+    expires_at    TIMESTAMP NOT NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_platform_sessions_token ON platform_sessions(token);

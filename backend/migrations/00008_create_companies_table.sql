@@ -4,17 +4,17 @@
 -- Core V1 compatibility: All company_id fields are nullable to maintain backward compatibility
 
 CREATE TABLE IF NOT EXISTS companies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
-    active BOOLEAN DEFAULT 1,
+    active BOOLEAN DEFAULT TRUE,
     logo_url VARCHAR(500),
     primary_color VARCHAR(7) DEFAULT '#3b82f6',
     secondary_color VARCHAR(7) DEFAULT '#1e40af',
-    deleted_at DATETIME,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    deleted_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create index on slug for faster lookups

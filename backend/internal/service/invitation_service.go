@@ -215,7 +215,8 @@ func (s *InvitationService) GetInvitationByToken(ctx context.Context, token stri
 
 // AcceptInvitation accepts an invitation and associates the user with the company
 func (s *InvitationService) AcceptInvitation(ctx context.Context, token string, userEmail string) error {
-	invitation, err := s.invitationRepo.FindByToken(ctx, token)
+	// FASE A: Use FindByTokenForUpdate with SELECT FOR UPDATE to prevent race condition
+	invitation, err := s.invitationRepo.FindByTokenForUpdate(ctx, token)
 	if err != nil {
 		return fmt.Errorf("InvitationService.AcceptInvitation: buscar convite: %w", err)
 	}
@@ -228,7 +229,7 @@ func (s *InvitationService) AcceptInvitation(ctx context.Context, token string, 
 		return errors.New("o convite não pertence a este usuário")
 	}
 
-	// Check if invitation can be accepted
+	// Check if invitation can be accepted (double-check after lock)
 	if !invitation.CanBeAccepted() {
 		if invitation.Status == domain.InvitationStatusAccepted {
 			return ErrInvitationAlreadyUsed

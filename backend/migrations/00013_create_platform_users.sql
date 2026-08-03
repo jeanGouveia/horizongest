@@ -2,15 +2,15 @@
 -- +goose StatementBegin
 
 CREATE TABLE IF NOT EXISTS platform_users (
-    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-    name          TEXT     NOT NULL,
-    email         TEXT     NOT NULL UNIQUE,
-    password_hash TEXT     NOT NULL,
-    role          TEXT     NOT NULL DEFAULT 'PlatformSupport',
-    active        INTEGER  NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
-    deleted_at    INTEGER,
-    created_at    INTEGER  NOT NULL DEFAULT (strftime('%s', 'now')),
-    updated_at    INTEGER  NOT NULL DEFAULT (strftime('%s', 'now'))
+    id            BIGSERIAL PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          VARCHAR(50) NOT NULL DEFAULT 'PlatformSupport',
+    active        BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at    TIMESTAMP,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_platform_users_email ON platform_users(email);

@@ -3,17 +3,17 @@
 
 -- Create invitations table for Sprint 8: Invites & Onboarding
 CREATE TABLE IF NOT EXISTS invitations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
-    email TEXT NOT NULL,
-    role TEXT NOT NULL,
-    token TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL DEFAULT 'pending',
-    expires_at INTEGER NOT NULL,
-    accepted_at INTEGER,
-    created_by INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    expires_at TIMESTAMP NOT NULL,
+    accepted_at TIMESTAMP,
+    created_by BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id)
 );

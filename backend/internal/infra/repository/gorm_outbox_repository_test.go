@@ -3,17 +3,22 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
 func setupOutboxTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=horizongest_user password=horizongest_secure_password dbname=horizongest_test sslmode=disable"
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -95,7 +100,30 @@ func TestOutboxRepository_Create_WithTransaction(t *testing.T) {
 }
 
 func TestOutboxRepository_Create_Idempotency(t *testing.T) {
-	t.Skip("SQLite doesn't enforce unique constraints the same way as PostgreSQL - skip for now")
+	// Test idempotency with PostgreSQL unique constraint
+	db := setupOutboxTestDB(t)
+	repo := NewGormOutboxRepository(db)
+
+	ctx := setupTenantContext(context.Background(), 100)
+	event := createTestEvent(100)
+
+	// Create first event
+	err := repo.Create(ctx, event, nil)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	// Try to create duplicate event (should fail with unique constraint)
+	duplicateEvent := createTestEvent(100)
+	duplicateEvent.AggregateType = event.AggregateType
+	duplicateEvent.AggregateID = event.AggregateID
+	duplicateEvent.EventType = event.EventType
+	duplicateEvent.EventVersion = event.EventVersion
+
+	err = repo.Create(ctx, duplicateEvent, nil)
+	if err == nil {
+		t.Error("expected error when creating duplicate event")
+	}
 }
 
 func TestOutboxRepository_Create_InvalidEvent(t *testing.T) {
@@ -436,7 +464,48 @@ func TestOutboxRepository_DeleteOldCompletedEvents(t *testing.T) {
 }
 
 func TestOutboxRepository_TenantIsolation(t *testing.T) {
-	t.Skip("SQLite in-memory database doesn't properly isolate tenant contexts across test - skip for now")
+	db := setupOutboxTestDB(t)
+	repo := NewGormOutboxRepository(db)
+
+	// Create event for tenant 100
+	ctx1 := setupTenantContext(context.Background(), 100)
+	event1 := createTestEvent(100)
+	err := repo.Create(ctx1, event1, nil)
+	if err != nil {
+		t.Fatalf("Create failed for tenant 100: %v", err)
+	}
+
+	// Create event for tenant 200
+	ctx2 := setupTenantContext(context.Background(), 200)
+	event2 := createTestEvent(200)
+	err = repo.Create(ctx2, event2, nil)
+	if err != nil {
+		t.Fatalf("Create failed for tenant 200: %v", err)
+	}
+
+	// Tenant 100 should only see its own events
+	events1, err := repo.FindPendingEvents(ctx1, 100, 10)
+	if err != nil {
+		t.Fatalf("FindPendingEvents failed for tenant 100: %v", err)
+	}
+	if len(events1) != 1 {
+		t.Errorf("expected 1 event for tenant 100, got %d", len(events1))
+	}
+	if events1[0].TenantID != 100 {
+		t.Errorf("expected tenant ID 100, got %d", events1[0].TenantID)
+	}
+
+	// Tenant 200 should only see its own events
+	events2, err := repo.FindPendingEvents(ctx2, 200, 10)
+	if err != nil {
+		t.Fatalf("FindPendingEvents failed for tenant 200: %v", err)
+	}
+	if len(events2) != 1 {
+		t.Errorf("expected 1 event for tenant 200, got %d", len(events2))
+	}
+	if events2[0].TenantID != 200 {
+		t.Errorf("expected tenant ID 200, got %d", events2[0].TenantID)
+	}
 }
 
 func TestOutboxRepository_Create_AutoFillTenantID(t *testing.T) {

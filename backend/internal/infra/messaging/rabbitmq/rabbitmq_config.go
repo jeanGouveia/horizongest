@@ -28,6 +28,23 @@ type Config struct {
 
 	// EnablePublisherConfirm habilita publisher confirms
 	EnablePublisherConfirm bool
+
+	// Sprint 5D.3 - Performance Hardening: DLQ and Prefetch Configuration
+
+	// DLQEnabled habilita Dead Letter Queue
+	DLQEnabled bool
+
+	// DLQName é o nome da Dead Letter Queue
+	DLQName string
+
+	// DLQTTL é o TTL da DLQ em milissegundos
+	DLQTTL int64
+
+	// DLQMaxRetries é o número máximo de retries antes de enviar para DLQ
+	DLQMaxRetries int
+
+	// PrefetchCount é o número de mensagens que um consumer pode receber antes de ack
+	PrefetchCount int
 }
 
 // DefaultConfig retorna configurações padrão para desenvolvimento
@@ -38,8 +55,14 @@ func DefaultConfig() Config {
 		ExchangeType:           "topic",
 		QueuePrefix:            "horizongest",
 		RetryCount:             3,
-		PublisherTimeout:       10 * time.Second,
+		PublisherTimeout:       30 * time.Second, // Sprint 5D.3: Increased from 10s to 30s
 		ReconnectDelay:         5 * time.Second,
 		EnablePublisherConfirm: true,
+		// Sprint 5D.3 - Performance Hardening: DLQ and Prefetch
+		DLQEnabled:    true,
+		DLQName:       "horizongest.dlq",
+		DLQTTL:        86400000, // 24 hours in milliseconds
+		DLQMaxRetries: 3,
+		PrefetchCount: 10, // Optimal for most workloads
 	}
 }

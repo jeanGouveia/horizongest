@@ -210,7 +210,8 @@ func (r *GormProductRepository) FindProductByID(ctx context.Context, id uint) (*
 func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Product, error) {
 	var ms []GormProduct
 	query := ApplyTenantFilter(ctx, r.db)
-	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Find(&ms).Error; err != nil {
+	// Sprint 5D.3 - Performance Hardening: Add default LIMIT to prevent timeouts
+	if err := query.WithContext(ctx).Where("deleted_at IS NULL").Limit(100).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ProductRepository.ListProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))
@@ -223,7 +224,8 @@ func (r *GormProductRepository) ListProducts(ctx context.Context) ([]domain.Prod
 func (r *GormProductRepository) ListActiveProducts(ctx context.Context) ([]domain.Product, error) {
 	var ms []GormProduct
 	query := ApplyTenantFilter(ctx, r.db)
-	if err := query.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Find(&ms).Error; err != nil {
+	// Sprint 5D.3 - Performance Hardening: Add default LIMIT to prevent timeouts
+	if err := query.WithContext(ctx).Where("active = ? AND deleted_at IS NULL", true).Limit(100).Find(&ms).Error; err != nil {
 		return nil, fmt.Errorf("ProductRepository.ListActiveProducts: %w", err)
 	}
 	out := make([]domain.Product, len(ms))

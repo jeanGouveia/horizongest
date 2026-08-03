@@ -29,7 +29,7 @@ func TestConcurrency_100Goroutines_CompleteInventory(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -162,7 +162,7 @@ func TestConcurrency_LostUpdate_100Goroutines(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -246,7 +246,7 @@ func TestConcurrency_WriteSkew(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -370,7 +370,7 @@ func TestConcurrency_PhantomReads(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -506,7 +506,7 @@ func TestConcurrency_DirtyRead(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -616,7 +616,7 @@ func TestConcurrency_NonRepeatableRead(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -740,7 +740,7 @@ func TestConcurrency_Deadlock(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -933,7 +933,7 @@ func TestConcurrency_HeavyRollback(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -1094,7 +1094,7 @@ func TestConcurrency_Crash(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -1268,7 +1268,7 @@ func TestConcurrency_MultiTenant(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -1420,7 +1420,7 @@ func TestConcurrency_ExplainAnalyze(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -1537,7 +1537,7 @@ func TestConcurrency_Stress(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate
@@ -1708,7 +1708,7 @@ func TestConcurrency_Audit(t *testing.T) {
 	// Clean up
 	db.Exec("DROP SCHEMA public CASCADE")
 	db.Exec("CREATE SCHEMA public")
-	db.Exec("GRANT ALL ON SCHEMA public TO prato")
+	db.Exec("GRANT ALL ON SCHEMA public TO horizongest_user")
 	db.Exec("GRANT ALL ON SCHEMA public TO public")
 
 	// AutoMigrate

@@ -5,24 +5,24 @@
 -- This ensures existing Core V1 data continues to work without modification
 
 -- Add company_id to users table
-ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id);
+ALTER TABLE users ADD COLUMN company_id BIGINT REFERENCES companies(id);
 
 -- Note: categories table doesn't exist in this codebase
 
 -- Add company_id to ingredients table
-ALTER TABLE ingredients ADD COLUMN company_id INTEGER REFERENCES companies(id);
+ALTER TABLE ingredients ADD COLUMN company_id BIGINT REFERENCES companies(id);
 
 -- Add company_id to products table
-ALTER TABLE products ADD COLUMN company_id INTEGER REFERENCES companies(id);
+ALTER TABLE products ADD COLUMN company_id BIGINT REFERENCES companies(id);
 
 -- Note: orders table will be created in migration 00027 with company_id already included
 -- This avoids the error since orders table doesn't exist yet
 
 -- Add company_id to stock_adjustments_pending table
-ALTER TABLE stock_adjustments_pending ADD COLUMN company_id INTEGER REFERENCES companies(id);
+ALTER TABLE stock_adjustments_pending ADD COLUMN company_id BIGINT REFERENCES companies(id);
 
 -- Add company_id to media table
-ALTER TABLE media ADD COLUMN company_id INTEGER REFERENCES companies(id);
+ALTER TABLE media ADD COLUMN company_id BIGINT REFERENCES companies(id);
 
 -- Create indexes for efficient tenant filtering
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);

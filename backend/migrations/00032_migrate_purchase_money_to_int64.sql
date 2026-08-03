@@ -1,4 +1,7 @@
--- Migration: Migrar campos monetários de Purchase de REAL para BIGINT (centavos)
+-- +goose Up
+-- +goose StatementBegin
+
+-- Migration: Migrar campos monetários de Purchase de NUMERIC(10,2) para BIGINT (centavos)
 -- Sprint 5A: Eliminação completa de float64 monetário
 
 -- Tabela: purchase_orders
@@ -50,3 +53,61 @@ ALTER TABLE purchase_receiving_items DROP COLUMN subtotal;
 
 ALTER TABLE purchase_receiving_items RENAME COLUMN unit_price_cents TO unit_price;
 ALTER TABLE purchase_receiving_items RENAME COLUMN subtotal_cents TO subtotal;
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+-- Revert migration: migrar campos monetários de Purchase de BIGINT para NUMERIC(10,2)
+-- Tabela: purchase_receiving_items
+ALTER TABLE purchase_receiving_items ADD COLUMN unit_price NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE purchase_receiving_items ADD COLUMN subtotal NUMERIC(10,2) DEFAULT 0;
+
+UPDATE purchase_receiving_items SET 
+  unit_price = unit_price_cents / 100.0,
+  subtotal = subtotal_cents / 100.0;
+
+ALTER TABLE purchase_receiving_items DROP COLUMN unit_price_cents;
+ALTER TABLE purchase_receiving_items DROP COLUMN subtotal_cents;
+
+ALTER TABLE purchase_receiving_items RENAME COLUMN unit_price TO unit_price_cents;
+ALTER TABLE purchase_receiving_items RENAME COLUMN subtotal TO subtotal_cents;
+
+-- Tabela: purchase_order_items
+ALTER TABLE purchase_order_items ADD COLUMN unit_price NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE purchase_order_items ADD COLUMN subtotal NUMERIC(10,2) DEFAULT 0;
+
+UPDATE purchase_order_items SET 
+  unit_price = unit_price_cents / 100.0,
+  subtotal = subtotal_cents / 100.0;
+
+ALTER TABLE purchase_order_items DROP COLUMN unit_price_cents;
+ALTER TABLE purchase_order_items DROP COLUMN subtotal_cents;
+
+ALTER TABLE purchase_order_items RENAME COLUMN unit_price TO unit_price_cents;
+ALTER TABLE purchase_order_items RENAME COLUMN subtotal TO subtotal_cents;
+
+-- Tabela: purchase_orders
+ALTER TABLE purchase_orders ADD COLUMN subtotal NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN tax NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN discount NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN total NUMERIC(10,2) DEFAULT 0;
+
+UPDATE purchase_orders SET 
+  subtotal = subtotal_cents / 100.0,
+  tax = tax_cents / 100.0,
+  discount = discount_cents / 100.0,
+  total = total_cents / 100.0;
+
+ALTER TABLE purchase_orders DROP COLUMN subtotal_cents;
+ALTER TABLE purchase_orders DROP COLUMN tax_cents;
+ALTER TABLE purchase_orders DROP COLUMN discount_cents;
+ALTER TABLE purchase_orders DROP COLUMN total_cents;
+
+ALTER TABLE purchase_orders RENAME COLUMN subtotal TO subtotal_cents;
+ALTER TABLE purchase_orders RENAME COLUMN tax TO tax_cents;
+ALTER TABLE purchase_orders RENAME COLUMN discount TO discount_cents;
+ALTER TABLE purchase_orders RENAME COLUMN total TO total_cents;
+
+-- +goose StatementEnd

@@ -1,8 +1,8 @@
 -- +goose Up
 
 ALTER TABLE ingredients
-ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
+ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- +goose Down
 
-SELECT 1;
+ALTER TABLE ingredients DROP COLUMN active;

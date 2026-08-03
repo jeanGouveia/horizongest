@@ -35,7 +35,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Receita de hoje
 	var todayRevenue int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) = ? AND deleted_at IS NULL", today).
+		Where("DATE(created_at) = ? AND deleted_at IS NULL", today).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&todayRevenue).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -45,7 +45,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Pedidos de hoje
 	var todayOrders int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) = ? AND deleted_at IS NULL", today).
+		Where("DATE(created_at) = ? AND deleted_at IS NULL", today).
 		Count(&todayOrders).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
 	}
@@ -55,7 +55,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	var todayProductsSold int64
 	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("date(datetime(orders.created_at, 'unixepoch')) = ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", today).
+		Where("DATE(orders.created_at) = ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", today).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
 		Scan(&todayProductsSold).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -77,7 +77,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Receita de ontem
 	var yesterdayRevenue int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) = ? AND deleted_at IS NULL", yesterday).
+		Where("DATE(created_at) = ? AND deleted_at IS NULL", yesterday).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&yesterdayRevenue).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -87,7 +87,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Pedidos de ontem
 	var yesterdayOrders int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) = ? AND deleted_at IS NULL", yesterday).
+		Where("DATE(created_at) = ? AND deleted_at IS NULL", yesterday).
 		Count(&yesterdayOrders).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
 	}
@@ -97,7 +97,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	var yesterdayProductsSold int64
 	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("date(datetime(orders.created_at, 'unixepoch')) = ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", yesterday).
+		Where("DATE(orders.created_at) = ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", yesterday).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
 		Scan(&yesterdayProductsSold).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -114,7 +114,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Receita da semana
 	var weekRevenue int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) >= ? AND deleted_at IS NULL", weekStart).
+		Where("DATE(created_at) >= ? AND deleted_at IS NULL", weekStart).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&weekRevenue).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -124,7 +124,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Pedidos da semana
 	var weekOrders int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) >= ? AND deleted_at IS NULL", weekStart).
+		Where("DATE(created_at) >= ? AND deleted_at IS NULL", weekStart).
 		Count(&weekOrders).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
 	}
@@ -134,7 +134,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	var weekProductsSold int64
 	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("date(datetime(orders.created_at, 'unixepoch')) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", weekStart).
+		Where("DATE(orders.created_at) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", weekStart).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
 		Scan(&weekProductsSold).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -151,7 +151,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Receita do mês
 	var monthRevenue int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) >= ? AND deleted_at IS NULL", monthStart).
+		Where("DATE(created_at) >= ? AND deleted_at IS NULL", monthStart).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&monthRevenue).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -161,7 +161,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	// Pedidos do mês
 	var monthOrders int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("date(datetime(created_at, 'unixepoch')) >= ? AND deleted_at IS NULL", monthStart).
+		Where("DATE(created_at) >= ? AND deleted_at IS NULL", monthStart).
 		Count(&monthOrders).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
 	}
@@ -171,7 +171,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	var monthProductsSold int64
 	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("date(datetime(orders.created_at, 'unixepoch')) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", monthStart).
+		Where("DATE(orders.created_at) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", monthStart).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
 		Scan(&monthProductsSold).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
@@ -258,39 +258,36 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 	dashboard.TotalIngredients = int(totalIngredients)
 
 	// --- Pedidos recentes (últimos 10) ---
-	type OrderResult struct {
+	// Sprint 5D.3 - Performance Hardening: Eliminate N+1 query by using JOIN
+	type OrderWithCountResult struct {
 		ID          uint      `gorm:"column:id"`
 		OrderNumber int       `gorm:"column:order_number"`
 		Status      string    `gorm:"column:status"`
 		TotalPrice  int64     `gorm:"column:total_price"`
 		CreatedAt   time.Time `gorm:"column:created_at"`
+		ItemsCount  int64     `gorm:"column:items_count"`
 	}
-	var recentOrders []OrderResult
+	var recentOrders []OrderWithCountResult
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("deleted_at IS NULL").
-		Order("created_at DESC").
+		Select("orders.*, COUNT(order_items.id) as items_count").
+		Joins("LEFT JOIN order_items ON order_items.order_id = orders.id AND order_items.deleted_at IS NULL").
+		Where("orders.deleted_at IS NULL").
+		Group("orders.id").
+		Order("orders.created_at DESC").
 		Limit(10).
-		Find(&recentOrders).Error; err != nil {
+		Scan(&recentOrders).Error; err != nil {
 		return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
 	}
 
 	dashboard.RecentOrders = make([]domain.RecentOrder, len(recentOrders))
 	for i, o := range recentOrders {
-		// Contar itens
-		var itemsCount int64
-		if err := r.db.WithContext(ctx).Model(&GormOrderItem{}).
-			Where("order_id = ? AND deleted_at IS NULL", o.ID).
-			Count(&itemsCount).Error; err != nil {
-			return nil, fmt.Errorf("DashboardRepository.GetDashboard: %w", err)
-		}
-
 		dashboard.RecentOrders[i] = domain.RecentOrder{
 			ID:          o.ID,
 			OrderNumber: o.OrderNumber,
 			Status:      domain.OrderStatus(o.Status),
 			TotalPrice:  domain.Money(o.TotalPrice),
 			CreatedAt:   o.CreatedAt.Format("2006-01-02 15:04"),
-			ItemsCount:  int(itemsCount),
+			ItemsCount:  int(o.ItemsCount),
 		}
 	}
 
@@ -360,6 +357,7 @@ func (r *GormDashboardRepository) GetDashboard(ctx context.Context) (*domain.Das
 }
 
 // getSalesByDay retorna vendas por dia (últimos 7 dias)
+// Sprint 5D.3 - Performance Hardening: Eliminate loop by using GROUP BY DATE
 func (r *GormDashboardRepository) getSalesByDay(ctx context.Context, now time.Time) []domain.ChartPoint {
 	type DayResult struct {
 		Date  string `gorm:"column:date"`
@@ -368,17 +366,15 @@ func (r *GormDashboardRepository) getSalesByDay(ctx context.Context, now time.Ti
 
 	query := ApplyTenantFilter(ctx, r.db)
 
+	weekAgo := now.AddDate(0, 0, -7).Format("2006-01-02")
 	var results []DayResult
-	for i := 6; i >= 0; i-- {
-		date := now.AddDate(0, 0, -i).Format("2006-01-02")
-		var total int64
-		if err := query.WithContext(ctx).Model(&GormOrder{}).
-			Where("date(datetime(created_at, 'unixepoch')) = ? AND deleted_at IS NULL", date).
-			Select("COALESCE(SUM(total_price), 0)").
-			Scan(&total).Error; err != nil {
-			return []domain.ChartPoint{}
-		}
-		results = append(results, DayResult{Date: date, Total: total})
+	if err := query.WithContext(ctx).Model(&GormOrder{}).
+		Select("DATE(created_at) as date, COALESCE(SUM(total_price), 0) as total").
+		Where("DATE(created_at) >= ? AND deleted_at IS NULL", weekAgo).
+		Group("DATE(created_at)").
+		Order("date ASC").
+		Scan(&results).Error; err != nil {
+		return []domain.ChartPoint{}
 	}
 
 	chartPoints := make([]domain.ChartPoint, len(results))
@@ -403,8 +399,8 @@ func (r *GormDashboardRepository) getSalesByHour(ctx context.Context, today stri
 
 	var results []HourResult
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Select("strftime('%H', datetime(created_at, 'unixepoch')) as hour, COALESCE(SUM(total_price), 0) as total").
-		Where("date(datetime(created_at, 'unixepoch')) = ? AND deleted_at IS NULL", today).
+		Select("EXTRACT(HOUR FROM created_at) as hour, COALESCE(SUM(total_price), 0) as total").
+		Where("DATE(created_at) = ? AND deleted_at IS NULL", today).
 		Group("hour").
 		Order("hour ASC").
 		Scan(&results).Error; err != nil {
@@ -429,15 +425,18 @@ func (r *GormDashboardRepository) getTopProducts(ctx context.Context, now time.T
 		Total    int64  `gorm:"column:total"`
 	}
 
-	query := ApplyTenantFilter(ctx, r.db)
+	tenantCtx, ok := domain.GetTenantContextFromContext(ctx)
+	if !ok {
+		return []domain.TopItem{}
+	}
 
 	monthAgo := now.AddDate(0, 0, -30).Format("2006-01-02")
 	var results []ProductResult
-	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
+	if err := r.db.WithContext(ctx).Model(&GormOrderItem{}).
 		Select("products.id, products.name, SUM(order_items.quantity) as quantity, SUM(order_items.quantity * order_items.unit_price) as total").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("date(datetime(orders.created_at, 'unixepoch')) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL", monthAgo).
+		Where("orders.company_id = ? AND DATE(orders.created_at) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL", tenantCtx.GetCompanyID(), monthAgo).
 		Group("products.id, products.name").
 		Order("quantity DESC").
 		Limit(10).
@@ -467,16 +466,19 @@ func (r *GormDashboardRepository) getTopCategories(ctx context.Context, now time
 		Total    int64  `gorm:"column:total"`
 	}
 
-	query := ApplyTenantFilter(ctx, r.db)
+	tenantCtx, ok := domain.GetTenantContextFromContext(ctx)
+	if !ok {
+		return []domain.TopItem{}
+	}
 
 	monthAgo := now.AddDate(0, 0, -30).Format("2006-01-02")
 	var results []CategoryResult
-	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
+	if err := r.db.WithContext(ctx).Model(&GormOrderItem{}).
 		Select("categories.id, categories.name, SUM(order_items.quantity) as quantity, SUM(order_items.quantity * order_items.unit_price) as total").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("JOIN categories ON categories.id = products.category_id").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("date(datetime(orders.created_at, 'unixepoch')) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL AND categories.deleted_at IS NULL", monthAgo).
+		Where("orders.company_id = ? AND DATE(orders.created_at) >= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL AND categories.deleted_at IS NULL", tenantCtx.GetCompanyID(), monthAgo).
 		Group("categories.id, categories.name").
 		Order("quantity DESC").
 		Limit(10).

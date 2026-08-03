@@ -7,21 +7,21 @@
 -- Isolamento multi-tenant via tenant_id (company_id)
 
 CREATE TABLE IF NOT EXISTS outbox_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     
     -- Identificação do agregado
     aggregate_type VARCHAR(100) NOT NULL,        -- 'order', 'product', 'ingredient', etc.
-    aggregate_id INTEGER NOT NULL,                -- ID do agregado (ex: order_id)
+    aggregate_id BIGINT NOT NULL,                -- ID do agregado (ex: order_id)
     
     -- Metadados do evento
     event_type VARCHAR(100) NOT NULL,            -- 'order.created', 'product.updated', etc.
     event_version VARCHAR(20) NOT NULL DEFAULT '1.0',  -- Versão do schema do evento
     
     -- Payload do evento (dados completos em JSON)
-    payload TEXT NOT NULL,                       -- JSON string (SQLite não tem JSONB nativo)
+    payload TEXT NOT NULL,                       -- JSON string (PostgreSQL suporta JSONB, mas TEXT é compatível)
     
     -- Isolamento multi-tenant
-    tenant_id INTEGER NOT NULL,                   -- company_id para isolamento
+    tenant_id BIGINT NOT NULL,                   -- company_id para isolamento
     
     -- Controle de processamento
     status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
@@ -29,9 +29,9 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     attempts INTEGER NOT NULL DEFAULT 0,         -- Número de tentativas de processamento
     
     -- Controle de tempo
-    available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Quando o evento fica disponível para processamento
-    processed_at DATETIME,                       -- Quando foi processado com sucesso
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    available_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Quando o evento fica disponível para processamento
+    processed_at TIMESTAMP,                       -- Quando foi processado com sucesso
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     -- Tratamento de erros
     last_error TEXT,                             -- Último erro (se houver)

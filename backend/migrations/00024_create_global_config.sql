@@ -2,33 +2,33 @@
 -- +goose StatementBegin
 
 CREATE TABLE IF NOT EXISTS global_config (
-    id                   INTEGER  PRIMARY KEY AUTOINCREMENT,
-    default_timezone     TEXT     DEFAULT 'America/Sao_Paulo',
-    default_locale       TEXT     DEFAULT 'pt-BR',
-    monetary_format      TEXT     DEFAULT 'BRL R$ 1.000,00',
-    date_format          TEXT     DEFAULT 'DD/MM/YYYY',
-    time_format          TEXT     DEFAULT 'HH:mm',
-    max_upload_size_mb   INTEGER  DEFAULT 10,
-    max_image_size_mb    INTEGER  DEFAULT 5,
-    allowed_image_types  TEXT     DEFAULT 'jpg,png,webp,gif',
-    allowed_file_types   TEXT     DEFAULT 'pdf,doc,docx,xlsx,xls,txt',
-    maintenance_mode     INTEGER  DEFAULT 0,
+    id                   BIGSERIAL PRIMARY KEY,
+    default_timezone     VARCHAR(50) DEFAULT 'America/Sao_Paulo',
+    default_locale       VARCHAR(10) DEFAULT 'pt-BR',
+    monetary_format      VARCHAR(50) DEFAULT 'BRL R$ 1.000,00',
+    date_format          VARCHAR(20) DEFAULT 'DD/MM/YYYY',
+    time_format          VARCHAR(20) DEFAULT 'HH:mm',
+    max_upload_size_mb   INTEGER DEFAULT 10,
+    max_image_size_mb    INTEGER DEFAULT 5,
+    allowed_image_types  TEXT DEFAULT 'jpg,png,webp,gif',
+    allowed_file_types   TEXT DEFAULT 'pdf,doc,docx,xlsx,xls,txt',
+    maintenance_mode     BOOLEAN DEFAULT FALSE,
     maintenance_message  TEXT,
-    enable_finance       INTEGER  DEFAULT 1,
-    enable_purchasing    INTEGER  DEFAULT 1,
-    enable_inventory     INTEGER  DEFAULT 1,
-    enable_crm           INTEGER  DEFAULT 0,
-    enable_calendar      INTEGER  DEFAULT 0,
-    enable_pos           INTEGER  DEFAULT 0,
-    enable_ai            INTEGER  DEFAULT 0,
-    enable_delivery      INTEGER  DEFAULT 0,
-    enable_marketplace   INTEGER  DEFAULT 0,
-    updated_at           INTEGER  NOT NULL DEFAULT (strftime('%s', 'now')),
-    updated_by           INTEGER
+    enable_finance       BOOLEAN DEFAULT TRUE,
+    enable_purchasing    BOOLEAN DEFAULT TRUE,
+    enable_inventory     BOOLEAN DEFAULT TRUE,
+    enable_crm           BOOLEAN DEFAULT FALSE,
+    enable_calendar      BOOLEAN DEFAULT FALSE,
+    enable_pos           BOOLEAN DEFAULT FALSE,
+    enable_ai            BOOLEAN DEFAULT FALSE,
+    enable_delivery      BOOLEAN DEFAULT FALSE,
+    enable_marketplace   BOOLEAN DEFAULT FALSE,
+    updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by           BIGINT
 );
 
 -- Insert default global configuration (idempotent)
-INSERT OR IGNORE INTO global_config (
+INSERT INTO global_config (
     id, default_timezone, default_locale, monetary_format, date_format, time_format,
     max_upload_size_mb, max_image_size_mb, allowed_image_types, allowed_file_types,
     maintenance_mode, maintenance_message, enable_finance, enable_purchasing,
@@ -37,10 +37,10 @@ INSERT OR IGNORE INTO global_config (
 ) VALUES (
     1, 'America/Sao_Paulo', 'pt-BR', 'BRL R$ 1.000,00', 'DD/MM/YYYY', 'HH:mm',
     10, 5, 'jpg,png,webp,gif', 'pdf,doc,docx,xlsx,xls,txt',
-    0, '', 1, 1,
-    1, 0, 0, 0, 0,
-    0, 0
-);
+    FALSE, '', TRUE, TRUE,
+    TRUE, FALSE, FALSE, FALSE, FALSE,
+    FALSE, FALSE
+) ON CONFLICT (id) DO NOTHING;
 
 -- +goose StatementEnd
 

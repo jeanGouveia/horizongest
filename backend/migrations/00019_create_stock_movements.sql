@@ -5,20 +5,20 @@
 
 -- Stock Movements Table
 CREATE TABLE IF NOT EXISTS stock_movements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
-    ingredient_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    ingredient_id BIGINT NOT NULL,
     type VARCHAR(20) NOT NULL,
-    quantity REAL NOT NULL,
-    previous_stock REAL NOT NULL,
-    new_stock REAL NOT NULL,
+    quantity NUMERIC(10,2) NOT NULL,
+    previous_stock NUMERIC(10,2) NOT NULL,
+    new_stock NUMERIC(10,2) NOT NULL,
     reason VARCHAR(500),
     reference_type VARCHAR(50),
-    reference_id INTEGER,
-    performed_by INTEGER NOT NULL,
-    performed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    reference_id BIGINT,
+    performed_by BIGINT NOT NULL,
+    performed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (company_id) REFERENCES companies(id),
     FOREIGN KEY (ingredient_id) REFERENCES ingredients(id),
@@ -32,15 +32,15 @@ CREATE INDEX IF NOT EXISTS idx_stock_movements_deleted_at ON stock_movements(del
 
 -- Stock Inventories Table
 CREATE TABLE IF NOT EXISTS stock_inventories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
-    inventory_date DATETIME NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    inventory_date TIMESTAMP NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'draft',
     notes VARCHAR(1000),
-    performed_by INTEGER NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME,
-    deleted_at INTEGER,
+    performed_by BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (company_id) REFERENCES companies(id),
     FOREIGN KEY (performed_by) REFERENCES users(id)
@@ -53,15 +53,15 @@ CREATE INDEX IF NOT EXISTS idx_stock_inventories_deleted_at ON stock_inventories
 
 -- Stock Inventory Items Table
 CREATE TABLE IF NOT EXISTS stock_inventory_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    inventory_id INTEGER NOT NULL,
-    ingredient_id INTEGER NOT NULL,
-    expected_stock REAL NOT NULL,
-    actual_stock REAL NOT NULL,
-    difference REAL NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    inventory_id BIGINT NOT NULL,
+    ingredient_id BIGINT NOT NULL,
+    expected_stock NUMERIC(10,2) NOT NULL,
+    actual_stock NUMERIC(10,2) NOT NULL,
+    difference NUMERIC(10,2) NOT NULL,
     reason VARCHAR(500),
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (inventory_id) REFERENCES stock_inventories(id),
     FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)

@@ -44,7 +44,18 @@ func NewGormCompanyRepository(db *gorm.DB) *GormCompanyRepository {
 	return &GormCompanyRepository{db: db}
 }
 
+func (r *GormCompanyRepository) getDB(ctx context.Context, tx *gorm.DB) *gorm.DB {
+	if tx != nil {
+		return tx.WithContext(ctx)
+	}
+	return r.db.WithContext(ctx)
+}
+
 func (r *GormCompanyRepository) Create(ctx context.Context, company *domain.Company) error {
+	return r.CreateWithTx(ctx, company, nil)
+}
+
+func (r *GormCompanyRepository) CreateWithTx(ctx context.Context, company *domain.Company, tx *gorm.DB) error {
 	model := GormCompanyModel{
 		Name:           company.Name,
 		Slug:           company.Slug,
@@ -58,7 +69,7 @@ func (r *GormCompanyRepository) Create(ctx context.Context, company *domain.Comp
 		Currency:       company.Currency,
 		Timezone:       company.Timezone,
 	}
-	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
+	if err := r.getDB(ctx, tx).Create(&model).Error; err != nil {
 		return fmt.Errorf("CompanyRepository.Create: %w", err)
 	}
 	company.ID = model.ID

@@ -3,19 +3,19 @@
 
 -- Create plans table
 CREATE TABLE IF NOT EXISTS plans (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
-    price REAL DEFAULT 0,
-    currency TEXT DEFAULT 'BRL',
-    interval TEXT DEFAULT 'monthly',
+    price NUMERIC(10,2) DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'BRL',
+    interval VARCHAR(20) DEFAULT 'monthly',
     max_users INTEGER DEFAULT 1,
     max_products INTEGER DEFAULT 100,
     features TEXT,
-    active INTEGER DEFAULT 1,
-    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug);

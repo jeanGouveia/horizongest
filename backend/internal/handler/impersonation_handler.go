@@ -77,9 +77,13 @@ func (h *ImpersonationHandler) StartImpersonation(w http.ResponseWriter, r *http
 	input.IPAddress = r.RemoteAddr
 	input.UserAgent = r.UserAgent()
 
-	// FORENSIC: Log JWT received
+	// FASE A: Remove sensitive Authorization header from logs
 	authHeader := r.Header.Get("Authorization")
-	log.Printf("[FORENSIC impersonation/start] JWT_RECEIVED - Authorization: %s", authHeader)
+	authPrefix := "..."
+	if len(authHeader) > 20 {
+		authPrefix = authHeader[:20] + "..."
+	}
+	log.Printf("[FORENSIC impersonation/start] JWT_RECEIVED - Authorization (prefix): %s", authPrefix)
 	log.Printf("[FORENSIC impersonation/start] JWT_VALIDATED - PlatformUserID: %d, PlatformRole: %s", platformUserID, platformRole)
 	log.Printf("[FORENSIC impersonation/start] COMPANY_ID - CompanyID recebido: %d", input.CompanyID)
 	log.Printf("[FORENSIC impersonation/start] USER - PlatformUserID: %d", platformUserID)

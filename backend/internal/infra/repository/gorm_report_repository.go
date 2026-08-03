@@ -34,7 +34,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 	// Total de pedidos
 	var totalOrders int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("DATE(created_at) >= ? AND DATE(created_at) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Count(&totalOrders).Error; err != nil {
 		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
 	}
@@ -43,7 +43,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 	// Receita total
 	var totalRevenue float64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("DATE(created_at) >= ? AND DATE(created_at) <= ? AND deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&totalRevenue).Error; err != nil {
 		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
@@ -59,7 +59,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 	var productsSold int64
 	if err := query.WithContext(ctx).Model(&GormOrderItem{}).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("DATE(orders.created_at) >= ? AND DATE(orders.created_at) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Select("COALESCE(SUM(order_items.quantity), 0)").
 		Scan(&productsSold).Error; err != nil {
 		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
@@ -69,7 +69,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 	// Pedidos cancelados
 	var cancelledOrders int64
 	if err := query.WithContext(ctx).Model(&GormOrder{}).
-		Where("status = ? AND DATE(FROM_UNIXTIME(created_at)) >= ? AND DATE(FROM_UNIXTIME(created_at)) <= ? AND deleted_at IS NULL", "cancelled", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("status = ? AND DATE(created_at) >= ? AND DATE(created_at) <= ? AND deleted_at IS NULL", "cancelled", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Count(&cancelledOrders).Error; err != nil {
 		return nil, fmt.Errorf("ReportRepository.GetSalesReport: %w", err)
 	}
@@ -87,7 +87,7 @@ func (r *GormReportRepository) GetSalesReport(ctx context.Context, companyID uin
 		Select("products.id, products.name, SUM(order_items.quantity) as quantity, SUM(order_items.quantity * order_items.unit_price) as total").
 		Joins("JOIN products ON products.id = order_items.product_id").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("DATE(FROM_UNIXTIME(orders.created_at)) >= ? AND DATE(FROM_UNIXTIME(orders.created_at)) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Where("DATE(orders.created_at) >= ? AND DATE(orders.created_at) <= ? AND orders.deleted_at IS NULL AND order_items.deleted_at IS NULL AND products.deleted_at IS NULL", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 		Group("products.id, products.name").
 		Order("quantity DESC").
 		Limit(10).

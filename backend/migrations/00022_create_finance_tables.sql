@@ -5,15 +5,15 @@
 
 -- Transaction Categories Table
 CREATE TABLE IF NOT EXISTS transaction_categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
     type VARCHAR(20) NOT NULL,
     color VARCHAR(7),
-    active BOOLEAN NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (company_id) REFERENCES companies(id)
 );
@@ -25,18 +25,18 @@ CREATE INDEX IF NOT EXISTS idx_transaction_categories_deleted_at ON transaction_
 
 -- Transactions Table
 CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    category_id BIGINT NOT NULL,
     type VARCHAR(20) NOT NULL,
-    amount REAL NOT NULL,
+    amount NUMERIC(10,2) NOT NULL,
     description VARCHAR(1000),
-    date DATETIME NOT NULL,
+    date TIMESTAMP NOT NULL,
     reference VARCHAR(255),
-    created_by INTEGER NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at INTEGER,
+    created_by BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP,
     
     FOREIGN KEY (company_id) REFERENCES companies(id),
     FOREIGN KEY (category_id) REFERENCES transaction_categories(id),

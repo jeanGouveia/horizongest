@@ -3,7 +3,7 @@
 
 -- Adicionar campos para rastreabilidade operacional
 ALTER TABLE stock_adjustments_pending 
-ADD COLUMN processed_by INTEGER;
+ADD COLUMN processed_by BIGINT;
 
 ALTER TABLE stock_adjustments_pending 
 ADD COLUMN processing_notes TEXT;

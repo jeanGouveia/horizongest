@@ -518,7 +518,7 @@ func TestStockMovementRepository_StressTest_100Goroutines(t *testing.T) {
 		t.Fatalf("failed to create inventory item: %v", err)
 	}
 
-	// Simular 2 goroutines tentando completar o mesmo inventário (SQLite in-memory tem limitações com concorrência)
+	// Simular 2 goroutines tentando completar o mesmo inventário
 	var wg sync.WaitGroup
 	results := make([]error, 2)
 

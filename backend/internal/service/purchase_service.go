@@ -20,20 +20,23 @@ var (
 )
 
 type PurchaseService struct {
-	purchaseRepo ports.PurchaseRepository
-	productRepo  ports.ProductRepository
-	db           *gorm.DB
+	purchaseRepo      ports.PurchaseRepository
+	productRepo       ports.ProductRepository
+	stockMovementRepo ports.StockMovementRepository
+	db                *gorm.DB
 }
 
 func NewPurchaseService(
 	purchaseRepo ports.PurchaseRepository,
 	productRepo ports.ProductRepository,
+	stockMovementRepo ports.StockMovementRepository,
 	db *gorm.DB,
 ) *PurchaseService {
 	return &PurchaseService{
-		purchaseRepo: purchaseRepo,
-		productRepo:  productRepo,
-		db:           db,
+		purchaseRepo:      purchaseRepo,
+		productRepo:       productRepo,
+		stockMovementRepo: stockMovementRepo,
+		db:                db,
 	}
 }
 
@@ -253,8 +256,20 @@ func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseO
 				return fmt.Errorf("PurchaseService.ReceivePurchaseOrder: criar item de recebimento: %w", err)
 			}
 
-			// TODO: Atualizar estoque do ingrediente via stock movements
-			// Isso será implementado na integração com o módulo de estoque
+			// Atualizar estoque do ingrediente via stock movements
+			stockMovement := &domain.StockMovement{
+				Type:          domain.StockMovementEntry,
+				IngredientID:  item.IngredientID,
+				Quantity:      item.Quantity,
+				Reason:        fmt.Sprintf("Recebimento de compra PO-%d", purchaseOrderID),
+				ReferenceType: "purchase_receiving",
+				ReferenceID:   receiving.ID,
+				PerformedBy:   userID,
+			}
+
+			if err := s.stockMovementRepo.Create(ctx, stockMovement, nil); err != nil {
+				return fmt.Errorf("PurchaseService.ReceivePurchaseOrder: criar movimento de estoque: %w", err)
+			}
 		}
 
 		// Atualizar status do pedido para recebido
