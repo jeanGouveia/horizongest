@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -17,14 +18,22 @@ import (
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/handler"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/database"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/messaging/rabbitmq"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/redis"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
+	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
 
 func main() {
 	// Carrega .env se existir (ignora erro em produção)
 	_ = godotenv.Load()
+
+	// FASE A: Initialize structured logger
+	env := getEnv("ENVIRONMENT", "development")
+	serviceName := getEnv("SERVICE_NAME", "horizongest-backend")
+	util.InitLogger(serviceName, env)
 
 	// --- Banco de dados ---
 	db, err := database.Connect(database.DBConfig{
@@ -36,30 +45,30 @@ func main() {
 		SSLMode:  getEnv("DB_SSLMODE", "disable"),
 	})
 	if err != nil {
-		log.Fatalf("FATAL: falha ao conectar banco: %v", err)
+		util.LogFatal("falha ao conectar banco", map[string]interface{}{"error": err.Error()})
 	}
 
 	// --- Migrações automáticas (estrutura das tabelas) ---
 	if err := database.RunMigrations(db); err != nil {
-		log.Fatalf("FATAL: falha ao executar migrações: %v", err)
+		util.LogFatal("falha ao executar migrações", map[string]interface{}{"error": err.Error()})
 	}
 
 	// --- Seed (dados iniciais) ---
 	if os.Getenv("RUN_SEED") == "true" {
-		log.Println("Executando seed...")
+		util.LogInfo("Executando seed", nil)
 		ctx := context.Background()
 		platformUserRepo := repository.NewGormPlatformUserRepository(db)
 
 		// Verificar se já existe usuário admin
 		existing, err := platformUserRepo.FindByEmail(ctx, "admin@platform.com")
 		if err != nil {
-			log.Fatalf("Erro ao verificar usuário admin: %v", err)
+			util.LogFatal("Erro ao verificar usuário admin", map[string]interface{}{"error": err.Error()})
 		}
 		if existing == nil {
 			// Criar usuário admin padrão
 			hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 			if err != nil {
-				log.Fatalf("Erro ao gerar hash da senha: %v", err)
+				util.LogFatal("Erro ao gerar hash da senha", map[string]interface{}{"error": err.Error()})
 			}
 
 			adminUser := &domain.PlatformUser{
@@ -67,16 +76,13 @@ func main() {
 				Email:        "admin@platform.com",
 				PasswordHash: string(hash),
 				Role:         domain.PlatformRoleAdmin,
-				Active:       true,
 			}
-
 			if err := platformUserRepo.Create(ctx, adminUser); err != nil {
-				log.Fatalf("Erro ao criar usuário admin: %v", err)
+				util.LogFatal("Erro ao criar usuário admin", map[string]interface{}{"error": err.Error()})
 			}
-			// Sprint 4A: Remover senha do log por segurança
-			log.Println("Usuário admin criado com sucesso: admin@platform.com")
+			util.LogInfo("Usuário admin criado com sucesso", nil)
 		} else {
-			log.Println("Usuário admin já existe, pulando seed")
+			util.LogInfo("Usuário admin já existe", nil)
 		}
 	}
 
@@ -105,29 +111,45 @@ func main() {
 	impersonationAuditRepo := repository.NewGormImpersonationAuditRepository(db)
 
 	// JWT secrets (Sprint 3.4 - Security Hardening)
-	// Sprint 4A: Validar secrets em produção - não aceitar valores padrão
-	env := getEnv("ENVIRONMENT", "development")
+	// FASE A: Validar secrets com validação de entropia e comprimento mínimo
 	jwtPlatformSecret := getEnv("JWT_PLATFORM_SECRET", "")
 	jwtTenantSecret := getEnv("JWT_TENANT_SECRET", "")
+	isProduction := env == "production"
 
-	// Em produção, falhar se secrets não estiverem configurados
-	if env == "production" {
-		if jwtPlatformSecret == "" || jwtPlatformSecret == "your-platform-secret-key-change-in-production" {
-			log.Fatalf("FATAL: JWT_PLATFORM_SECRET não configurado ou usando valor padrão em produção")
-		}
-		if jwtTenantSecret == "" || jwtTenantSecret == "your-tenant-secret-key-change-in-production" {
-			log.Fatalf("FATAL: JWT_TENANT_SECRET não configurado ou usando valor padrão em produção")
-		}
-	}
-
-	// Em desenvolvimento/staging, usar fallback com warning
+	// Validate JWT Platform Secret
 	if jwtPlatformSecret == "" {
-		jwtPlatformSecret = "your-platform-secret-key-change-in-production"
-		log.Println("WARNING: JWT_PLATFORM_SECRET não configurado, usando valor padrão (apenas para desenvolvimento)")
+		if isProduction {
+			util.LogFatal("JWT_PLATFORM_SECRET não configurado em produção", nil)
+		}
+		// Generate secure secret for development
+		generatedSecret, err := util.GenerateSecureSecretAlphaNum(32)
+		if err != nil {
+			log.Fatalf("FATAL: failed to generate secure secret: %v", err)
+		}
+		jwtPlatformSecret = generatedSecret
+		log.Printf("WARNING: JWT_PLATFORM_SECRET gerado automaticamente para desenvolvimento: %s", jwtPlatformSecret[:8]+"...")
+	} else {
+		if err := util.ValidateJWTSecret(jwtPlatformSecret, isProduction); err != nil {
+			util.LogFatal("JWT_PLATFORM_SECRET inválido", map[string]interface{}{"error": err.Error()})
+		}
 	}
+
+	// Validate JWT Tenant Secret
 	if jwtTenantSecret == "" {
-		jwtTenantSecret = "your-tenant-secret-key-change-in-production"
-		log.Println("WARNING: JWT_TENANT_SECRET não configurado, usando valor padrão (apenas para desenvolvimento)")
+		if isProduction {
+			util.LogFatal("JWT_TENANT_SECRET não configurado em produção", nil)
+		}
+		// Generate secure secret for development
+		generatedSecret, err := util.GenerateSecureSecretAlphaNum(32)
+		if err != nil {
+			log.Fatalf("FATAL: failed to generate secure secret: %v", err)
+		}
+		jwtTenantSecret = generatedSecret
+		log.Printf("WARNING: JWT_TENANT_SECRET gerado automaticamente para desenvolvimento: %s", jwtTenantSecret[:8]+"...")
+	} else {
+		if err := util.ValidateJWTSecret(jwtTenantSecret, isProduction); err != nil {
+			util.LogFatal("JWT_TENANT_SECRET inválido", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	// Platform services (Sprint 3.2)
@@ -149,7 +171,7 @@ func main() {
 	rbacSvc := service.NewRBACService(userRepo)
 	userManagementSvc := service.NewUserManagementService(userRepo, companyRepo, rbacSvc)
 	financeSvc := service.NewFinanceService(financeRepo)
-	purchaseSvc := service.NewPurchaseService(purchaseRepo, productRepo, db)
+	purchaseSvc := service.NewPurchaseService(purchaseRepo, productRepo, stockMovementRepo, db)
 	reportSvc := service.NewReportService(reportRepo)
 
 	// Initialize platform brand config (Sprint 3.6)
@@ -175,7 +197,7 @@ func main() {
 	impersonationSvc := service.NewImpersonationService(authSvc, companyRepo, userRepo, impersonationAuditRepo)
 
 	emailSvc := service.NewEmailService(false, platformBrand.SupportEmail, platformBrand.PlatformName) // Email disabled by default
-	platformSvc := service.NewPlatformService(companyRepo, userRepo, platformUserRepo, platformAuditRepo, emailSvc)
+	platformSvc := service.NewPlatformService(db, companyRepo, userRepo, platformUserRepo, platformAuditRepo, emailSvc)
 	planSvc := service.NewPlanService(planRepo)
 	backupSvc := service.NewBackupService(
 		getEnv("DB_HOST", "localhost"),
@@ -187,6 +209,82 @@ func main() {
 		platformBrand.PlatformName, // Backup filename prefix from platform brand (Sprint 3.6)
 	)
 	exportSvc := service.NewExportService(companyRepo, userRepo, getEnv("EXPORT_DIR", "./exports"))
+
+	// --- Async Infrastructure (SPRINT 5D.1 - Critical Fix O1-O4) ---
+
+	// Redis Client (for distributed cache and idempotency)
+	var redisClient *redis.Client
+	if redisHost := getEnv("REDIS_HOST", ""); redisHost != "" {
+		redisConfig := redis.Config{
+			Host:         redisHost,
+			Port:         getEnvAsInt("REDIS_PORT", 6379),
+			Password:     getEnv("REDIS_PASSWORD", ""),
+			DB:           getEnvAsInt("REDIS_DB", 0),
+			PoolSize:     50, // Increased for scalability
+			MinIdleConns: 10,
+			MaxIdleConns: 20,
+			MaxRetries:   3,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  3 * time.Second,
+			WriteTimeout: 3 * time.Second,
+			PoolTimeout:  4 * time.Second,
+		}
+		var err error
+		redisClient, err = redis.NewClient(redisConfig)
+		if err != nil {
+			log.Printf("WARNING: failed to initialize Redis client: %v (async features disabled)", err)
+		} else {
+			log.Println("✅ Redis client initialized")
+			defer redisClient.Close()
+		}
+	} else {
+		log.Println("WARNING: REDIS_HOST not configured, async features disabled")
+	}
+
+	// RabbitMQ Publisher (for event publishing)
+	var rabbitmqPublisher *rabbitmq.RabbitMQPublisher
+	if rabbitmqURL := getEnv("RABBITMQ_URL", ""); rabbitmqURL != "" {
+		rabbitmqConfig := rabbitmq.Config{
+			URL:                    rabbitmqURL,
+			Exchange:               getEnv("RABBITMQ_EXCHANGE", "horizongest.events"),
+			ExchangeType:           "topic",
+			QueuePrefix:            "horizongest",
+			RetryCount:             3,
+			PublisherTimeout:       10 * time.Second,
+			ReconnectDelay:         5 * time.Second,
+			EnablePublisherConfirm: true,
+		}
+		var err error
+		rabbitmqPublisher, err = rabbitmq.NewRabbitMQPublisher(rabbitmqConfig)
+		if err != nil {
+			log.Printf("WARNING: failed to initialize RabbitMQ publisher: %v (event publishing disabled)", err)
+		} else {
+			log.Println("✅ RabbitMQ publisher initialized")
+			defer rabbitmqPublisher.Close()
+		}
+	} else {
+		log.Println("WARNING: RABBITMQ_URL not configured, event publishing disabled")
+	}
+
+	// EventDispatcher (for outbox pattern)
+	var eventDispatcher *service.EventDispatcher
+	if rabbitmqPublisher != nil {
+		outboxRepo := repository.NewGormOutboxRepository(db)
+		dispatcherConfig := service.DispatcherConfig{
+			BatchSize:  100,
+			Interval:   5 * time.Second,
+			RetryCount: 3,
+		}
+		eventDispatcher = service.NewEventDispatcher(outboxRepo, rabbitmqPublisher, dispatcherConfig)
+		ctx := context.Background()
+		eventDispatcher.Start(ctx)
+		log.Println("✅ EventDispatcher started")
+		defer eventDispatcher.Shutdown()
+	}
+
+	// Consumers (for email, webhook, etc.)
+	// TODO: Initialize consumers when RabbitMQ is available
+	// For now, consumers are not started to avoid blocking server startup
 
 	// Middlewares
 	authMw := middleware.NewAuthMiddleware(authSvc)
@@ -231,17 +329,16 @@ func main() {
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
-	r.Use(middleware.CORS)            // CORS middleware
-	r.Use(middleware.SecurityHeaders) // Sprint 3.4 - Security headers
+	r.Use(middleware.CORS)                  // CORS middleware
+	r.Use(middleware.SecurityHeaders)       // Sprint 3.4 - Security headers
+	r.Use(middleware.CorrelationMiddleware) // FASE A: CorrelationID and RequestID propagation
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.Timeout(30 * time.Second))
 
 	// --- Rotas públicas ---
-	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"status":"ok","service":"horizongest"}`)
-	})
+	// FASE A: Health check endpoints
+	healthHandler := handler.NewHealthHandler()
+	r.Route("/health", healthHandler.RegisterRoutes)
 
 	// Public platform branding endpoint (Sprint 3.6 - White Label)
 	r.Get("/api/public/brand", platformBrandHandler.GetPublicPlatformBrand)
@@ -537,16 +634,72 @@ func main() {
 
 	// --- Servidor ---
 	port := getEnv("PORT", "8080")
-	log.Printf("✅ %s backend iniciado em http://localhost:%s", platformBrand.PlatformName, port)
+	env = getEnv("ENVIRONMENT", "development")
 
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		log.Fatalf("FATAL: servidor encerrado: %v", err)
+	// FASE A: TLS/HTTPS enforcement in production
+	if env == "production" {
+		// In production, require HTTPS
+		tlsCert := getEnv("TLS_CERT_PATH", "")
+		tlsKey := getEnv("TLS_KEY_PATH", "")
+
+		if tlsCert == "" || tlsKey == "" {
+			util.LogFatal("TLS_CERT_PATH and TLS_KEY_PATH environment variables are required in production", nil)
+		}
+
+		// Start HTTPS server
+		util.LogInfo("Backend iniciado", map[string]interface{}{
+			"platform": platformBrand.PlatformName,
+			"port":     port,
+			"protocol": "HTTPS",
+		})
+
+		// Configure TLS with secure settings
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			},
+			PreferServerCipherSuites: true,
+		}
+
+		server := &http.Server{
+			Addr:      ":" + port,
+			Handler:   r,
+			TLSConfig: tlsConfig,
+		}
+
+		if err := server.ListenAndServeTLS(tlsCert, tlsKey); err != nil {
+			util.LogFatal("servidor HTTPS encerrado", map[string]interface{}{"error": err.Error()})
+		}
+	} else {
+		// In development, use HTTP with warning
+		util.LogWarn("Backend iniciado em modo HTTP (development)", map[string]interface{}{
+			"platform": platformBrand.PlatformName,
+			"port":     port,
+			"warning":  "HTTP is insecure. Use HTTPS in production.",
+		})
+
+		if err := http.ListenAndServe(":"+port, r); err != nil {
+			util.LogFatal("servidor encerrado", map[string]interface{}{"error": err.Error()})
+		}
 	}
 }
 
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvAsInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
 	}
 	return fallback
 }
