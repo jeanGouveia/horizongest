@@ -24,8 +24,13 @@ go.work
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
+
+# Test snapshots
+test_snapshot_*
 
 # IDE
 .vscode/
@@ -46,8 +51,14 @@ Thumbs.db
 
 # Coverage
 coverage.out
+coverage.html
 
 # Uploads
 uploads/
 
-backend/coverage.html
+# Build
+/server
+
+# Temporary
+*.tmp
+*.bak
