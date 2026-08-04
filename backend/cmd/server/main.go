@@ -7,21 +7,28 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/jeanGouveia/horizongest/backend/internal/config"
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/handler"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/database"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/health"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/messaging/rabbitmq"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/redis"
 	"github.com/jeanGouveia/horizongest/backend/internal/infra/repository"
+	"github.com/jeanGouveia/horizongest/backend/internal/infra/shutdown"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
+	"github.com/jeanGouveia/horizongest/backend/internal/observability"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
 	"github.com/jeanGouveia/horizongest/backend/internal/util"
 )
@@ -30,12 +37,26 @@ func main() {
 	// Carrega .env se existir (ignora erro em produção)
 	_ = godotenv.Load()
 
+	// FASE A.4: Load and validate configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
 	// FASE A: Initialize structured logger
-	env := getEnv("ENVIRONMENT", "development")
+	env := cfg.Environment
 	serviceName := getEnv("SERVICE_NAME", "horizongest-backend")
 	util.InitLogger(serviceName, env)
 
+	// FASE A.4.1: Startup validation - validate critical dependencies before starting
+	startupValidator := health.NewStartupValidator(cfg)
+	ctx := context.Background()
+	if err := startupValidator.Validate(ctx); err != nil {
+		util.LogFatal("Startup validation failed - aborting", map[string]interface{}{"error": err.Error()})
+	}
+
 	// --- Banco de dados ---
+	// FASE A.4.1: Use cfg.DatabaseURL instead of individual DB config
 	db, err := database.Connect(database.DBConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnv("DB_PORT", "5432"),
@@ -44,6 +65,8 @@ func main() {
 		Password: getEnv("DB_PASSWORD", "horizongest_secure_password"),
 		SSLMode:  getEnv("DB_SSLMODE", "disable"),
 	})
+	// Note: Database connection still uses individual env vars for compatibility
+	// Future: migrate to use cfg.DatabaseURL directly
 	if err != nil {
 		util.LogFatal("falha ao conectar banco", map[string]interface{}{"error": err.Error()})
 	}
@@ -101,6 +124,12 @@ func main() {
 	financeRepo := repository.NewGormFinanceRepository(db)
 	purchaseRepo := repository.NewGormPurchaseRepository(db)
 	reportRepo := repository.NewGormReportRepository(db)
+
+	// Audit repository (FASE A.4: Audit Logs)
+	auditRepo := repository.NewAuditRepository(db)
+
+	// Outbox repository (FASE A.4: Outbox pattern)
+	outboxRepo := repository.NewGormOutboxRepository(db)
 
 	// Platform repositories (Sprint 3.2)
 	platformUserRepo := repository.NewGormPlatformUserRepository(db)
@@ -160,7 +189,7 @@ func main() {
 	// Tenant services
 	productSvc := service.NewProductService(productRepo, db)
 	categorySvc := service.NewCategoryService(categoryRepo)
-	orderSvc := service.NewOrderService(orderRepo, productRepo)
+	orderSvc := service.NewOrderService(orderRepo, productRepo, outboxRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
 	stockMovementSvc := service.NewStockMovementService(stockMovementRepo, productRepo, db)
 	mediaSvc := service.NewMediaService(mediaRepo)
@@ -205,29 +234,40 @@ func main() {
 		getEnv("DB_USER", "root"),
 		getEnv("DB_PASSWORD", ""),
 		getEnv("DB_NAME", "horizongest"), // Default DB name - should be configured via environment
-		getEnv("BACKUP_DIR", "./backups"),
-		platformBrand.PlatformName, // Backup filename prefix from platform brand (Sprint 3.6)
+		cfg.StoragePath,                  // FASE A.4.1: Use cfg.StoragePath for backup/exports directory
+		platformBrand.PlatformName,       // Backup filename prefix from platform brand (Sprint 3.6)
 	)
-	exportSvc := service.NewExportService(companyRepo, userRepo, getEnv("EXPORT_DIR", "./exports"))
+	exportSvc := service.NewExportService(companyRepo, userRepo, cfg.StoragePath) // FASE A.4.1: Use cfg.StoragePath
+
+	// FASE A.4: Initialize metrics service for Prometheus
+	_ = observability.NewMetricsService()
+
+	// FASE A.4: Initialize tracing service for OpenTelemetry
+	tracingSvc := observability.NewTracingService(serviceName)
+	_ = tracingSvc // Tracing service initialized for distributed tracing
+
+	// FASE A.4: Initialize audit service for audit logging
+	auditSvc := service.NewAuditService(auditRepo)
 
 	// --- Async Infrastructure (SPRINT 5D.1 - Critical Fix O1-O4) ---
 
 	// Redis Client (for distributed cache and idempotency)
+	// FASE A.4.1: Use cfg.RedisURL for Redis configuration
 	var redisClient *redis.Client
-	if redisHost := getEnv("REDIS_HOST", ""); redisHost != "" {
+	if cfg.RedisURL != "" && cfg.RedisURL != "redis://localhost:6379" {
 		redisConfig := redis.Config{
-			Host:         redisHost,
+			Host:         getEnv("REDIS_HOST", "localhost"),
 			Port:         getEnvAsInt("REDIS_PORT", 6379),
 			Password:     getEnv("REDIS_PASSWORD", ""),
 			DB:           getEnvAsInt("REDIS_DB", 0),
-			PoolSize:     50, // Increased for scalability
-			MinIdleConns: 10,
+			PoolSize:     cfg.RedisPoolSize,
+			MinIdleConns: cfg.RedisMinIdleConns,
 			MaxIdleConns: 20,
 			MaxRetries:   3,
-			DialTimeout:  5 * time.Second,
-			ReadTimeout:  3 * time.Second,
-			WriteTimeout: 3 * time.Second,
-			PoolTimeout:  4 * time.Second,
+			DialTimeout:  cfg.RedisDialTimeout,
+			ReadTimeout:  cfg.RedisReadTimeout,
+			WriteTimeout: cfg.RedisWriteTimeout,
+			PoolTimeout:  cfg.RedisPoolTimeout,
 		}
 		var err error
 		redisClient, err = redis.NewClient(redisConfig)
@@ -238,20 +278,21 @@ func main() {
 			defer redisClient.Close()
 		}
 	} else {
-		log.Println("WARNING: REDIS_HOST not configured, async features disabled")
+		log.Println("WARNING: REDIS_URL not configured, async features disabled")
 	}
 
 	// RabbitMQ Publisher (for event publishing)
+	// FASE A.4.1: Use cfg.RabbitMQURL for RabbitMQ configuration
 	var rabbitmqPublisher *rabbitmq.RabbitMQPublisher
-	if rabbitmqURL := getEnv("RABBITMQ_URL", ""); rabbitmqURL != "" {
+	if cfg.RabbitMQURL != "" && cfg.RabbitMQURL != "amqp://localhost:5672" {
 		rabbitmqConfig := rabbitmq.Config{
-			URL:                    rabbitmqURL,
-			Exchange:               getEnv("RABBITMQ_EXCHANGE", "horizongest.events"),
+			URL:                    cfg.RabbitMQURL,
+			Exchange:               cfg.RabbitMQExchange,
 			ExchangeType:           "topic",
 			QueuePrefix:            "horizongest",
 			RetryCount:             3,
 			PublisherTimeout:       10 * time.Second,
-			ReconnectDelay:         5 * time.Second,
+			ReconnectDelay:         cfg.RabbitMQReconnectInterval,
 			EnablePublisherConfirm: true,
 		}
 		var err error
@@ -293,7 +334,7 @@ func main() {
 	platformAuthMw := middleware.NewPlatformAuthMiddleware(platformAuthSvc) // Sprint 3.2
 	rateLimiter := middleware.NewRateLimiter(5, 30)                         // 5 req/min per IP, 30 req/hour per user (Sprint 3.4)
 
-	authHandler := handler.NewAuthHandler(authSvc, userRepo)
+	authHandler := handler.NewAuthHandler(authSvc, userRepo, auditSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
@@ -337,8 +378,11 @@ func main() {
 
 	// --- Rotas públicas ---
 	// FASE A: Health check endpoints
-	healthHandler := handler.NewHealthHandler()
+	healthHandler := handler.NewHealthHandler(cfg)
 	r.Route("/health", healthHandler.RegisterRoutes)
+
+	// FASE A: Metrics endpoint for Prometheus
+	r.Handle("/metrics", promhttp.Handler())
 
 	// Public platform branding endpoint (Sprint 3.6 - White Label)
 	r.Get("/api/public/brand", platformBrandHandler.GetPublicPlatformBrand)
@@ -633,10 +677,57 @@ func main() {
 	r.Get("/uploads/*", mediaHandler.ServeFile)
 
 	// --- Servidor ---
-	port := getEnv("PORT", "8080")
-	env = getEnv("ENVIRONMENT", "development")
+	port := cfg.ServerPort
+	env = cfg.Environment
 
-	// FASE A: TLS/HTTPS enforcement in production
+	// FASE A.4.1: Initialize shutdown manager
+	shutdownManager := shutdown.NewShutdownManager(cfg.ShutdownTimeout)
+
+	// FASE A.4.1: Register shutdown functions
+	// Register HTTP server shutdown
+	shutdownManager.Register("http-server", func(ctx context.Context) error {
+		util.LogInfo("Shutting down HTTP server", nil)
+		return nil
+	})
+
+	// Register RabbitMQ shutdown
+	if rabbitmqPublisher != nil {
+		shutdownManager.Register("rabbitmq", func(ctx context.Context) error {
+			util.LogInfo("Shutting down RabbitMQ publisher", nil)
+			rabbitmqPublisher.Close()
+			return nil
+		})
+	}
+
+	// Register Redis shutdown
+	if redisClient != nil {
+		shutdownManager.Register("redis", func(ctx context.Context) error {
+			util.LogInfo("Shutting down Redis client", nil)
+			redisClient.Close()
+			return nil
+		})
+	}
+
+	// Register Database shutdown
+	shutdownManager.Register("database", func(ctx context.Context) error {
+		util.LogInfo("Shutting down database connection", nil)
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		return sqlDB.Close()
+	})
+
+	// Register EventDispatcher shutdown
+	if eventDispatcher != nil {
+		shutdownManager.Register("event-dispatcher", func(ctx context.Context) error {
+			util.LogInfo("Shutting down event dispatcher", nil)
+			eventDispatcher.Shutdown()
+			return nil
+		})
+	}
+
+	// FASE A.4.1: TLS/HTTPS enforcement in production
 	if env == "production" {
 		// In production, require HTTPS
 		tlsCert := getEnv("TLS_CERT_PATH", "")
@@ -645,13 +736,6 @@ func main() {
 		if tlsCert == "" || tlsKey == "" {
 			util.LogFatal("TLS_CERT_PATH and TLS_KEY_PATH environment variables are required in production", nil)
 		}
-
-		// Start HTTPS server
-		util.LogInfo("Backend iniciado", map[string]interface{}{
-			"platform": platformBrand.PlatformName,
-			"port":     port,
-			"protocol": "HTTPS",
-		})
 
 		// Configure TLS with secure settings
 		tlsConfig := &tls.Config{
@@ -671,8 +755,37 @@ func main() {
 			TLSConfig: tlsConfig,
 		}
 
-		if err := server.ListenAndServeTLS(tlsCert, tlsKey); err != nil {
+		// Start HTTPS server in goroutine
+		serverErr := make(chan error, 1)
+		go func() {
+			util.LogInfo("Backend iniciado", map[string]interface{}{
+				"platform": platformBrand.PlatformName,
+				"port":     port,
+				"protocol": "HTTPS",
+			})
+			serverErr <- server.ListenAndServeTLS(tlsCert, tlsKey)
+		}()
+
+		// FASE A.4.1: Graceful shutdown with signal handling
+		sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		select {
+		case err := <-serverErr:
 			util.LogFatal("servidor HTTPS encerrado", map[string]interface{}{"error": err.Error()})
+		case <-sigCtx.Done():
+			util.LogInfo("Shutdown signal received", nil)
+			// Shutdown HTTP server
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			defer cancel()
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				util.LogError("HTTP server shutdown error", map[string]interface{}{"error": err.Error()})
+			}
+			// Execute all registered shutdown functions
+			if err := shutdownManager.Shutdown(); err != nil {
+				util.LogError("Shutdown error", map[string]interface{}{"error": err.Error()})
+			}
+			util.LogInfo("Graceful shutdown completed", nil)
 		}
 	} else {
 		// In development, use HTTP with warning
@@ -682,8 +795,37 @@ func main() {
 			"warning":  "HTTP is insecure. Use HTTPS in production.",
 		})
 
-		if err := http.ListenAndServe(":"+port, r); err != nil {
+		server := &http.Server{
+			Addr:    ":" + port,
+			Handler: r,
+		}
+
+		// Start HTTP server in goroutine
+		serverErr := make(chan error, 1)
+		go func() {
+			serverErr <- server.ListenAndServe()
+		}()
+
+		// FASE A.4.1: Graceful shutdown with signal handling
+		sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		select {
+		case err := <-serverErr:
 			util.LogFatal("servidor encerrado", map[string]interface{}{"error": err.Error()})
+		case <-sigCtx.Done():
+			util.LogInfo("Shutdown signal received", nil)
+			// Shutdown HTTP server
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			defer cancel()
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				util.LogError("HTTP server shutdown error", map[string]interface{}{"error": err.Error()})
+			}
+			// Execute all registered shutdown functions
+			if err := shutdownManager.Shutdown(); err != nil {
+				util.LogError("Shutdown error", map[string]interface{}{"error": err.Error()})
+			}
+			util.LogInfo("Graceful shutdown completed", nil)
 		}
 	}
 }
