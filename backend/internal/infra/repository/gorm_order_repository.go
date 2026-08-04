@@ -59,10 +59,11 @@ type GormOrderRepository struct {
 	db                  *gorm.DB
 	productRepo         ports.ProductRepository
 	stockAdjustmentRepo *GormStockAdjustmentRepository
+	outboxRepo          ports.OutboxRepository // Sprint 2.1: Outbox for transactional event publishing
 }
 
-func NewGormOrderRepository(db *gorm.DB, productRepo ports.ProductRepository, stockAdjustmentRepo *GormStockAdjustmentRepository) *GormOrderRepository {
-	return &GormOrderRepository{db: db, productRepo: productRepo, stockAdjustmentRepo: stockAdjustmentRepo}
+func NewGormOrderRepository(db *gorm.DB, productRepo ports.ProductRepository, stockAdjustmentRepo *GormStockAdjustmentRepository, outboxRepo ports.OutboxRepository) *GormOrderRepository {
+	return &GormOrderRepository{db: db, productRepo: productRepo, stockAdjustmentRepo: stockAdjustmentRepo, outboxRepo: outboxRepo}
 }
 
 // CreateOrder é a operação crítica: persiste pedido + itens + baixa de estoque
@@ -188,6 +189,26 @@ func (r *GormOrderRepository) CreateOrder(ctx context.Context, order *domain.Ord
 				return fmt.Errorf("OrderRepository.CreateOrder: erro ao criar item do pedido (produto_id=%d): %w", item.ProductID, err)
 			}
 			item.ID = gItem.ID
+		}
+
+		// Sprint 2.1: Create outbox event within the same transaction
+		// This ensures atomicity: Order + StockMovement + Outbox are committed together
+		if r.outboxRepo != nil {
+			outboxEvent := &domain.OutboxEvent{
+				AggregateType: "order",
+				AggregateID:   order.ID,
+				EventType:     "order.created",
+				EventVersion:  "1.0",
+				Payload:       fmt.Sprintf(`{"order_id":%d,"total_price":%d}`, order.ID, order.TotalPrice),
+				TenantID:      companyID,
+				Status:        domain.OutboxStatusPending,
+				Priority:      5,
+				Attempts:      0,
+				AvailableAt:   time.Now(),
+			}
+			if err := r.outboxRepo.Create(ctx, outboxEvent, tx); err != nil {
+				return fmt.Errorf("OrderRepository.CreateOrder: criar evento outbox: %w", err)
+			}
 		}
 
 		return nil // commit
@@ -489,6 +510,14 @@ func (r *GormOrderRepository) UpdateOrder(
 			}
 		}
 
+		// Sprint 2.1: Collect all ingredient stock operations for deterministic locking
+		type stockOperation struct {
+			ingredientID uint
+			quantity     float64
+			operation    string // "increase" or "decrease"
+		}
+		var stockOps []stockOperation
+
 		// Step 1: Add back stock for removed items or reduced quantities
 		for _, gi := range gItems {
 			// Find if this item still exists in new items
@@ -506,9 +535,11 @@ func (r *GormOrderRepository) UpdateOrder(
 				if ok && len(ingredients) > 0 {
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * gi.Quantity
-						if err := r.productRepo.IncreaseIngredientStock(ctx, pi.IngredientID, consumo, tx); err != nil {
-							return fmt.Errorf("OrderRepository.UpdateOrder: restaurar estoque item removido: %w", err)
-						}
+						stockOps = append(stockOps, stockOperation{
+							ingredientID: pi.IngredientID,
+							quantity:     consumo,
+							operation:    "increase",
+						})
 					}
 				}
 			} else if newItem.Quantity < gi.Quantity {
@@ -518,9 +549,11 @@ func (r *GormOrderRepository) UpdateOrder(
 				if ok && len(ingredients) > 0 {
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * difference
-						if err := r.productRepo.IncreaseIngredientStock(ctx, pi.IngredientID, consumo, tx); err != nil {
-							return fmt.Errorf("OrderRepository.UpdateOrder: restaurar estoque redução: %w", err)
-						}
+						stockOps = append(stockOps, stockOperation{
+							ingredientID: pi.IngredientID,
+							quantity:     consumo,
+							operation:    "increase",
+						})
 					}
 				}
 			}
@@ -545,9 +578,11 @@ func (r *GormOrderRepository) UpdateOrder(
 				if ok && len(ingredients) > 0 {
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * item.Quantity
-						if err := r.productRepo.DecreaseIngredientStock(ctx, pi.IngredientID, consumo, tx, pi.Ingredient.Name, pi.Ingredient.StockQuantity); err != nil {
-							return fmt.Errorf("OrderRepository.UpdateOrder: baixar estoque novo item: %w", err)
-						}
+						stockOps = append(stockOps, stockOperation{
+							ingredientID: pi.IngredientID,
+							quantity:     consumo,
+							operation:    "decrease",
+						})
 					}
 				}
 			} else if item.Quantity > oldItem.Quantity {
@@ -557,10 +592,44 @@ func (r *GormOrderRepository) UpdateOrder(
 				if ok && len(ingredients) > 0 {
 					for _, pi := range ingredients {
 						consumo := pi.Quantity * difference
-						if err := r.productRepo.DecreaseIngredientStock(ctx, pi.IngredientID, consumo, tx, pi.Ingredient.Name, pi.Ingredient.StockQuantity); err != nil {
-							return fmt.Errorf("OrderRepository.UpdateOrder: baixar estoque aumento: %w", err)
+						stockOps = append(stockOps, stockOperation{
+							ingredientID: pi.IngredientID,
+							quantity:     consumo,
+							operation:    "decrease",
+						})
+					}
+				}
+			}
+		}
+
+		// Sprint 2.1: Sort stock operations by ingredientID for deterministic locking
+		// This prevents deadlocks by ensuring all transactions acquire locks in the same order
+		sort.Slice(stockOps, func(i, j int) bool {
+			return stockOps[i].ingredientID < stockOps[j].ingredientID
+		})
+
+		// Execute all stock operations in sorted order
+		for _, op := range stockOps {
+			if op.operation == "increase" {
+				if err := r.productRepo.IncreaseIngredientStock(ctx, op.ingredientID, op.quantity, tx); err != nil {
+					return fmt.Errorf("OrderRepository.UpdateOrder: restaurar estoque: %w", err)
+				}
+			} else {
+				// Need ingredient name and current stock for DecreaseIngredientStock
+				// Fetch ingredient info from productIngredients map
+				var ingredientName string
+				var currentStock float64
+				for _, ingredients := range productIngredients {
+					for _, pi := range ingredients {
+						if pi.IngredientID == op.ingredientID {
+							ingredientName = pi.Ingredient.Name
+							currentStock = pi.Ingredient.StockQuantity
+							break
 						}
 					}
+				}
+				if err := r.productRepo.DecreaseIngredientStock(ctx, op.ingredientID, op.quantity, tx, ingredientName, currentStock); err != nil {
+					return fmt.Errorf("OrderRepository.UpdateOrder: baixar estoque: %w", err)
 				}
 			}
 		}

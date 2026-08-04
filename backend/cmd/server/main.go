@@ -114,7 +114,11 @@ func main() {
 	productRepo := repository.NewGormProductRepository(db)
 	categoryRepo := repository.NewGormCategoryRepository(db)
 	stockAdjustmentRepo := repository.NewGormStockAdjustmentRepository(db, productRepo)
-	orderRepo := repository.NewGormOrderRepository(db, productRepo, stockAdjustmentRepo)
+
+	// Outbox repository (FASE A.4: Outbox pattern) - Sprint 2.1: Must be created before OrderRepository
+	outboxRepo := repository.NewGormOutboxRepository(db)
+
+	orderRepo := repository.NewGormOrderRepository(db, productRepo, stockAdjustmentRepo, outboxRepo) // Sprint 2.1: Pass outboxRepo for transactional event publishing
 	mediaRepo := repository.NewGormMediaRepository(db)
 	dashboardRepo := repository.NewGormDashboardRepository(db)
 	companyRepo := repository.NewGormCompanyRepository(db)
@@ -127,9 +131,6 @@ func main() {
 
 	// Audit repository (FASE A.4: Audit Logs)
 	auditRepo := repository.NewAuditRepository(db)
-
-	// Outbox repository (FASE A.4: Outbox pattern)
-	outboxRepo := repository.NewGormOutboxRepository(db)
 
 	// Platform repositories (Sprint 3.2)
 	platformUserRepo := repository.NewGormPlatformUserRepository(db)
@@ -189,7 +190,7 @@ func main() {
 	// Tenant services
 	productSvc := service.NewProductService(productRepo, db)
 	categorySvc := service.NewCategoryService(categoryRepo)
-	orderSvc := service.NewOrderService(orderRepo, productRepo, outboxRepo)
+	orderSvc := service.NewOrderService(orderRepo, productRepo)
 	stockAdjustmentSvc := service.NewStockAdjustmentService(stockAdjustmentRepo, productRepo)
 	stockMovementSvc := service.NewStockMovementService(stockMovementRepo, productRepo, db)
 	mediaSvc := service.NewMediaService(mediaRepo)
