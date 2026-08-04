@@ -85,7 +85,7 @@
     <Alert variant="error" dismissible onDismiss={() => error = ''}>
       ⚠️ {error}
     </Alert>
-  {:else if dashboard}
+  {:else if dashboard && dashboard.metrics}
     <!-- KPIs Executivos -->
   <div class="kpi-grid">
     <Card class="kpi-card kpi-primary">
@@ -95,7 +95,7 @@
         </div>
         <span class="kpi-label">Pedidos Hoje</span>
       </div>
-      <div class="kpi-value">{formatNumber(dashboard.metrics.todayOrders)}</div>
+      <div class="kpi-value">{formatNumber(dashboard?.metrics?.todayOrders ?? 0)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Hoje</span>
@@ -111,7 +111,7 @@
         </div>
         <span class="kpi-label">Faturamento Hoje</span>
       </div>
-      <div class="kpi-value">{formatCurrency(dashboard.metrics.todayRevenue)}</div>
+      <div class="kpi-value">{formatCurrency(dashboard?.metrics?.todayRevenue ?? 0)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Hoje</span>
@@ -143,7 +143,7 @@
         </div>
         <span class="kpi-label">Estoque Baixo</span>
       </div>
-      <div class="kpi-value">{formatNumber(dashboard.metrics.lowStockCount)}</div>
+      <div class="kpi-value">{formatNumber(dashboard?.metrics?.lowStockCount ?? 0)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Crítico</span>
@@ -159,7 +159,7 @@
         </div>
         <span class="kpi-label">Pedidos Pendentes</span>
       </div>
-      <div class="kpi-value">{formatNumber(dashboard.metrics.pendingOrders)}</div>
+      <div class="kpi-value">{formatNumber(dashboard?.metrics?.pendingOrders ?? 0)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Aguardando</span>
@@ -175,7 +175,7 @@
         </div>
         <span class="kpi-label">Produtos Ativos</span>
       </div>
-      <div class="kpi-value">{formatNumber(dashboard.metrics.activeProducts)}</div>
+      <div class="kpi-value">{formatNumber(dashboard?.metrics?.activeProducts ?? 0)}</div>
       <div class="kpi-footer">
         <div class="kpi-change neutral">
           <span>Catálogo</span>

@@ -125,7 +125,7 @@ export const api = {
 
   // --- System endpoints ---
   dashboard: () =>
-    request<any>('/dashboard'),
+    request<Dashboard>('/dashboard'),
 
   health: () =>
     request<any>('/health'),
