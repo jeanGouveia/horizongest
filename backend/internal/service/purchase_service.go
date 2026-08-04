@@ -264,7 +264,7 @@ func (s *PurchaseService) CreatePurchaseReceiving(ctx context.Context, purchaseO
 				Reason:        fmt.Sprintf("Recebimento de compra PO-%d", purchaseOrderID),
 				ReferenceType: "purchase_receiving",
 				ReferenceID:   receiving.ID,
-				PerformedBy:   userID,
+				PerformedBy:   &userID,
 			}
 
 			if err := s.stockMovementRepo.Create(ctx, stockMovement, nil); err != nil {

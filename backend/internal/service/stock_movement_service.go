@@ -102,7 +102,7 @@ func (s *StockMovementService) CreateStockMovement(ctx context.Context, companyI
 			Reason:        input.Reason,
 			ReferenceType: input.ReferenceType,
 			ReferenceID:   input.ReferenceID,
-			PerformedBy:   userID,
+			PerformedBy:   &userID,
 			PerformedAt:   time.Now(),
 		}
 
@@ -282,7 +282,7 @@ func (s *StockMovementService) CompleteInventory(ctx context.Context, inventoryI
 					Reason:        fmt.Sprintf("Ajuste por inventário #%d: %s", inventoryID, item.Reason),
 					ReferenceType: "inventory",
 					ReferenceID:   inventoryID,
-					PerformedBy:   userID,
+					PerformedBy:   &userID,
 					PerformedAt:   time.Now(),
 				}
 

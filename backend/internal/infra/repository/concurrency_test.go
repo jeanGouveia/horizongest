@@ -1037,7 +1037,7 @@ func TestConcurrency_HeavyRollback(t *testing.T) {
 			Reason:        fmt.Sprintf("Item %d", i),
 			ReferenceType: "inventory",
 			ReferenceID:   inventory.ID,
-			PerformedBy:   user.ID,
+			PerformedBy:   &user.ID,
 		}
 		if err := tx.Create(movement).Error; err != nil {
 			tx.Rollback()
@@ -1198,7 +1198,7 @@ func TestConcurrency_Crash(t *testing.T) {
 				Reason:        fmt.Sprintf("Item %d", i),
 				ReferenceType: "inventory",
 				ReferenceID:   inventory.ID,
-				PerformedBy:   user.ID,
+				PerformedBy:   &user.ID,
 			}
 			if err := tx.Create(movement).Error; err != nil {
 				tx.Rollback()
@@ -1635,7 +1635,7 @@ func TestConcurrency_Stress(t *testing.T) {
 				Reason:        fmt.Sprintf("Movement %d-%d", i, j),
 				ReferenceType: "inventory",
 				ReferenceID:   inventories[i].ID,
-				PerformedBy:   user.ID,
+				PerformedBy:   &user.ID,
 			}
 			if err := db.Create(movement).Error; err != nil {
 				t.Fatalf("failed to create movement %d-%d: %v", i, j, err)
