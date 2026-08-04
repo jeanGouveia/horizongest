@@ -94,7 +94,7 @@ func (m *MockOrderRepository) ValidateStock(ctx context.Context, items []domain.
 func TestOrderService_CreateOrder_Idempotency(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup product
 	mockProductRepo.products[1] = &domain.Product{
@@ -153,7 +153,7 @@ func TestOrderService_CreateOrder_Idempotency(t *testing.T) {
 func TestOrderService_CreateOrder_IdempotencyDifferentKeys(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup product
 	mockProductRepo.products[1] = &domain.Product{
@@ -214,7 +214,7 @@ func TestOrderService_CreateOrder_IdempotencyDifferentKeys(t *testing.T) {
 func TestOrderService_CreateOrder_NoIdempotencyKey(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup product
 	mockProductRepo.products[1] = &domain.Product{
@@ -254,7 +254,7 @@ func NewMockProductRepositoryForOrder() *MockProductRepository {
 func TestOrderService_CreateOrder_Success(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup product
 	mockProductRepo.products[1] = &domain.Product{
@@ -289,7 +289,7 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 func TestOrderService_CreateOrder_ProductNotFound(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	input := CreateOrderInput{
 		Items: []OrderItemInput{
@@ -306,7 +306,7 @@ func TestOrderService_CreateOrder_ProductNotFound(t *testing.T) {
 func TestOrderService_CreateOrder_InactiveProduct(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup inactive product
 	mockProductRepo.products[1] = &domain.Product{
@@ -331,7 +331,7 @@ func TestOrderService_CreateOrder_InactiveProduct(t *testing.T) {
 func TestOrderService_CreateOrder_InsufficientStock(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup product with ingredients
 	mockProductRepo.products[1] = &domain.Product{
@@ -371,7 +371,7 @@ func TestOrderService_CreateOrder_InsufficientStock(t *testing.T) {
 func TestOrderService_CreateOrder_SimpleProduct(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup simple product without ingredients
 	mockProductRepo.products[1] = &domain.Product{
@@ -400,7 +400,7 @@ func TestOrderService_CreateOrder_SimpleProduct(t *testing.T) {
 func TestOrderService_ListOrders(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup orders
 	mockOrderRepo.orders[1] = &domain.Order{
@@ -421,7 +421,7 @@ func TestOrderService_ListOrders(t *testing.T) {
 func TestOrderService_GetOrder(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:         1,
@@ -441,7 +441,7 @@ func TestOrderService_GetOrder(t *testing.T) {
 func TestOrderService_GetOrder_NotFound(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	_, err := svc.GetOrder(context.Background(), 999)
 	if err == nil {
@@ -455,7 +455,7 @@ func TestOrderService_GetOrder_NotFound(t *testing.T) {
 func TestOrderService_UpdateOrderStatus_ValidTransition(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:     1,
@@ -478,7 +478,7 @@ func TestOrderService_UpdateOrderStatus_ValidTransition(t *testing.T) {
 func TestOrderService_UpdateOrderStatus_InvalidTransition(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:     1,
@@ -498,7 +498,7 @@ func TestOrderService_UpdateOrderStatus_InvalidTransition(t *testing.T) {
 func TestOrderService_UpdateOrderStatus_CancelOrder(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:     1,
@@ -528,7 +528,7 @@ func TestOrderService_UpdateOrderStatus_CancelOrder(t *testing.T) {
 func TestOrderService_UpdateOrderStatus_NotFound(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	input := UpdateOrderStatusInput{
 		Status: "confirmed",
@@ -546,7 +546,7 @@ func TestOrderService_UpdateOrderStatus_NotFound(t *testing.T) {
 func TestOrderService_UpdateOrder_Success(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:     1,
@@ -592,7 +592,7 @@ func TestOrderService_UpdateOrder_Success(t *testing.T) {
 func TestOrderService_UpdateOrder_InvalidStatus(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:     1,
@@ -614,7 +614,7 @@ func TestOrderService_UpdateOrder_InvalidStatus(t *testing.T) {
 func TestOrderService_UpdateOrder_InsufficientStock(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	mockOrderRepo.orders[1] = &domain.Order{
 		ID:     1,
@@ -658,7 +658,7 @@ func TestOrderService_UpdateOrder_InsufficientStock(t *testing.T) {
 func TestOrderService_UpdateOrder_NotFound(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	input := UpdateOrderInput{
 		Items: []OrderItemInput{
@@ -708,7 +708,7 @@ func TestIsValidTransition(t *testing.T) {
 func TestOrderService_CreateOrder_MultipleItems(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup products
 	mockProductRepo.products[1] = &domain.Product{
@@ -747,7 +747,7 @@ func TestOrderService_CreateOrder_MultipleItems(t *testing.T) {
 func TestOrderService_CreateOrder_WithProductSnapshots(t *testing.T) {
 	mockOrderRepo := NewMockOrderRepository()
 	mockProductRepo := NewMockProductRepositoryForOrder()
-	svc := NewOrderService(mockOrderRepo, mockProductRepo)
+	svc := NewOrderService(mockOrderRepo, mockProductRepo, nil) // FASE A.4: outboxRepo nil for tests
 
 	// Setup product with all fields
 	promotionPrice := domain.FromFloat64(8.0)

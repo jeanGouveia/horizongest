@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
@@ -47,12 +48,14 @@ func NewInsufficientStockError(ingredients []InsufficientIngredient) *Insufficie
 type OrderService struct {
 	orderRepo   ports.OrderRepository
 	productRepo ports.ProductRepository
+	outboxRepo  ports.OutboxRepository // FASE A.4: Outbox for event publishing
 }
 
-func NewOrderService(orderRepo ports.OrderRepository, productRepo ports.ProductRepository) *OrderService {
+func NewOrderService(orderRepo ports.OrderRepository, productRepo ports.ProductRepository, outboxRepo ports.OutboxRepository) *OrderService {
 	return &OrderService{
 		orderRepo:   orderRepo,
 		productRepo: productRepo,
+		outboxRepo:  outboxRepo,
 	}
 }
 
@@ -184,6 +187,31 @@ func (s *OrderService) CreateOrder(ctx context.Context, in CreateOrderInput) (*d
 	if err != nil {
 		log.Printf("Service - Erro ao criar pedido no repository: %v", err)
 		return nil, fmt.Errorf("OrderService.CreateOrder: criar pedido: %w", err)
+	}
+
+	// FASE A.4: Publish order.created event to outbox
+	if s.outboxRepo != nil {
+		tenantCtxValue := ctx.Value("tenant")
+		if tenantCtxValue != nil {
+			if tenantCtx, ok := tenantCtxValue.(*domain.TenantContext); ok {
+				outboxEvent := &domain.OutboxEvent{
+					AggregateType: "order",
+					AggregateID:   createdOrder.ID,
+					EventType:     "order.created",
+					EventVersion:  "1.0",
+					Payload:       fmt.Sprintf(`{"order_id":%d,"total_price":%d}`, createdOrder.ID, createdOrder.TotalPrice),
+					TenantID:      tenantCtx.CompanyID,
+					Status:        domain.OutboxStatusPending,
+					Priority:      5,
+					Attempts:      0,
+					AvailableAt:   time.Now(),
+				}
+				if err := s.outboxRepo.Create(ctx, outboxEvent, nil); err != nil {
+					log.Printf("Service - Erro ao criar evento outbox: %v", err)
+					// Não falhar a operação se o outbox falhar
+				}
+			}
+		}
 	}
 
 	log.Printf("Service - Pedido criado com sucesso: ID=%d", createdOrder.ID)
