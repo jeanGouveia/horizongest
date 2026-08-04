@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
+	"github.com/jeanGouveia/horizongest/backend/internal/domain"
 	"github.com/jeanGouveia/horizongest/backend/internal/middleware"
 	"github.com/jeanGouveia/horizongest/backend/internal/ports"
 	"github.com/jeanGouveia/horizongest/backend/internal/service"
@@ -23,13 +24,15 @@ type AuthHandler struct {
 	authService service.AuthServiceInterface
 	userRepo    ports.UserRepository
 	sanitizer   *util.Sanitizer
+	auditSvc    *service.AuditService // FASE A.4: Audit service
 }
 
-func NewAuthHandler(authService service.AuthServiceInterface, userRepo ports.UserRepository) *AuthHandler {
+func NewAuthHandler(authService service.AuthServiceInterface, userRepo ports.UserRepository, auditSvc *service.AuditService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		userRepo:    userRepo,
 		sanitizer:   util.NewSanitizer(),
+		auditSvc:    auditSvc,
 	}
 }
 
@@ -61,11 +64,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	result, err := h.authService.Login(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
+			// FASE A.4: Log failed login attempt
+			tenantCtx, _ := domain.GetTenantContextFromContext(r.Context())
+			if tenantCtx != nil {
+				_ = h.auditSvc.LogUserAction(r.Context(), tenantCtx.UserID, tenantCtx.CompanyID, "login_failed", "user", "", nil, nil, r.RemoteAddr, r.UserAgent(), middleware.GetCorrelationID(r.Context()), middleware.GetRequestID(r.Context()))
+			}
 			jsonError(w, "e-mail ou senha incorretos. Verifique suas credenciais.", http.StatusUnauthorized)
 			return
 		}
 		jsonError(w, "não foi possível fazer login. Tente novamente.", http.StatusInternalServerError)
 		return
+	}
+
+	// FASE A.4: Log successful login
+	tenantCtx, _ := domain.GetTenantContextFromContext(r.Context())
+	if tenantCtx != nil {
+		_ = h.auditSvc.LogUserAction(r.Context(), tenantCtx.UserID, tenantCtx.CompanyID, "login_success", "user", "", nil, nil, r.RemoteAddr, r.UserAgent(), middleware.GetCorrelationID(r.Context()), middleware.GetRequestID(r.Context()))
 	}
 
 	// Seta o JWT como Cookie HttpOnly — nunca exposto ao JavaScript
